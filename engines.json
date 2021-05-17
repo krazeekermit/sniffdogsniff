@@ -5,21 +5,24 @@
       "search_url": "https://www.google.com/search?q=",
       "result_container_filter": "div.g",
       "result_url_filter": "//a/@href",
-      "result_title_filter": "//h3/text()"
+      "result_title_filter": "//h3/text()",
+      "number_results_arg": "&num="
     },
     {
       "name": "Yahoo",
       "search_url": "https://search.yahoo.com/search?p=",
       "result_container_filter": "h3.title",
       "result_url_filter": "//a/@href",
-      "result_title_filter": "//a/text()"
+      "result_title_filter": "//a/text()",
+      "number_results_arg": "&n="
     },
     {
       "name": "Bing",
       "search_url": "https://www.bing.com/search?q=",
       "result_container_filter": "li.b_algo",
       "result_url_filter": "//a/@href",
-      "result_title_filter": "//a/text()"
+      "result_title_filter": "//a/text()",
+      "number_results_arg": "&count="
     }
   ]
 }
