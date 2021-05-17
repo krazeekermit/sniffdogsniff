@@ -5,19 +5,6 @@ import json
 import argparse
 
 
-def show_logo():
-    print(
-        "╔═══╗────╔═╗╔═╦═══╗─────╔═══╗────╔═╗╔═╗ \n" +
-        "║╔═╗║────║╔╝║╔╩╗╔╗║─────║╔═╗║────║╔╝║╔╝ \n" +
-        "║╚══╦═╗╔╦╝╚╦╝╚╗║║║╠══╦══╣╚══╦═╗╔╦╝╚╦╝╚╗ \n" +
-        "╚══╗║╔╗╬╬╗╔╩╗╔╝║║║║╔╗║╔╗╠══╗║╔╗╬╬╗╔╩╗╔╝ \n" +
-        "║╚═╝║║║║║║║─║║╔╝╚╝║╚╝║╚╝║╚═╝║║║║║║║─║║ \n" +
-        "╚═══╩╝╚╩╝╚╝─╚╝╚═══╩══╩═╗╠═══╩╝╚╩╝╚╝─╚╝ \n" +
-        "─────────────────────╔═╝║ by c3rzTheFrog\n" +
-        "─────────────────────╚══╝ \n"
-    )
-
-
 def get_config(fname) -> dict:
     with open(fname) as fi:
         return json.load(fi)
@@ -63,7 +50,7 @@ def get_dataframe():
 
 
 def get_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='SniffDogSniff is a Web Scraping automated searching tool!!!')
     parser.add_argument('search_query', help='String or something you want to search', type=str)
     parser.add_argument('-v', '--verbose', action='store_true', help='Use this if you want to see a verbose output')
     parser.add_argument('output', help='the output file (see format)', type=str)
@@ -96,5 +83,4 @@ def main():
 
 
 if __name__ == '__main__':
-    show_logo()
     main()
