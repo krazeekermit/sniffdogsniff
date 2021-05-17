@@ -1,0 +1,25 @@
+{
+  "engines": [
+    {
+      "name": "Google",
+      "search_url": "https://www.google.com/search?q=",
+      "result_container_filter": "div.g",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//h3/text()"
+    },
+    {
+      "name": "Yahoo",
+      "search_url": "https://search.yahoo.com/search?p=",
+      "result_container_filter": "h3.title",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//a/text()"
+    },
+    {
+      "name": "Bing",
+      "search_url": "https://www.bing.com/search?q=",
+      "result_container_filter": "li.b_algo",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//a/text()"
+    }
+  ]
+}
