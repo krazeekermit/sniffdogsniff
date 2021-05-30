@@ -33,10 +33,14 @@ def get_searches(search_query: str, config: dict, nr: int) -> pd.DataFrame:
                         engine['number_results_arg'] + str(nr))
 
         for c in r.html.find(engine['result_container_filter']):
+            # print(engine['name'], c)
             search_url = c.xpath(engine['result_url_filter'], first=True)
             search_title = c.xpath(engine['result_title_filter'], first=True)
+
+            if search_url is not None:
+                search_url = search_url.replace(' ', '')
             parsed_url = urlparse(search_url)
-            # print(engine['name'], search_url, search_title)
+
             if parsed_url.scheme in ['http', 'https']:
                 df = df.append({'engine': engine['name'], 'title': search_title, 'search_url': search_url},
                                ignore_index=True)
