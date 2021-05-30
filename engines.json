@@ -23,14 +23,16 @@
       "result_url_filter": "//p[@class=\"url\"]/text()",
       "result_title_filter": "//a/text()",
       "number_results_arg": "&count="
-    },
+    }
+  ],
+  "video_engines": [
     {
-      "name": "YouTube",
-      "search_url": "https://www.youtube.com/results?search_query=",
-      "result_container_filter": "div#title-wrapper",
-      "result_url_filter": "//a[@id=\"video-title\"]/text()",
-      "result_title_filter": "//a[@id=\"video-title\"]/title()",
-      "number_results_arg": "&count="
+      "name": "Rumble",
+      "search_url": "https://rumble.com/search/video?q=",
+      "result_container_filter": "article.video-item",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//h3/text()",
+      "url_prefix": "https://www.rumble.com"
     }
   ]
 }
