@@ -9,12 +9,22 @@ $ pip3 install -r requirements.txt
 
 ### How to use
 ```
-$ python3 sds.py [-h] [-v] [-o OUTPUT] search_query
+$ python3 sds.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
 ```
-* _search_query_ String or something you want to search
+* search_query          String or something you want to search
+* output                the output file (see format)
+
 * -h, --help            show this help message and exit
-*  -v, --verbose         Use this if you want to see a verbose output
-* -o OUTPUT, --output OUTPUT Use this if you want to save in a csv file
+* -v, --verbose         Use this if you want to see a verbose output
+* -f FORMAT, --format FORMAT
+                        is used to decide in which format you want to save the
+                        search. Default is CSV, -f [CSV, HTML]
+* -n NUMBER, --number NUMBER
+                        is used to decide number of results asked to engines.
+                        Default is 10, -n 10
+* -u, --unified         use it if you want an output without duplicates, and
+                        not grouped by engine
+
 
 
 
