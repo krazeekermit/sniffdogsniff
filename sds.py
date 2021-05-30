@@ -48,9 +48,36 @@ def get_searches(search_query: str, config: dict, nr: int) -> pd.DataFrame:
     return df
 
 
+def get_video_searches(search_query: str, config: dict) -> pd.DataFrame:
+    df = get_dataframe()
+    for engine in config['video_engines']:
+        session = HTMLSession()
+        r = session.get(engine['search_url'] + search_query)
+
+        for c in r.html.find(engine['result_container_filter']):
+            search_url = c.xpath(engine['result_url_filter'], first=True)
+            search_title = c.xpath(engine['result_title_filter'], first=True)
+
+            if search_url is not None:
+                search_url = search_url.replace(' ', '')
+
+            decent_url = engine['url_prefix'] + search_url
+            parsed_url = urlparse(decent_url)
+
+            if parsed_url.scheme in ['http', 'https']:
+                df = df.append({'engine': engine['name'], 'title': search_title, 'search_url': decent_url},
+                               ignore_index=True)
+
+    return df
+
+
 def get_dataframe():
     df = pd.DataFrame(columns=['engine', 'title', 'search_url'])
     return df
+
+
+def merge_frames(frame1: pd.DataFrame, frame2: pd.DataFrame) -> pd.DataFrame:
+    return pd.concat([frame1, frame2], ignore_index=True)
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -64,16 +91,30 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument('-n', '--number', type=int,
                         help='is used to decide number of results asked to engines. '
                              'Default is 10, -n 10', default=10)
-    parser.add_argument('-u', '--unified', action='store_true',
+    parser.add_argument('-u', '--unify', action='store_true',
                         help='use it if you want an output without duplicates, and not grouped by engine')
+    parser.add_argument('-t', '--type', type=str,
+                        help='use it if you want to do different types of search -t [NORMAL,VIDEO,SOCIAL]'
+                             'can be more than one separated by comma ex: -t VIDEO,SOCIAL ,default is NORMAL',
+                        default='NORMAL')
     return parser
 
 
 def main():
     args = get_parser().parse_args()
     config = get_config('engines.json')
-    sdf = get_searches(args.search_query, config, args.number)
-    if args.unified:
+    sdf = get_dataframe()
+
+    wanted_searches = args.type.split(',')
+
+    if 'NORMAL' in wanted_searches:
+        sdf = merge_frames(sdf,
+                           get_searches(args.search_query, config, args.number))
+    if 'VIDEO' in wanted_searches:
+        sdf = merge_frames(sdf,
+                           get_video_searches(args.search_query, config))
+
+    if args.unify:
         sdf = get_unified_searches(sdf)
 
     if args.verbose:
