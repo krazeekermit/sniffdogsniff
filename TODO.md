@@ -1,2 +1,2 @@
-* add different type of searches such as (personal, social, contact of person)
-* ~~add a specified video search with images thumbnails~~ done!
+* add compare tools for compare multiple searches
+* ~~add multiple searches~~ done!
