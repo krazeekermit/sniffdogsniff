@@ -100,31 +100,60 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def perform_searches(search_queries: str, config, number, wanted_searches):
+    multiple_search_dataframes = list()
+    for query in search_queries.split(','):
+        sdf = get_dataframe()
+        if 'NORMAL' in wanted_searches:
+            sdf = merge_frames(sdf,
+                               get_searches(query, config, number))
+        if 'VIDEO' in wanted_searches:
+            sdf = merge_frames(sdf,
+                               get_video_searches(query, config))
+
+        multiple_search_dataframes.append(sdf)
+
+    return multiple_search_dataframes
+
+
 def main():
     args = get_parser().parse_args()
     config = get_config('engines.json')
-    sdf = get_dataframe()
 
     wanted_searches = args.type.split(',')
 
-    if 'NORMAL' in wanted_searches:
-        sdf = merge_frames(sdf,
-                           get_searches(args.search_query, config, args.number))
-    if 'VIDEO' in wanted_searches:
-        sdf = merge_frames(sdf,
-                           get_video_searches(args.search_query, config))
+    search_dataframes = perform_searches(args.search_query, config, args.number, wanted_searches)
+    out_dataframes = list()
 
     if args.unify:
-        sdf = get_unified_searches(sdf)
+        unified_dataframe = None
+        for df in search_dataframes:
+            unified_dataframe = merge_frames(unified_dataframe, get_unified_searches(df))
+
+        out_dataframes.append(unified_dataframe)
+
+    else:
+        out_dataframes = search_dataframes
 
     if args.verbose:
-        print(sdf)
+        for df in search_dataframes:
+            print(df)
 
     if args.output is not None:
-        if args.format == 'CSV':
-            sdf.to_csv(args.output)
+        print(len(out_dataframes))
+        if len(out_dataframes) <= 1:
+            if args.format == 'CSV':
+                df.to_csv(args.output)
+            else:
+                export_df_html(df, args.output)
         else:
-            export_df_html(sdf, args.output)
+            for index in range(0, len(out_dataframes)):
+                df = search_dataframes[index]
+
+                if args.format == 'CSV':
+                    df.to_csv(str(args.output + str(index)))
+                else:
+                    export_df_html(df, args.output)
 
 
 if __name__ == '__main__':
