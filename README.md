@@ -11,7 +11,7 @@ $ pip3 install -r requirements.txt
 ```
 $ python3 sds.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
 ```
-* search_query          String or something you want to search
+* search_query          String or something you want to search (or multiple queries separated by comma)
 * output                the output file (see format)
 
 * -h, --help            show this help message and exit
