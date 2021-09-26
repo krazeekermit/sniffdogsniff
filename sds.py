@@ -1,8 +1,9 @@
-from requests_html import HTMLSession
-import pandas as pd
-from urllib.parse import urlparse
-import json
 import argparse
+import json
+from urllib.parse import urlparse
+import tqdm
+import pandas as pd
+from requests_html import HTMLSession
 
 
 def get_config(fname) -> dict:
@@ -97,13 +98,17 @@ def get_parser() -> argparse.ArgumentParser:
                         help='use it if you want to do different types of search -t [NORMAL,VIDEO,SOCIAL]'
                              'can be more than one separated by comma ex: -t VIDEO,SOCIAL ,default is NORMAL',
                         default='NORMAL')
+    parser.add_argument('-c', '--compare',
+                        help='use it if you want to compare two or more searches by specific operand')
     return parser
 
 
 def perform_searches(search_queries: str, config, number, wanted_searches):
     multiple_search_dataframes = list()
-    for query in search_queries.split(','):
+    queries = search_queries.split(',')
+    for index in tqdm.tqdm(range(0, len(queries)), desc='Searching queries...'):
         sdf = get_dataframe()
+        query = queries[index]
         if 'NORMAL' in wanted_searches:
             sdf = merge_frames(sdf,
                                get_searches(query, config, number))
@@ -114,6 +119,15 @@ def perform_searches(search_queries: str, config, number, wanted_searches):
         multiple_search_dataframes.append(sdf)
 
     return multiple_search_dataframes
+
+
+def parse_compare_arguments(compare_arg: str, search_dataframes: list, search_queries):
+    if compare_arg.lower() == 'count':
+        sq = search_queries.split(',')
+        for elem in range(0, len(search_dataframes)):
+            print(sq[elem], '\t::\t\t', str(len(search_dataframes[elem])))
+
+        return search_dataframes
 
 
 def main():
@@ -139,8 +153,11 @@ def main():
         for df in search_dataframes:
             print(df)
 
+    if args.compare is not None:
+        print(len(search_dataframes))
+        parse_compare_arguments(args.compare, search_dataframes, args.search_query)
+
     if args.output is not None:
-        print(len(out_dataframes))
         if len(out_dataframes) <= 1:
             if args.format == 'CSV':
                 df.to_csv(args.output)
