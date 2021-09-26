@@ -24,8 +24,16 @@ $ python3 sds.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
                         Default is 10, -n 10
 * -u, --unified         use it if you want an output without duplicates, and
                         not grouped by engine
+* -c OPERAND, --compare OPERAND
+                        is used to compare different search results (see Compare)
 
 
+### Compare
+The flag -c is used to compare one or more queries search results with themselves (or the others if you 
+use multiple search queries). How to use compare flag:
+* -c COUNT or -c count      counts the number of results for each query and print the result
+
+**work in progress**
 
 
 ### The config file (engines.json) (Advanced use)
