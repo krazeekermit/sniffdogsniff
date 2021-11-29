@@ -1,3 +1,4 @@
 #envinronment files
 .idea*
 venv*
+__pycache__*
