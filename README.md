@@ -35,6 +35,12 @@ use multiple search queries). How to use compare flag:
 
 **work in progress**
 
+### Graphical User Interface
+To simplify life of users, i recently made a simple GUI with PyQt5. To run the Ui simply run:
+```
+$ python3 sds_gui.py
+```
+
 
 ### The config file (engines.json) (Advanced use)
 ```
