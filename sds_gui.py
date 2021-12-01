@@ -104,6 +104,7 @@ class SDSQueryBar(QWidget):
         self._query_field_.setPlaceholderText('Type your queries comma separated')
         self._merge_checkbox_ = QCheckBox('Merge results')
         self._main_layout_ = QHBoxLayout()
+        self._merge_checkbox_.clicked.connect(self._merge_checks_)
 
         self._main_layout_.addWidget(self._query_field_)
         self._main_layout_.addWidget(self._search_button_)
@@ -116,19 +117,25 @@ class SDSQueryBar(QWidget):
         else:
             self._search_button_.setEnabled(False)
 
-    def _merge_checks(self):
-        print('checked me!')
+    def _merge_checks_(self):
+        if self._merge_checkbox_.isChecked():
+            for d in data_container_widget.get_searches_list.selectionModel().selectedIndexes():
+                index = d.row()
+                merged = sds.get_unified_searches(searches[index])
+                search_data_models[index] = PandasTable(merged)
+
+            data_container_widget.get_table.setModel(search_data_models[d.row()])
 
     def _query_field_enter_pressed_(self, text):
         perform_searches_fill_data(text)
-        print('perform searches')
 
     def _search_button_pressed_(self):
         self._query_field_enter_pressed_(self._query_field_.text())
 
 
 def perform_searches_fill_data(queries: str):
-    searches = sds.perform_searches(queries, config, 100, 'NORMAL')
+    searches.clear()
+    searches.extend(sds.perform_searches(queries, config, 100, 'NORMAL'))
     query_list = queries.split(',')
     list_model = QStringListModel(query_list)
     for q in query_list:
@@ -147,6 +154,7 @@ if __name__ == '__main__':
     data_container_widget = SDSDataWidget()
     window = SniffDogSniffUi(data_container_widget)
     config = sds.get_config('./engines.json')
+    searches = list()
     search_data_models = list()
 
     window.show()
