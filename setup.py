@@ -7,4 +7,7 @@ setup(name='sniffDogSniff',
       license='GPLv3',
       packages=['sniffdogsniff'],
       install_requires=['pandas', 'requests-html', 'tqdm', 'PyQt5'],
+      entry_points = {
+        'console_scripts': ['sniffdogsniff.sds:main'],
+      },
       zip_safe=False)
