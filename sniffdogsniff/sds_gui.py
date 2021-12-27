@@ -34,7 +34,7 @@ class SniffDogSniffUi(QMainWindow):
         self.setMinimumHeight(500)
         self.setMinimumWidth(900)
         self.setWindowTitle("SniffDogSniff")
-        self.setWindowIcon(QtGui.QIcon('./sniffdogsniff_icon.png'))
+        self.setWindowIcon(QtGui.QIcon('../sniffdogsniff_icon.png'))
         self._initialize_menu_bar_()
         self._central_widget_ = SDSCentralWidget(data_widget)
         self.setCentralWidget(self._central_widget_)
