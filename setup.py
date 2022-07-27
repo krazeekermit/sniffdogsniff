@@ -5,9 +5,9 @@ setup(name='sniffDogSniff',
       description='Web Search web-scraping tool',
       author='c3rzTheFrog',
       license='GPLv3',
-      packages=['sniffdogsniff'],
+      packages=['sds'],
       install_requires=['pandas', 'requests-html', 'tqdm', 'PyQt5'],
       entry_points = {
-        'console_scripts': ['sniffdogsniff.sds:main'],
+        'console_scripts': ['sds.sds:main'],
       },
       zip_safe=False)

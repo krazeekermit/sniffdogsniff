@@ -1,0 +1,41 @@
+{
+  "engines": [
+    {
+      "name": "Google",
+      "search_url": "https://www.google.com/search?q=",
+      "result_container_filter": "div.g",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//h3/text()",
+      "result_description_filter": "//span/text()",
+      "number_results_arg": "&num="
+    },
+    {
+      "name": "Bing",
+      "search_url": "https://www.bing.com/search?q=",
+      "result_container_filter": "li.b_algo",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//a/text()",
+      "result_description_filter": "//span/text()",
+      "number_results_arg": "&count="
+    },
+    {
+      "name": "Qwant",
+      "search_url": "https://lite.qwant.com/?q=",
+      "result_container_filter": "article.result",
+      "result_url_filter": "//p[@class=\"url\"]/text()",
+      "result_title_filter": "//a/text()",
+      "result_description_filter": "//div/text()",
+      "number_results_arg": "&count="
+    }
+  ],
+  "video_engines": [
+    {
+      "name": "Rumble",
+      "search_url": "https://rumble.com/search/video?q=",
+      "result_container_filter": "article.video-item",
+      "result_url_filter": "//a/@href",
+      "result_title_filter": "//h3/text()",
+      "url_prefix": "https://www.rumble.com"
+    }
+  ]
+}

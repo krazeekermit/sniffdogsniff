@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SniffDigSniff - Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+    <a class="navbar-brand" href="/">
+        <img src="{{ url_for('static', filename='sds_logo.png') }}" width="40" height="40" alt=""> SniffDogSniff
+    </a>
+        <form class="form-inline" action="/search" method="get">
+            <input type="search" class="form-control rounded" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q"/>
+            <input type="submit" class="btn btn-outline-primary" value="Search"/>
+        <!--<input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+        <input type="submit" name="q" class="btn btn-outline-success my-2 my-sm-0"/>-->
+    </form>
+    </nav>
+    <div>
+        <ul id="navigation" class="list-group">
+        {% for item in searches %}
+            <li class="list-group-item list-group-item-action"><div>
+                <a href="{{ item['search_url'] }}">{{ item['title'] }}</a>
+                <p>
+                    {{ item['description'] }}
+                </p>
+            </div></li>
+        {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

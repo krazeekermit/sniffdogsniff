@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>SniffDigSniff - Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body class="text-center">
+    <div class="container">
+        <div class="py-5 text-center">
+        <img class="d-block mx-auto mb-4" src="{{ url_for('static', filename='sds_logo.png') }}" alt="" width="72" height="72">
+        <h2>SniffDogSniff</h2>
+        </div>
+        <form action="/search" method="get">
+            <div class="input-group">
+            <input type="search" class="form-control rounded" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q"/>
+            <input type="submit" class="btn btn-outline-primary" value="Search"/>
+        </div>
+        </form>
+</body>
+</html>
