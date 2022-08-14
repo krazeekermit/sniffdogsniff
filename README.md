@@ -1,15 +1,15 @@
 # sniffDogSniff
 
-Sniff Dog Sniff is a customizable multiple search web scraping tool 
+Sniff Dog Sniff is a customizable, decentralized search engine
 
 ### Install dependencies
 ```
-$ pip3 install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### How to use
 ```
-$ python3 sds.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
+python3 sds/cli.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
 ```
 * search_query          String or something you want to search (or multiple queries separated by comma)
 * output                the output file (see format)
@@ -35,12 +35,6 @@ use multiple search queries). How to use compare flag:
 
 **work in progress**
 
-### Graphical User Interface
-To simplify life of users, i recently made a simple GUI with PyQt5. To run the Ui simply run:
-```
-$ python3 sds_gui.py
-```
-
 
 ### The config file (engines.json) (Advanced use)
 ```
@@ -60,3 +54,11 @@ $ python3 sds_gui.py
 * _result_container_filter_ is the filter referring to the main result container uses html/css filtering
 * _result_url_filter_ and _result_title_filter_ use both xpath filtering are used to determine respectively the search 
   url and the link text
+
+## Sds as Web Application (Work in progress...)
+Sds uses flask, so to run the application first install the dependencies^, then issue the following command:
+```
+export FLASK_APP=webui; flask run
+```
+* note this running mode sds is for debug purpose and is not intended to be used in a production environment.
+* more detailed documentation will coming soon...

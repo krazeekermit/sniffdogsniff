@@ -35,7 +35,7 @@ class LocalSearchDatabase:
 
     def search(self, query: str) -> pd.DataFrame:
         return pd.read_sql_query(
-            f'select * from search_cache where title like "{query}" or description like "{query}" or search_url like "{query}"',
+            f'select * from search_cache where description like "%{query}%" or title like "%{query}%" or search_url like "%{query}%"',
             self._conn
         )
 

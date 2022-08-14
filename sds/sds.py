@@ -3,15 +3,18 @@ import pandas as pd
 from requests_html import HTMLSession
 from . import sdsutils
 from . import local_db
+from . import search_providers
+from . import peers
 
 
 class SniffingDog:
 
-    def __init__(self, engines_properties: dict):
+    def __init__(self, configs: dict):
         self._df = None
         self._reset_df()
-        self._engines_properties = engines_properties
+        self._engines_properties = configs['engines']
         self._local_db = local_db.LocalSearchDatabase('./search_cache.db')
+        self._sds_peers = peers.SdsPeers(configs)
 
     def get_unified_searches(self) -> pd.DataFrame:
         self._df.pop('engine')
@@ -30,34 +33,19 @@ class SniffingDog:
     def export_to_csv(self, output_file):
         self._df.to_csv(output_file)
 
-    def do_search(self, search_query: str, nr: int) -> pd.DataFrame:
+    def do_search(self, search_query: str, nr: int, exclude_engines=False) -> pd.DataFrame:
         df = self._local_db.search(search_query)
-        self._reset_df()
-        for engine in self._engines_properties['engines']:
-            session = HTMLSession()
-            r = session.get(engine['search_url'] + search_query +
-                            engine['number_results_arg'] + str(nr),
-                            headers=engine['headers'])
+        if not df.size > 50:
+            df = df.append(
+                search_providers.search_from_other_peer(self._sds_peers.get_peer_list, search_query),
+                ignore_index=True
+            )
 
-            for c in r.html.find(engine['result_container_filter']):
-                search_url = c.xpath(engine['result_url_filter'], first=True)
-                search_title = sdsutils.clean_string(c.xpath(engine['result_title_filter'], first=True))
-                if search_url is not None:
-                    search_url = search_url.replace(' ', '')
-                parsed_url = urlparse(search_url)
-
-                if parsed_url.scheme in ['http', 'https']:
-                    try:
-                        search_desc = sdsutils.clean_string(session.get(
-                            search_url, headers=engine['headers'], timeout=0.75
-                        ).html.xpath('//meta[@name="description"]/@content', first=True))
-                    except:
-                        search_desc = ""
-
-                    df = df.append({'engine': engine['name'],
-                                    'title': search_title,
-                                    'search_url': search_url,
-                                    'description': search_desc}, ignore_index=True)
+        if not exclude_engines and not df.size > 50:
+            df = df.append(
+                search_providers.search_from_engines(search_query, nr, self._engines_properties),
+                ignore_index=True
+            )
 
         self._local_db.sync(df)
         self._df = df
@@ -84,6 +72,9 @@ class SniffingDog:
 
         self._df = df
 
+    def _reset_df(self):
+        self._df = sdsutils.new_searches_df()
+
     @property
     def get_searches(self):
         return self._df
@@ -92,5 +83,6 @@ class SniffingDog:
     def get_searches_as_dicts(self) -> list:
         return self._df.to_dict('records')
 
-    def _reset_df(self):
-        self._df = sdsutils.new_searches_df()
+    @property
+    def peers(self) -> peers.SdsPeers:
+        return self._sds_peers

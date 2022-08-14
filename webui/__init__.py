@@ -1,6 +1,5 @@
 from flask import Flask, render_template
 from flask.globals import request
-from sds import sdsutils
 from sds.sds import SniffingDog
 
 engines = {
@@ -35,7 +34,10 @@ engines = {
             "result_title_filter": "//h3/text()",
             "url_prefix": "https://www.rumble.com"
         }
-    ]
+    ],
+    "peering": {
+        "peer_db_path": "./peers.json"
+    }
 }
 
 app = Flask(__name__)
@@ -54,3 +56,22 @@ def do_search():
         sniffer.unify_searches()
         searches = sniffer.get_searches_as_dicts
         return render_template('results.html', searches=searches)
+
+
+@app.route('/api/search')
+def search_api():
+    if request.method == 'POST':
+        sniffer.do_search(request.json['query'], 1000, exclude_engines=True)
+        searches = sniffer.get_searches_as_dicts
+        return searches
+    else:
+        return render_template('wrong_api_request.html')
+
+
+@app.route('/api/sync_peers')
+def sync_peer_list_api():
+    if request.method == 'POST':
+        return sniffer.peers.get_peer_dict
+    else:
+        return render_template('wrong_api_request.html')
+
