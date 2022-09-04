@@ -5,7 +5,7 @@ import os
 
 class SdsPeers:
     def __init__(self, configs: dict):
-        self._config = configs['peering']
+        self._config = configs['peers']
         self._peer_dict = self._load_peers()
         self._peer_list = self._gen_peer_list()
 
@@ -26,6 +26,7 @@ class SdsPeers:
         peer_list = list()
         for p in self._peer_dict['peers'].keys():
             peer_list.append(p)
+        return peer_list
 
     def _merge_peer_dict(self, dictionary: dict):
         for p in dictionary['peers'].keys():

@@ -6,7 +6,8 @@ engines = {
     "engines": [
         {
             "name": "Google",
-            "headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
             "search_url": "https://www.google.com/search?q=",
             "result_container_filter": "div.g",
             "result_url_filter": "//a/@href",
@@ -16,13 +17,22 @@ engines = {
         },
         {
             "name": "Bing",
-            "headers": {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
             "search_url": "https://www.bing.com/search?q=",
             "result_container_filter": "li.b_algo",
             "result_url_filter": "//a/@href",
             "result_title_filter": "//a/text()",
             "result_description_filter": "//div[@class='b_snippet']//p/text()",
             "number_results_arg": "&count="
+        },
+        {
+            "name": "Yandex",
+            "search_url": "https://yandex.com/search/?text=",
+            "result_container_filter": "li.serp-item",
+            "result_url_filter": "//a[@class=\"link\"]/@href()",
+            "result_title_filter": "//a[@class=\"link\"]/text()",
+            "number_results_arg": "&lr="
         }
     ],
     "video_engines": [
@@ -74,4 +84,3 @@ def sync_peer_list_api():
         return sniffer.peers.get_peer_dict
     else:
         return render_template('wrong_api_request.html')
-

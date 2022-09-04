@@ -23,6 +23,14 @@
       "result_url_filter": "//p[@class=\"url\"]/text()",
       "result_title_filter": "//a/text()",
       "number_results_arg": "&count="
+    },
+    {
+      "name": "Yandex",
+      "search_url": "https://yandex.com/search/?text=",
+      "result_container_filter": "li.serp-item",
+      "result_url_filter": "//a[@class=\"link\"]/@href()",
+      "result_title_filter": "//a[@class=\"link\"]/text()",
+      "number_results_arg": "&lr="
     }
   ],
   "video_engines": [

@@ -12,8 +12,8 @@ class SniffingDog:
     def __init__(self, configs: dict):
         self._df = None
         self._reset_df()
-        self._engines_properties = configs['engines']
-        self._local_db = local_db.LocalSearchDatabase('./search_cache.db')
+        self._engines_properties = configs['search']['engines']
+        self._local_db = local_db.LocalSearchDatabase(self._engines_properties['local_search_db_path'])
         self._sds_peers = peers.SdsPeers(configs)
 
     def get_unified_searches(self) -> pd.DataFrame:
@@ -37,7 +37,7 @@ class SniffingDog:
         df = self._local_db.search(search_query)
         if not df.size > 50:
             df = df.append(
-                search_providers.search_from_other_peer(self._sds_peers.get_peer_list, search_query),
+                search_providers.search_from_peers(self._sds_peers.get_peer_list, search_query),
                 ignore_index=True
             )
 

@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import os
 
 import requests
 import time
@@ -36,3 +37,7 @@ def find_suitable_string(results: list):
             if len(text) > 5:
                 return text
 
+
+def env_config_override(configs: dict):
+    configs['peers']['peer_db_path'] = os.getenv('PEER_DB_PATH')
+    configs['search']['engines']['local_search_db_path'] = os.getenv('SEARCHES_DB_PATH')
