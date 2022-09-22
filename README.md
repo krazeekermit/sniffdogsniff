@@ -1,6 +1,8 @@
 # sniffDogSniff
 
 Sniff Dog Sniff is a customizable, decentralized search engine
+* further info coming soon...
+* project is a work in progress is not ready for production environment
 
 ### Install dependencies
 ```
@@ -9,56 +11,50 @@ pip3 install -r requirements.txt
 
 ### How to use
 ```
-python3 sds/cli.py [-h] [-v] [-f FORMAT] [-n NUMBER] [-u] search_query output
+python3 webui/__init__.py
 ```
-* search_query          String or something you want to search (or multiple queries separated by comma)
-* output                the output file (see format)
-
-* -h, --help            show this help message and exit
-* -v, --verbose         Use this if you want to see a verbose output
-* -f FORMAT, --format FORMAT
-                        is used to decide in which format you want to save the
-                        search. Default is CSV, -f [CSV, HTML]
-* -n NUMBER, --number NUMBER
-                        is used to decide number of results asked to engines.
-                        Default is 10, -n 10
-* -u, --unified         use it if you want an output without duplicates, and
-                        not grouped by engine
-* -c OPERAND, --compare OPERAND
-                        is used to compare different search results (see Compare)
 
 
-### Compare
-The flag -c is used to compare one or more queries search results with themselves (or the others if you 
-use multiple search queries). How to use compare flag:
-* -c COUNT or -c count      counts the number of results for each query and print the result
-
-**work in progress**
-
-
-### The config file (engines.json) (Advanced use)
+### The config file (config.ini)
 ```
-{
-  "engines": [
-    {
-      "name": "Google",
-      "search_url": "https://www.google.com/search?q=",
-      "result_container_filter": "div.g",
-      "result_url_filter": "//a/@href",
-      "result_title_filter": "//h3/text()"
-    }
-}
-```
-* _engines_ is a list of dictionary for each engine
-* _name_ the search engine name
-* _result_container_filter_ is the filter referring to the main result container uses html/css filtering
-* _result_url_filter_ and _result_title_filter_ use both xpath filtering are used to determine respectively the search 
-  url and the link text
+[general]
+web_service_http_port = 4000
+searches_database_path = ./custom_path.db
+peer_to_peer_port = 4222
+peer_database_path = ./peers.db
+minimum_search_results_threshold = 10
+# sync frequency in seconds
+peer_sync_frequency = 10
 
-## Sds as Web Application (Work in progress...)
-Sds uses flask, so to run the application first install the dependencies^, then issue the following command:
+[proxy]
+;used for Peer communication
+;can be socks5 or http
+;proxy_type = socks5
+;proxy_host = 127.0.0.1
+;proxy_port = 9050
+
+[known_peers]
+peer1 = http://free.sniffdogsniff.net:4222
+peer2 = http://sniffdogsniff.mirror1:4222
+peer3 = http://sniffdogsniff.mirror2:4222
+
+;search engines
+
+[google]
+name = Google
+user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
+search_query_url = https://www.google.com/search?q=
+results_container_filter = div.g
+result_url_filter = //a/@href
+result_title_filter = //h3/text()
 ```
-export FLASK_APP=webui; flask run
-```
-* note this running mode sds is for debug purpose and is not intended to be used in a production environment.
-* more detailed documentation will coming soon...
+
+### Code contribution
+If you want to contribute the code you are Welcome!
+
+#### Coding style
+* the class attributes must be named with _ before name, e.g. **self**.__name_
+* the "private" methods should be named with _ before name, e.g. __do_something(self):_
+* leave comments in the code and let us know what the piece of code you have written does
+* do not commit .db files please!
+* feel free to add comment in some part of the code that are uncommented
