@@ -72,23 +72,26 @@ class NodeManager:
 class NodeRpcServer(Thread):
 
     def __init__(self, node_manger: NodeManager):
-        Thread.__init__(self, name='Node Rpc Server')
+        Thread.__init__(self, name='NodeRpcServer Thread')
+        self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manger
         self._rpc_server = SimpleJSONRPCServer(('0.0.0.0', node_manger.configs.peer_to_peer_port))
         self._rpc_server.register_function(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._rpc_server.register_function(self.request_node_peers_db_data, 'request_node_peers_db_data')
 
     def run(self):
-        logging.info('[P2P] Starting Rpc Server')
+        self._logger.info('Starting Rpc Server')
         self._rpc_server.serve_forever()
 
     def request_node_searches_db_data(self, hashes: list):
+        self._logger.debug('rpc_request = request_node_searches_db_data')
         self._node_manager.unlock()
         data = self._node_manager.request_node_searches(hashes)
         self._node_manager.lock()
         return data
 
     def request_node_peers_db_data(self):
+        self._logger.debug('rpc_request = request_node_peers_db_data')
         self._node_manager.unlock()
         data = self._node_manager.get_peers()
         self._node_manager.lock()
@@ -98,14 +101,15 @@ class NodeRpcServer(Thread):
 class PeerSyncManager(Thread):
 
     def __init__(self, node_manager: NodeManager):
-        Thread.__init__(self, name='Peer SyncManager Thread')
+        Thread.__init__(self, name='PeerSyncManager Thread')
+        self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manager
         self._sync_freq = node_manager.configs.peer_sync_frequency
 
     def run(self) -> None:
         while True:
             time.sleep(self._sync_freq)
-            logging.debug('Syncing')
+            self._logger.debug('Syncing...')
             # self._sync_with_other_peers()
 
     def _sync_with_other_peers(self):
@@ -118,6 +122,7 @@ class PeerSyncManager(Thread):
             s_time = time.time()
             client = ServerProxy(p.address)
             self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
+            self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
             p.rank = int((time.time() - s_time) * 1000)
             self._node_manager.update_peer_rank(p)
 
