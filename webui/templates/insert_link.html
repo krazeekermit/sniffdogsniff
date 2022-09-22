@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>SniffDigSniff - Search</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+<body>
+    <div class="container">
+        <div class="py-5">
+        <h2>Insert Link</h2>
+        </div>
+        <form action="/insert_link" method="post">
+            <div class="form-group">
+                <label for="text_input_title">Link title</label>
+                <input type="text" class="form-control rounded" id="text_input_title" placeholder="Title" aria-label="Search" name="link_title"/>
+            </div>
+            <div class="form-group">
+                <label for="text_input_url">Link url</label>
+                <input type="text" class="form-control rounded" id="text_input_url" placeholder="http://example.com or http://example344trjhsjkdlsldk.onion" aria-label="Search" name="link_url"/>
+            </div>
+            <div class="form-group">
+                <label for="text_area_description">Link description</label>
+                <textarea rows="4" class="form-control rounded" id="text_area_description" placeholder="Something..." aria-label="Search" name="link_description"></textarea>
+            </div>
+            <input type="submit" class="btn btn-outline-primary" value="Insert"/>
+        </form>
+</body>
+</html>

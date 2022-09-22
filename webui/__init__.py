@@ -1,57 +1,11 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect
 from flask.globals import request
-from sds.sds import SniffingDog
-
-engines = {
-    "engines": [
-        {
-            "name": "Google",
-            "headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
-            "search_url": "https://www.google.com/search?q=",
-            "result_container_filter": "div.g",
-            "result_url_filter": "//a/@href",
-            "result_title_filter": "//h3/text()",
-            "result_description_filter": "//span/text()",
-            "number_results_arg": "&num="
-        },
-        {
-            "name": "Bing",
-            "headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"},
-            "search_url": "https://www.bing.com/search?q=",
-            "result_container_filter": "li.b_algo",
-            "result_url_filter": "//a/@href",
-            "result_title_filter": "//a/text()",
-            "result_description_filter": "//div[@class='b_snippet']//p/text()",
-            "number_results_arg": "&count="
-        },
-        {
-            "name": "Yandex",
-            "search_url": "https://yandex.com/search/?text=",
-            "result_container_filter": "li.serp-item",
-            "result_url_filter": "//a[@class=\"link\"]/@href()",
-            "result_title_filter": "//a[@class=\"link\"]/text()",
-            "number_results_arg": "&lr="
-        }
-    ],
-    "video_engines": [
-        {
-            "name": "Rumble",
-            "search_url": "https://rumble.com/search/video?q=",
-            "result_container_filter": "article.video-item",
-            "result_url_filter": "//a/@href",
-            "result_title_filter": "//h3/text()",
-            "url_prefix": "https://www.rumble.com"
-        }
-    ],
-    "peering": {
-        "peer_db_path": "./peers.json"
-    }
-}
+from sds.node import NodeManager, start_sds_node
+from sds.sdsconfigs import SdsConfigs
+import logging
+import os
 
 app = Flask(__name__)
-sniffer = SniffingDog(engines)
 
 
 @app.route('/')
@@ -62,25 +16,25 @@ def search_home():
 @app.route('/search')
 def do_search():
     if request.method == 'GET':
-        sniffer.do_search(request.args.get('q'), 1000)
-        sniffer.unify_searches()
-        searches = sniffer.get_searches_as_dicts
+        searches = node.sniffing_dog.do_search(request.args.get('q'))
         return render_template('results.html', searches=searches)
 
 
-@app.route('/api/search')
-def search_api():
+@app.route('/insert_link', methods=['GET', 'POST'])
+def do_insert_link():
     if request.method == 'POST':
-        sniffer.do_search(request.json['query'], 1000, exclude_engines=True)
-        searches = sniffer.get_searches_as_dicts
-        return searches
+        node.insert_new_search_result(
+            request.form['link_title'], request.form['link_url'], request.form['link_description']
+        )
+        return "<html><h1>Link insertion successful!</h1></html>"
     else:
-        return render_template('wrong_api_request.html')
+        return render_template('insert_link.html')
 
 
-@app.route('/api/sync_peers')
-def sync_peer_list_api():
-    if request.method == 'POST':
-        return sniffer.peers.get_peer_dict
-    else:
-        return render_template('wrong_api_request.html')
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    configs = SdsConfigs()
+    configs.read_from_file('../config.ini')
+    node = NodeManager(configs)
+    start_sds_node(node_manager=node)
+    app.run('127.0.0.1', 5000)
