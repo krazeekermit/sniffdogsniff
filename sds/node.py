@@ -2,8 +2,12 @@ from .sdsconfigs import SdsConfigs
 from .peers_db import PeersDB, Peer
 from .local_db import LocalSearchDatabase, SearchResult
 from .sniffingdog import SniffingDog
-from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
-from jsonrpclib.jsonrpc import ServerProxy
+import zmq
+from tinyrpc.server import RPCServer
+from tinyrpc import RPCClient
+from tinyrpc.dispatch import RPCDispatcher
+from tinyrpc.protocols.jsonrpc import JSONRPCProtocol
+from tinyrpc.transports.zmq import ZmqServerTransport, ZmqClientTransport
 from threading import Thread, Lock
 import logging
 import time
@@ -73,11 +77,22 @@ class NodeRpcServer(Thread):
 
     def __init__(self, node_manger: NodeManager):
         Thread.__init__(self, name='NodeRpcServer Thread')
+        ctx = zmq.Context()
+        dispatcher = RPCDispatcher()
+        dispatcher.add_method(self.request_node_searches_db_data, name='request_node_searches_db_data')
+        dispatcher.add_method(self.request_node_peers_db_data, name='request_node_peers_db_data')
+        transport = ZmqServerTransport.create(
+            ctx,
+            f'tcp://127.0.0.1:{node_manger.configs.peer_to_peer_port}'
+        )
+        self._rpc_server = RPCServer(
+            transport,
+            JSONRPCProtocol(),
+            dispatcher
+        )
+
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manger
-        self._rpc_server = SimpleJSONRPCServer(('0.0.0.0', node_manger.configs.peer_to_peer_port))
-        self._rpc_server.register_function(self.request_node_searches_db_data, 'request_node_searches_db_data')
-        self._rpc_server.register_function(self.request_node_peers_db_data, 'request_node_peers_db_data')
 
     def run(self):
         self._logger.info('Starting Rpc Server')
@@ -120,11 +135,20 @@ class PeerSyncManager(Thread):
         for p in peers_list:
             logging.info(f'Syncing from {p.name}')
             s_time = time.time()
-            client = ServerProxy(p.address)
+            client = self._get_client_for_peer(p.address)
             self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
             self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
             p.rank = int((time.time() - s_time) * 1000)
             self._node_manager.update_peer_rank(p)
+
+    @staticmethod
+    def _get_client_for_peer(address: str) -> RPCClient:
+        ctx = zmq.Context()
+        client = RPCClient(
+            JSONRPCProtocol(),
+            ZmqClientTransport.create(ctx, address)
+        )
+        return client.get_proxy()
 
 
 def start_sds_node(node_manager: NodeManager):
@@ -134,5 +158,3 @@ def start_sds_node(node_manager: NodeManager):
     server.start()
     logging.info('Starting Peers Sync Manager')
     peer_manager.start()
-
-
