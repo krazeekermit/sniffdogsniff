@@ -33,7 +33,7 @@ class LocalSearchDatabase:
         cur.execute(sql_query)
         searches = dict()
         for row in cur.fetchall():
-            sr = SearchResult(row[0], row[1], row[2], row[3])
+            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3])
             searches[sr.hash] = sr
 
         return searches

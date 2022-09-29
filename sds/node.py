@@ -1,16 +1,18 @@
-from .sdsconfigs import SdsConfigs
-from .peers_db import PeersDB, Peer
-from .local_db import LocalSearchDatabase, SearchResult
-from .sniffingdog import SniffingDog
-import zmq
-from tinyrpc.server import RPCServer
-from tinyrpc import RPCClient
-from tinyrpc.dispatch import RPCDispatcher
-from tinyrpc.protocols.jsonrpc import JSONRPCProtocol
-from tinyrpc.transports.zmq import ZmqServerTransport, ZmqClientTransport
+import socket
+
+from sds.sdsconfigs import SdsConfigs
+from sds.peers_db import PeersDB, Peer
+from sds.local_db import LocalSearchDatabase, SearchResult
+from sds.sniffingdog import SniffingDog
+
 from threading import Thread, Lock
 import logging
 import time
+from urllib.parse import urlparse
+
+from sdsjsonrpc.server import Server
+from sdsjsonrpc.errors import ProtocolError
+from sdsjsonrpc.client import Client
 
 
 class NodeManager:
@@ -35,8 +37,10 @@ class NodeManager:
         self._lock.release()
 
     def request_node_searches(self, hashes: list) -> dict:
+        logging.debug('Dio merdqa scaio schifo')
         searches = dict()
         for h, rs in self._local_db.get_searches().items():
+            logging.debug(f'Answering search request -> sync hash: {h}')
             if h not in hashes:
                 searches[h] = rs
         return searches
@@ -77,26 +81,18 @@ class NodeRpcServer(Thread):
 
     def __init__(self, node_manger: NodeManager):
         Thread.__init__(self, name='NodeRpcServer Thread')
-        ctx = zmq.Context()
-        dispatcher = RPCDispatcher()
-        dispatcher.add_method(self.request_node_searches_db_data, name='request_node_searches_db_data')
-        dispatcher.add_method(self.request_node_peers_db_data, name='request_node_peers_db_data')
-        transport = ZmqServerTransport.create(
-            ctx,
-            f'tcp://127.0.0.1:{node_manger.configs.peer_to_peer_port}'
-        )
-        self._rpc_server = RPCServer(
-            transport,
-            JSONRPCProtocol(),
-            dispatcher
-        )
+
+        self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
+        self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
+        self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
+        self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
 
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manger
 
     def run(self):
         self._logger.info('Starting Rpc Server')
-        self._rpc_server.serve_forever()
+        self._server.serve()
 
     def request_node_searches_db_data(self, hashes: list):
         self._logger.debug('rpc_request = request_node_searches_db_data')
@@ -135,20 +131,28 @@ class PeerSyncManager(Thread):
         for p in peers_list:
             logging.info(f'Syncing from {p.name}')
             s_time = time.time()
-            client = self._get_client_for_peer(p.address)
-            self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
-            self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
-            p.rank = int((time.time() - s_time) * 1000)
+
+            try:
+                client = self._get_client(p.address)
+                self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
+                self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
+            except socket.error as e:
+                logging.error(e.message)
+                continue
+            except ProtocolError as e:
+                logging.error(e.message)
+                p.rank -= 1000
+            finally:
+                p.rank = int((time.time() - s_time) * 1000)
             self._node_manager.update_peer_rank(p)
 
     @staticmethod
-    def _get_client_for_peer(address: str) -> RPCClient:
-        ctx = zmq.Context()
-        client = RPCClient(
-            JSONRPCProtocol(),
-            ZmqClientTransport.create(ctx, address)
-        )
-        return client.get_proxy()
+    def _get_client(address: str):
+        peer_url = urlparse(address)
+        client = Client((peer_url.hostname, peer_url.port), key=None)
+        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
+        client.serializer.register_object(Peer, ['address', 'rank'])
+        return client
 
 
 def start_sds_node(node_manager: NodeManager):

@@ -1,14 +1,14 @@
 import hashlib
+import json
 
 
 class SearchResult:
 
-    def __init__(self, *args):
-        self._hash = args[0]
-        self._title = args[1]
-        self._url = args[2]
-        self._description = args[3]
-        self._args = args
+    def __init__(self, **kwargs):
+        self._hash = kwargs['hash']
+        self._title = kwargs['title']
+        self._url = kwargs['url']
+        self._description = kwargs['description']
         self._auto_hash()
 
     def calculate_hash(self):
@@ -18,13 +18,13 @@ class SearchResult:
     def _auto_hash(self):
         self._hash = self.calculate_hash()
 
-    def as_dict(self) -> dict:
-        return {'title': self._title, 'search_url': self._url, 'description': self._description}
-
-    def _serialize(self):
-        return (self._args,
-                {'hash': self._hash, 'title': self._title, 'url': self._url, 'description': self._description}
-                )
+    def __dict__(self):
+        return {
+            'hash': self._hash,
+            'title': self._title,
+            'url': self._url,
+            'description': self._description
+        }
 
     def is_consistent(self) -> bool:
         return self._hash == self.calculate_hash()

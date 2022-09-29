@@ -4,13 +4,12 @@ from os.path import exists
 
 class Peer:
 
-    def __init__(self, *args):
-        self._address = args[0]
-        self._rank = args[1]
-        self._args = args
+    def __init__(self, **kwargs):
+        self._address = kwargs['address']
+        self._rank = kwargs['rank']
 
-    def _serialize(self):
-        return self._args, {'address': self._address, 'rank': self._rank}
+    def __dict__(self):
+        return {'address': self._address, 'rank': self._rank}
 
     @property
     def address(self, address):
