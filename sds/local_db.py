@@ -39,7 +39,7 @@ class LocalSearchDatabase:
         return searches
 
     def search(self, query) -> dict:
-        return self._do_query(f'select * from search_cache where description like "%{query}%" or title like "%{query}%" or search_url like "%{query}%"')
+        return self._do_query(self._build_sql_query(query))
 
     def get_searches(self) -> dict:
         return self._do_query('select * from search_cache')
@@ -65,4 +65,13 @@ class LocalSearchDatabase:
                 valid_searches[h] = sr
         self.sync(valid_searches)
 
-    
+    @staticmethod
+    def _build_sql_query(query_text: str) -> str:
+        txt = query_text.lower()
+        query = f'select * from search_cache where description' \
+                f' like "%{txt}%" or title like "%{txt}%" or search_url like "%{txt}%"'
+        for kw in txt.split(' '):
+            if kw.isnumeric():
+                continue
+            query += f' or like "%{kw}%" or title like "%{kw}%" or search_url like "%{kw}%"'
+

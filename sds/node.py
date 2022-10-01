@@ -1,6 +1,6 @@
 import socket
 
-from sds.sdsconfigs import SdsConfigs
+from sds.configs import NodeConfigurations
 from sds.peers_db import PeersDB, Peer
 from sds.local_db import LocalSearchDatabase, SearchResult
 from sds.sniffingdog import SniffingDog
@@ -17,7 +17,7 @@ from sdsjsonrpc.client import Client
 
 class NodeManager:
 
-    def __init__(self, configs: SdsConfigs):
+    def __init__(self, configs: NodeConfigurations):
         self._lock = Lock()
         self._configs = configs
         self._local_db = LocalSearchDatabase(configs.searches_db_path)

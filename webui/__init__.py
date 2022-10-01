@@ -1,7 +1,7 @@
 from flask import Flask, render_template, redirect
 from flask.globals import request
 from sds.node import NodeManager, start_sds_node
-from sds.sdsconfigs import SdsConfigs
+from sds.configs import NodeConfigurations
 import logging
 import os
 
@@ -33,7 +33,7 @@ def do_insert_link():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    configs = SdsConfigs()
+    configs = NodeConfigurations()
     configs.read_from_file('../config.ini')
     node = NodeManager(configs)
     start_sds_node(node_manager=node)
