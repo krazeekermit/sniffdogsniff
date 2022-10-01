@@ -68,10 +68,13 @@ class LocalSearchDatabase:
     @staticmethod
     def _build_sql_query(query_text: str) -> str:
         txt = query_text.lower()
-        query = f'select * from search_cache where description' \
-                f' like "%{txt}%" or title like "%{txt}%" or search_url like "%{txt}%"'
+        print(txt)
+        query = f'select * from search_cache where lower(description)' \
+                f' like "%{txt}%" or lower(title) like "%{txt}%" or lower(search_url) like "%{txt}%"'
         for kw in txt.split(' '):
             if kw.isnumeric():
                 continue
-            query += f' or like "%{kw}%" or title like "%{kw}%" or search_url like "%{kw}%"'
+            query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
+                     f' or lower(search_url) like "%{kw}%"'
+        return query
 

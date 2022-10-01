@@ -10,6 +10,7 @@ result = conn.tree.method(keyword=arg)
 from __future__ import print_function
 
 import sys
+import socks
 import socket
 import uuid
 import hashlib
@@ -34,12 +35,18 @@ class Client(object):
 
     def __init__(self, addr, **kwargs):
         self._addr = addr
+        self._proxy_type = kwargs.get('proxy_type', None)
+        self._proxy_addr = kwargs.get('proxy_address', None)
         self._requests = []
         self._serializer = JsonSerializer()
         self.__batch = kwargs.get('batch', None)
         self._key = kwargs.get('key', None)
         if self._key and not config.crypt:
             raise EncryptionMissing('No encryption library found.')
+
+    def set_proxy(self, proxy_type: int, proxy_addr):
+        self._proxy_type = proxy_type
+        self._proxy_addr = proxy_addr
 
     def __getattr__(self, key):
         if key.startswith('_'):
@@ -142,7 +149,11 @@ class Client(object):
             length = config.crypt_chunk_size
             pad_length = length - (len(message) % length)
             message = crypt.encrypt('%s%s' % (message, ' ' * pad_length))
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock = socks.socksocket()
+        if self._proxy_type is not None:
+            sock.set_proxy(socks.PROXY_TYPES[self._proxy_type.upper()], addr=self._proxy_addr[0],
+                           port=self._proxy_addr[1])
         sock.settimeout(config.timeout)
         sock.connect(self._addr)
         if sys.version_info[0] == 2:

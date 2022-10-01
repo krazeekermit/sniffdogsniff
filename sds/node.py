@@ -8,7 +8,7 @@ from sds.sniffingdog import SniffingDog
 from threading import Thread, Lock
 import logging
 import time
-from urllib.parse import urlparse
+from sds.utils import string_to_host_port_tuple, string_to_proxy_type
 
 from sdsjsonrpc.server import Server
 from sdsjsonrpc.errors import ProtocolError
@@ -37,7 +37,6 @@ class NodeManager:
         self._lock.release()
 
     def request_node_searches(self, hashes: list) -> dict:
-        logging.debug('Dio merdqa scaio schifo')
         searches = dict()
         for h, rs in self._local_db.get_searches().items():
             logging.debug(f'Answering search request -> sync hash: {h}')
@@ -72,6 +71,9 @@ class NodeManager:
         finally:
             self._lock.release()
 
+    def search(self, text: str):
+        return self._sniffing_dog.do_search(text)
+
     @property
     def configs(self):
         return self._configs
@@ -84,6 +86,7 @@ class NodeRpcServer(Thread):
 
         self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
         self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
+        self._server.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
 
@@ -133,7 +136,7 @@ class PeerSyncManager(Thread):
             s_time = time.time()
 
             try:
-                client = self._get_client(p.address)
+                client = self._get_client_for(p)
                 self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
                 self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
             except socket.error as e:
@@ -147,11 +150,12 @@ class PeerSyncManager(Thread):
             self._node_manager.update_peer_rank(p)
 
     @staticmethod
-    def _get_client(address: str):
-        peer_url = urlparse(address)
-        client = Client((peer_url.hostname, peer_url.port), key=None)
+    def _get_client_for(p: Peer):
+        client = Client(string_to_host_port_tuple(p.address), key=None)
+        if p.has_proxy():
+            client.set_proxy(string_to_proxy_type(p.proxy_type), string_to_host_port_tuple(p.proxy_address))
         client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
-        client.serializer.register_object(Peer, ['address', 'rank'])
+        client.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         return client
 
 

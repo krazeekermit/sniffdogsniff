@@ -14,6 +14,9 @@ class Peer:
         return {'address': self._address, 'rank': self._rank, 'proxy_type': self._proxy_type,
                 'proxy_address': self._proxy_address}
 
+    def has_proxy(self) -> bool:
+        return self.proxy_type != 'none'
+
     @property
     def address(self, address):
         self._address = address

@@ -1,6 +1,7 @@
 import pandas as pd
 import json
-import os
+from urllib.parse import urlparse
+import socks
 
 import requests
 import time
@@ -36,3 +37,12 @@ def find_suitable_string(results: list):
         if not (text == ""):
             if len(text) > 5:
                 return text
+
+
+def string_to_host_port_tuple(addr: str):
+    parsed_url = urlparse(addr)
+    return parsed_url.hostname, parsed_url.port
+
+
+def string_to_proxy_type(proxy_type: str):
+    return socks.PROXY_TYPES.get(proxy_type.upper())

@@ -16,7 +16,9 @@ def search_home():
 @app.route('/search')
 def do_search():
     if request.method == 'GET':
-        searches = node.sniffing_dog.do_search(request.args.get('q'))
+        node.unlock()
+        searches = node.search(request.args.get('q'))
+        node.lock()
         return render_template('results.html', searches=searches)
 
 

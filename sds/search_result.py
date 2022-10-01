@@ -5,7 +5,7 @@ import json
 class SearchResult:
 
     def __init__(self, **kwargs):
-        self._hash = kwargs['hash']
+        self._hash = kwargs.get('hash', '')
         self._title = kwargs['title']
         self._url = kwargs['url']
         self._description = kwargs['description']

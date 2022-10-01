@@ -1,9 +1,9 @@
-from .local_db import LocalSearchDatabase
+from sds.local_db import LocalSearchDatabase
 from urllib.parse import urlparse
 from requests_html import HTMLSession
 import logging
-from .search_result import SearchResult
-from . import sdsutils
+from sds.search_result import SearchResult
+from sds.utils import clean_string
 
 
 class SearchEngine:
@@ -25,21 +25,20 @@ class SearchEngine:
 
         for c in r.html.find(self._result_container_filter):
             search_url = c.xpath(self._result_url_filter, first=True)
-            search_title = sdsutils.clean_string(c.xpath(self._result_title_filter, first=True))
-            print(search_title)
+            search_title = clean_string(c.xpath(self._result_title_filter, first=True))
             if search_url is not None:
                 search_url = search_url.replace(' ', '')
             parsed_url = urlparse(search_url)
 
             if parsed_url.scheme in ['http', 'https']:
                 try:
-                    search_desc = sdsutils.clean_string(session.get(
+                    search_desc = clean_string(session.get(
                         search_url, headers=self._http_headers, timeout=0.75
                     ).html.xpath('//meta[@name="description"]/@content', first=True))
                 except:
-                    search_desc = ""
+                    search_desc = search_title
 
-                result = SearchResult('', search_title, search_url, search_desc)
+                result = SearchResult(title=search_title, url=search_url, description=search_desc)
                 searches[result.hash] = result
         return searches
 
@@ -64,7 +63,6 @@ class SniffingDog:
                 logging.debug(f'Searching results from {e.name}')
                 try:
                     res = e.search(search_query)
-                    print(res)
                     searches.update(res)
                 except Exception as ex:
                     print(f'error in {e.name}= {ex.args}')
