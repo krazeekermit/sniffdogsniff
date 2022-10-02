@@ -71,10 +71,10 @@ class LocalSearchDatabase:
         print(txt)
         query = f'select * from search_cache where lower(description)' \
                 f' like "%{txt}%" or lower(title) like "%{txt}%" or lower(search_url) like "%{txt}%"'
-        for kw in txt.split(' '):
-            if kw.isnumeric():
-                continue
-            query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
-                     f' or lower(search_url) like "%{kw}%"'
+        # for kw in txt.split(' '):
+        #     if kw.isnumeric():
+        #         continue
+        #     query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
+        #              f' or lower(search_url) like "%{kw}%"'
         return query
 

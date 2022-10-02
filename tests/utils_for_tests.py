@@ -1,5 +1,5 @@
 from multiprocessing import Process
-from sds.sdsconfigs import SdsConfigs
+from sds.configs import NodeConfigurations
 from sds.node import NodeManager, NodeRpcServer
 
 

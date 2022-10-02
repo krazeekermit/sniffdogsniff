@@ -6,7 +6,7 @@ from sdsjsonrpc import connect
 
 
 from sds.node import NodeManager
-from sds.sdsconfigs import SdsConfigs
+from sds.configs import NodeConfigurations
 from sds.search_result import SearchResult
 import utils_for_tests
 import logging
@@ -14,7 +14,7 @@ import logging
 
 def setup_server():
     logging.basicConfig(logging.DEBUG)
-    configs = SdsConfigs()
+    configs = NodeConfigurations()
     configs.read_from_file('./config.test.ini')
     node_manager = NodeManager(configs)
     node_manager.request_node_searches = MagicMock(return_value={
@@ -33,9 +33,10 @@ def setup_server():
 class TestRpcRequestsToServer(TestCase):
 
     def test_rpc_request_searches(self):
-        client = connect('127.0.0.1', 28600)
+        client = connect('127.0.0.1', 4222)
         client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
         response = client.request_node_searches_db_data([])
+        print(f'response_len={len(response)}')
         self.assertTrue('c1f537dbc72e4b72eeaeb4b61f33a068268da566b5c05f200bd21844cf534634' in response.keys())
         result_obj = response['c1f537dbc72e4b72eeaeb4b61f33a068268da566b5c05f200bd21844cf534634']
         self.assertIsInstance(result_obj, SearchResult)

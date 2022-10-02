@@ -98,9 +98,9 @@ class NodeRpcServer(Thread):
         self._server.serve()
 
     def request_node_searches_db_data(self, hashes: list):
-        self._logger.debug('rpc_request = request_node_searches_db_data')
         self._node_manager.unlock()
         data = self._node_manager.request_node_searches(hashes)
+        self._logger.debug(f'rpc_request = request_node_searches_db_data nsr={len(data)}')
         self._node_manager.lock()
         return data
 

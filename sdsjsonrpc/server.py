@@ -18,7 +18,7 @@ from sdsjsonrpc import history
 from sdsjsonrpc.errors import ProtocolError
 from sdsjsonrpc.errors import JSONRPC_ERRORS, EncryptionMissing
 from sdsjsonrpc.serialization import JsonSerializer
-from inspect import isclass
+import zlib
 
 
 import json
@@ -177,11 +177,11 @@ class ProcessRequest(object):
             data = self.get_data()
             if not data: 
                 break
-            data = data.decode()
+            # data = data.decode()
             requestlines.append(data)
             if len(data) < config.buffer: 
                 break
-        request = ''.join(requestlines)
+        request = zlib.decompress(b''.join(requestlines)).decode()
         response = ''
         crypt_error = False
         if config.secret:
@@ -205,7 +205,9 @@ class ProcessRequest(object):
                 length = config.crypt_chunk_size
                 pad_length = length - (len(response) % length)
                 response = crypt.encrypt('%s%s' % (response, ' '*pad_length))
-            self.socket.send(response.encode())
+            logger.debug(f'Server send no compression: {len(response.encode())}')
+            logger.debug(f'Server send compression: {len(zlib.compress(response.encode()))}')
+            self.socket.send(zlib.compress(response.encode()))
         self.socket.close()
 
     def get_data(self):

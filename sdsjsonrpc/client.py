@@ -14,6 +14,7 @@ import socks
 import socket
 import uuid
 import hashlib
+import zlib
 from sdsjsonrpc import config
 from sdsjsonrpc import history
 from sdsjsonrpc import logger
@@ -157,9 +158,9 @@ class Client(object):
         sock.settimeout(config.timeout)
         sock.connect(self._addr)
         if sys.version_info[0] == 2:
-            sock.send(message)
+            sock.send(zlib.compress(message))
         else:
-            sock.send(message.encode('utf-8'))
+            sock.send(zlib.compress(message.encode('utf-8')))
 
         responselist = []
         if notify:
@@ -173,12 +174,12 @@ class Client(object):
                     break
                 if not data:
                     break
-                data = data.decode()
+                # data = data.decode()
                 responselist.append(data)
                 if len(data) < config.buffer:
                     break
             sock.close()
-            response = ''.join(responselist)
+            response = zlib.decompress(b''.join(responselist))
         if self._key:
             try:
                 response = crypt.decrypt(response)
