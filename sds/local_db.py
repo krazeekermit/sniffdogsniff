@@ -14,8 +14,9 @@ class LocalSearchDatabase:
         if not exists(self._db_path):
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
             self._conn.execute(
-                'create table search_cache(hash text, title text, search_url text, description text)')
-            # self._conn.commit()
+                'create table search_cache(hash text, title text, search_url text, description text, content_type text)'
+            )
+            self._conn.commit()
         else:
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
 
@@ -23,7 +24,8 @@ class LocalSearchDatabase:
         self._conn.execute('delete from search_cache')
         for sr in results.values():
             self._conn.execute(
-                f'insert into search_cache values("{sr.hash}", "{sr.title}", "{sr.url}", "{sr.description}")'
+                f'insert into search_cache values("{sr.hash}", "{sr.title}", "{sr.url}", "{sr.description}",'
+                f' "{sr.content_type}")'
             )
 
         self._conn.commit()
@@ -33,7 +35,7 @@ class LocalSearchDatabase:
         cur.execute(sql_query)
         searches = dict()
         for row in cur.fetchall():
-            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3])
+            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3], content_type=row[4])
             searches[sr.hash] = sr
 
         return searches

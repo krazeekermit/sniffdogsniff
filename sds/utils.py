@@ -1,22 +1,6 @@
-import pandas as pd
 import json
 from urllib.parse import urlparse
 import socks
-
-import requests
-import time
-
-
-def new_searches_df() -> pd.DataFrame:
-    return pd.DataFrame(columns=['engine', 'title', 'search_url', 'description'])
-
-
-def set_clickable_links(self, link):
-    return f'<a href="{link}">{link}</a>'
-
-
-def merge_frames(frame1: pd.DataFrame, frame2: pd.DataFrame) -> pd.DataFrame:
-    return pd.concat([frame1, frame2], ignore_index=True)
 
 
 def json_to_dict(filename: str):
@@ -46,3 +30,9 @@ def string_to_host_port_tuple(addr: str):
 
 def string_to_proxy_type(proxy_type: str):
     return socks.PROXY_TYPES.get(proxy_type.upper())
+
+
+def content_type_to_mime_type(content_type: str):
+    return content_type.split(';')[0].strip()
+
+

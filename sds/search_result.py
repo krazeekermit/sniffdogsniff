@@ -9,6 +9,7 @@ class SearchResult:
         self._title = kwargs['title']
         self._url = kwargs['url']
         self._description = kwargs['description']
+        self._content_type = kwargs['content_type']
         self._auto_hash()
 
     def calculate_hash(self):
@@ -23,7 +24,8 @@ class SearchResult:
             'hash': self._hash,
             'title': self._title,
             'url': self._url,
-            'description': self._description
+            'description': self._description,
+            'content_type': self._content_type
         }
 
     def is_consistent(self) -> bool:
@@ -60,3 +62,7 @@ class SearchResult:
     @description.setter
     def description(self, desc):
         self._description = desc
+
+    @property
+    def content_type(self):
+        return self._content_type

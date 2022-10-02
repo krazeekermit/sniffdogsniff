@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 from requests_html import HTMLSession
 import logging
 from sds.search_result import SearchResult
-from sds.utils import clean_string
+from sds.utils import clean_string, content_type_to_mime_type
 
 
 class SearchEngine:
@@ -32,13 +32,15 @@ class SearchEngine:
 
             if parsed_url.scheme in ['http', 'https']:
                 try:
-                    search_desc = clean_string(session.get(
-                        search_url, headers=self._http_headers, timeout=0.75
-                    ).html.xpath('//meta[@name="description"]/@content', first=True))
+                    resp = session.get(search_url, headers=self._http_headers, timeout=0.75)
+                    content_type = content_type_to_mime_type(resp.headers['content-type'])
+                    search_desc = clean_string(resp.html.xpath('//meta[@name="description"]/@content', first=True))
                 except:
+                    content_type = 'text/html'
                     search_desc = search_title
 
-                result = SearchResult(title=search_title, url=search_url, description=search_desc)
+                result = SearchResult(title=search_title, url=search_url, description=search_desc,
+                                      content_type=content_type)
                 searches[result.hash] = result
         return searches
 

@@ -21,8 +21,9 @@
         <ul id="navigation" class="list-group">
         {% for item in searches.values() %}
             <li class="list-group-item list-group-item-action"><div>
+                <small class="disabled">{{ item|attr('url') }}<br/></small>
                 <a href="{{ item|attr('url') }}">{{ item|attr('title') }}</a>
-                <p>
+                <p class="mb-1">
                     {{ item|attr('description') }}
                 </p>
             </div></li>
