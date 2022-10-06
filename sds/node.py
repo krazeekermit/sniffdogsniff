@@ -71,8 +71,8 @@ class NodeManager:
         finally:
             self._lock.release()
 
-    def search(self, text: str):
-        return self._sniffing_dog.do_search(text)
+    def search(self, text: str, filter_content_types=[]):
+        return self._sniffing_dog.do_search(text, filter_content_types)
 
     @property
     def configs(self):
@@ -85,8 +85,8 @@ class NodeRpcServer(Thread):
         Thread.__init__(self, name='NodeRpcServer Thread')
 
         self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
-        self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
-        self._server.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
+        self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
+        self._server.serializer.register_object(Peer, ['id', 'address', 'rank', 'proxy_type', 'proxy_address'])
         self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
 
@@ -154,8 +154,8 @@ class PeerSyncManager(Thread):
         client = Client(string_to_host_port_tuple(p.address), key=None)
         if p.has_proxy():
             client.set_proxy(string_to_proxy_type(p.proxy_type), string_to_host_port_tuple(p.proxy_address))
-        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description'])
-        client.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
+        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
+        client.serializer.register_object(Peer, ['id', 'address', 'rank', 'proxy_type', 'proxy_address'])
         return client
 
 

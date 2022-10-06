@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect
+from flask import Flask, render_template, redirect, url_for
 from flask.globals import request
 from sds.node import NodeManager, start_sds_node
 from sds.configs import NodeConfigurations
@@ -6,6 +6,10 @@ import logging
 import os
 
 app = Flask(__name__)
+
+
+def content_type_img_path(c: str):
+    return url_for('static', filename=f'content_{c.split("/")[1]}.svg')
 
 
 @app.route('/')
@@ -34,6 +38,7 @@ def do_insert_link():
 
 
 if __name__ == '__main__':
+    app.jinja_env.globals.update(content_type_img_path=content_type_img_path)
     logging.basicConfig(level=logging.DEBUG)
     configs = NodeConfigurations()
     configs.read_from_file('../config.ini')

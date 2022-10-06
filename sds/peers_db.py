@@ -1,21 +1,27 @@
 import sqlite3
+import uuid
 from os.path import exists
 
 
 class Peer:
 
     def __init__(self, **kwargs):
+        self._id = kwargs.get('id', uuid.uuid1())
         self._address = kwargs['address']
         self._rank = kwargs['rank']
         self._proxy_type = kwargs['proxy_type']
         self._proxy_address = kwargs['proxy_address']
 
     def __dict__(self):
-        return {'address': self._address, 'rank': self._rank, 'proxy_type': self._proxy_type,
+        return {'id': self._id, 'address': self._address, 'rank': self._rank, 'proxy_type': self._proxy_type,
                 'proxy_address': self._proxy_address}
 
     def has_proxy(self) -> bool:
         return self.proxy_type != 'none'
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def address(self, address):
@@ -50,7 +56,7 @@ class PeersDB:
         if not exists(self._db_path):
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
             self._conn.execute(
-                'create table peers(address text, rank int, proxy_type text, proxy_addr text)')
+                'create table peers(id text, address text, rank int, proxy_type text, proxy_addr text)')
             # self._conn.commit()
         else:
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
@@ -61,7 +67,7 @@ class PeersDB:
         peers = list()
         peers.extend(self._known_peers)
         for row in cur.fetchall():
-            peers.append(Peer(address=row[0], rank=row[1], proxy_type=row[3], proxy_address=row[4]))
+            peers.append(Peer(id=row[0], address=row[1], rank=row[2], proxy_type=row[3], proxy_address=row[4]))
         return peers
 
     def peers_addresses(self) -> list:
@@ -75,14 +81,14 @@ class PeersDB:
         for p in peers:
             if p.address not in addresses:
                 self._conn.execute(
-                    f'insert into peers values("{p.address}", {p.rank}, "{p.proxy_type}", "{p.proxy_address}")'
+                    f'insert into peers values("{p.id}", "{p.address}", {p.rank}, "{p.proxy_type}", "{p.proxy_address}")'
                 )
 
         self._conn.commit()
 
     def update_peer_rank(self, peer: Peer):
         self._conn.execute(
-            f'update peers set rank={peer.rank} where address = {peer.address})'
+            f'update peers set rank={peer.rank} where id = {peer.id})'
         )
         self._conn.commit()
 

@@ -22,6 +22,7 @@
         {% for item in searches.values() %}
             <li class="list-group-item list-group-item-action"><div>
                 <small class="disabled">{{ item|attr('url') }}<br/></small>
+                <img src="{{ content_type_img_path(item|attr('content_type')) }}" width="16" height="16">
                 <a href="{{ item|attr('url') }}">{{ item|attr('title') }}</a>
                 <p class="mb-1">
                     {{ item|attr('description') }}

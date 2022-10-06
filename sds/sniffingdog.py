@@ -56,7 +56,7 @@ class SniffingDog:
         self._local_db = local_db
         self._minimum_search_results_thr = minimum_search_results_threshold
 
-    def do_search(self, search_query: str) -> dict:
+    def do_search(self, search_query: str, filter_content_types=[]) -> dict:
         searches = {}
         searches.update(self._local_db.search(search_query))
 
@@ -70,4 +70,7 @@ class SniffingDog:
                     print(f'error in {e.name}= {ex.args}')
 
         self._local_db.sync(searches)
+
+        # TODO Filter by content_type
+        # to be implemented
         return searches
