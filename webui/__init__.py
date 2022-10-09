@@ -44,4 +44,4 @@ if __name__ == '__main__':
     configs.read_from_file('../config.ini')
     node = NodeManager(configs)
     start_sds_node(node_manager=node)
-    app.run('127.0.0.1', 5000)
+    app.run('127.0.0.1', configs.web_service_http_port)

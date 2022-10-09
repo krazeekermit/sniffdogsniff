@@ -12,20 +12,22 @@ class NodeConfigurations:
 
     def __init__(self):
         self._config_parser = ConfigParser(allow_no_value=True)
-        self.__general_configs = dict()
+        self._general_configs = dict()
+        self._node_configs = dict()
         self._search_engines = list()
-        self._known_peers = dict()
+        self._known_peers = list()
 
     def read_from_file(self, file_path: str):
         self._config_parser.read(file_path)
-        self.__general_configs = dict(self._config_parser['general'])
+        self._general_configs = dict(self._config_parser['general'])
+        self._node_configs = dict(self._config_parser['node'])
         self._parse()
 
     def read_from_env_variables(self):
         for k in general_section_keys:
             val = os.environ.get(k.upper())
             if val is not None:
-                self.__general_configs[k] = val
+                self._general_configs[k] = val
 
     def _parse(self):
         if self._config_parser['general']['engines'] is not None:
@@ -42,8 +44,8 @@ class NodeConfigurations:
                 proxy_addr = None
                 if proxy_type != 'none':
                     proxy_addr = sec['proxy_address']
-                self._known_peers[pn] = Peer(address=sec['address'], rank=0, proxy_type=proxy_type,
-                                             proxy_address=proxy_addr)
+                self._known_peers.append(Peer(address=sec['address'], rank=0, proxy_type=proxy_type,
+                                              proxy_address=proxy_addr))
 
     @property
     def search_engines(self) -> list:
@@ -51,23 +53,32 @@ class NodeConfigurations:
 
     @property
     def web_service_http_port(self):
-        return self.__general_configs['web_service_http_port']
+        return self._general_configs['web_service_http_port']
 
     @property
     def searches_db_path(self) -> str:
-        return self.__general_configs['searches_database_path']
+        return self._general_configs['searches_database_path']
 
     @property
     def minimum_search_results_threshold(self) -> int:
-        return int(self.__general_configs['minimum_search_results_threshold'])
+        return int(self._general_configs['minimum_search_results_threshold'])
 
     @property
     def peer_to_peer_port(self):
-        return int(self.__general_configs['peer_to_peer_port'])
+        return int(self._node_configs['peer_to_peer_port'])
+
+    @property
+    def node_discoverable(self) -> bool:
+        return self._node_configs['discoverable']
+
+    @property
+    def self_peer(self) -> Peer:
+        return Peer(address=self._node_configs['node_address'], proxy_type=self._node_configs['proxy_type'],
+                    proxy_address=self._node_configs['proxy_address'])
 
     @property
     def peer_db_path(self):
-        return self.__general_configs['peer_database_path']
+        return self._general_configs['peer_database_path']
 
     @property
     def known_peers_dict(self) -> dict:
@@ -75,4 +86,4 @@ class NodeConfigurations:
 
     @property
     def peer_sync_frequency(self):
-        return int(self.__general_configs['peer_sync_frequency'])
+        return int(self._general_configs['peer_sync_frequency'])

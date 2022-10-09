@@ -16,7 +16,6 @@ from sdsjsonrpc.client import Client
 
 
 class NodeManager:
-
     def __init__(self, configs: NodeConfigurations):
         self._lock = Lock()
         self._configs = configs
@@ -86,9 +85,10 @@ class NodeRpcServer(Thread):
 
         self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
         self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
-        self._server.serializer.register_object(Peer, ['id', 'address', 'rank', 'proxy_type', 'proxy_address'])
+        self._server.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
+        self._server.add_handler(self.notify_availability, 'notify_availability')
 
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manger
@@ -97,7 +97,25 @@ class NodeRpcServer(Thread):
         self._logger.info('Starting Rpc Server')
         self._server.serve()
 
+    def notify_availability(self, requesting_peer: Peer):
+        """
+        If the requesting peer is a discoverable peer it will send a rpc request notify_availability
+        to the request handling peer, and the handling peer will register it as a suitable
+        candidate for future syncing (in peers_db)
+        :param requesting_peer: the requesting peer
+        :return: None
+        """
+        self._node_manager.sync_peers_db_from([requesting_peer])
+
     def request_node_searches_db_data(self, hashes: list):
+        """
+        Requests to the request handling peer NodeManager the searches stored in its database.
+        The result will be only the searches that the requesting peer doesn't have
+        :param hashes: the search hashes that the requesting peers already has in its local_db
+        :return: dict[hash, SearchResult] dictionary containing hashes and search results for the
+                requesting peer if the requesting peer already has these searches in its local_db
+                the returning dict of searches will be empty
+        """
         self._node_manager.unlock()
         data = self._node_manager.request_node_searches(hashes)
         self._logger.debug(f'rpc_request = request_node_searches_db_data nsr={len(data)}')
@@ -105,6 +123,10 @@ class NodeRpcServer(Thread):
         return data
 
     def request_node_peers_db_data(self):
+        """
+        Request peers to the handling request peer
+        :return: List of peers that the request handling peer has in its peers_db
+        """
         self._logger.debug('rpc_request = request_node_peers_db_data')
         self._node_manager.unlock()
         data = self._node_manager.get_peers()
@@ -113,30 +135,38 @@ class NodeRpcServer(Thread):
 
 
 class PeerSyncManager(Thread):
-
     def __init__(self, node_manager: NodeManager):
         Thread.__init__(self, name='PeerSyncManager Thread')
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manager
         self._sync_freq = node_manager.configs.peer_sync_frequency
+        self._self_peer = node_manager.configs.self_peer
+        self._discoverability = node_manager.configs.node_discoverable
 
     def run(self) -> None:
         while True:
             time.sleep(self._sync_freq)
-            self._logger.debug('Syncing...')
-            # self._sync_with_other_peers()
+            self._sync_with_other_peers()
 
     def _sync_with_other_peers(self):
+        """
+        Syncs search results, peers from the remote peer, when the remote peer is unresponsive
+        the ranking increases of 1000
+        !!! lower ranking highest speed !!!
+        :return: None
+        """
         self._node_manager.unlock()
         peers_list = self._node_manager.get_peers()
         hashes = self._node_manager.get_hashes()
         self._node_manager.lock()
         for p in peers_list:
-            logging.info(f'Syncing from {p.name}')
+            logging.info(f'Syncing from {p.address}')
             s_time = time.time()
 
             try:
                 client = self._get_client_for(p)
+                if self._discoverability:
+                    client.notify_availability(self._self_peer)
                 self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
                 self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
             except socket.error as e:
@@ -144,7 +174,7 @@ class PeerSyncManager(Thread):
                 continue
             except ProtocolError as e:
                 logging.error(e.message)
-                p.rank -= 1000
+                p.rank += 1000
             finally:
                 p.rank = int((time.time() - s_time) * 1000)
             self._node_manager.update_peer_rank(p)
@@ -155,7 +185,7 @@ class PeerSyncManager(Thread):
         if p.has_proxy():
             client.set_proxy(string_to_proxy_type(p.proxy_type), string_to_host_port_tuple(p.proxy_address))
         client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
-        client.serializer.register_object(Peer, ['id', 'address', 'rank', 'proxy_type', 'proxy_address'])
+        client.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         return client
 
 
