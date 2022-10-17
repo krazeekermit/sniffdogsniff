@@ -80,9 +80,7 @@ class PeersDB:
         self._conn.commit()
 
     def update_peer_rank(self, peer: Peer):
-        self._conn.execute(
-            f'update peers set rank={peer.rank} where id = {peer.id})'
-        )
+        self._conn.execute(f'update peers set rank={peer.rank} where address = "{peer.address}"')
         self._conn.commit()
 
 

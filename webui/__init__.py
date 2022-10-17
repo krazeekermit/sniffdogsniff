@@ -30,7 +30,7 @@ def do_search():
 def do_insert_link():
     if request.method == 'POST':
         node.insert_new_search_result(
-            request.form['link_title'], request.form['link_url'], request.form['link_description']
+            request.form['link_title'], request.form['link_url'], request.form['link_description'], 'text/html'
         )
         return "<html><h1>Link insertion successful!</h1></html>"
     else:

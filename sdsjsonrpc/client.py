@@ -153,7 +153,7 @@ class Client(object):
         # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock = socks.socksocket()
         if self._proxy_type is not None:
-            sock.set_proxy(socks.PROXY_TYPES[self._proxy_type.upper()], addr=self._proxy_addr[0],
+            sock.set_proxy(self._proxy_type, addr=self._proxy_addr[0],
                            port=self._proxy_addr[1])
         sock.settimeout(config.timeout)
         sock.connect(self._addr)

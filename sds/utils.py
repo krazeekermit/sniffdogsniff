@@ -36,3 +36,9 @@ def content_type_to_mime_type(content_type: str):
     return content_type.split(';')[0].strip()
 
 
+if __name__ == '__main__':
+    print()
+
+
+
+

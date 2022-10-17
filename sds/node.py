@@ -25,9 +25,11 @@ class NodeManager:
         self._sniffing_dog = SniffingDog(configs.search_engines, self._local_db,
                                          configs.minimum_search_results_threshold)
 
-    def insert_new_search_result(self, title: str, url: str, description: str):
-        res = SearchResult('', title, url, description)
-        self._local_db.sync({res.hash, res})
+    def insert_new_search_result(self, title: str, url: str, description: str, content_type: str):
+        self.unlock()
+        res = SearchResult(title=title, url=url, description=description, content_type=content_type)
+        self._local_db.sync({res.hash: res})
+        self.lock()
 
     def unlock(self):
         self._lock.acquire()
@@ -66,7 +68,7 @@ class NodeManager:
     def update_peer_rank(self, peer: Peer):
         self._lock.acquire()
         try:
-            self._peers_db.update_peer(peer)
+            self._peers_db.update_peer_rank(peer)
         finally:
             self._lock.release()
 
@@ -81,7 +83,7 @@ class NodeManager:
 class NodeRpcServer(Thread):
 
     def __init__(self, node_manger: NodeManager):
-        Thread.__init__(self, name='NodeRpcServer Thread')
+        Thread.__init__(self, name='NodeRpcServer')
 
         self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
         self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
@@ -136,7 +138,7 @@ class NodeRpcServer(Thread):
 
 class PeerSyncManager(Thread):
     def __init__(self, node_manager: NodeManager):
-        Thread.__init__(self, name='PeerSyncManager Thread')
+        Thread.__init__(self, name='PeerSyncManager')
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manager
         self._sync_freq = node_manager.configs.peer_sync_frequency
@@ -159,22 +161,22 @@ class PeerSyncManager(Thread):
         peers_list = self._node_manager.get_peers()
         hashes = self._node_manager.get_hashes()
         self._node_manager.lock()
+        s_time = 0
         for p in peers_list:
-            logging.info(f'Syncing from {p.address}')
-            s_time = time.time()
+            self._logger.info(f'Syncing from {p.address}')
 
             try:
                 client = self._get_client_for(p)
                 if self._discoverability:
                     client.notify_availability(self._self_peer)
+                s_time = time.time()
                 self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
                 self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
-            except socket.error as e:
-                logging.error(e.message)
-                continue
-            except ProtocolError as e:
-                logging.error(e.message)
+            except socket.error:
+                self._logger.error(f'Socket error: problems communicating with {p.address}')
                 p.rank += 1000
+            except ProtocolError as e:
+                self._logger.error(e.message)
             finally:
                 p.rank = int((time.time() - s_time) * 1000)
             self._node_manager.update_peer_rank(p)
