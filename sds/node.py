@@ -91,7 +91,7 @@ class NodeRpcServer(Thread):
         self._server.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
-        self._server.add_handler(self.notify_availability, 'notify_availability')
+        self._server.add_handler(self.handshake, 'handshake')
 
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manger
@@ -195,7 +195,5 @@ class PeerSyncManager(Thread):
 def start_sds_node(node_manager: NodeManager):
     server = NodeRpcServer(node_manager)
     peer_manager = PeerSyncManager(node_manager)
-    logging.info('Starting NodeRpcServer')
     server.start()
-    logging.info('Starting Peers Sync Manager')
     peer_manager.start()

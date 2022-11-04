@@ -1,5 +1,6 @@
 from configparser import ConfigParser
 import os
+import logging
 from sds.sniffingdog import SearchEngine
 from sds.peers_db import Peer
 
@@ -56,6 +57,10 @@ class NodeConfigurations:
         return self._general_configs['web_service_http_port']
 
     @property
+    def web_service_http_host(self):
+        return self._general_configs['web_service_http_host']
+
+    @property
     def searches_db_path(self) -> str:
         return self._general_configs['searches_database_path']
 
@@ -87,3 +92,14 @@ class NodeConfigurations:
     @property
     def peer_sync_frequency(self):
         return int(self._general_configs['peer_sync_frequency'])
+
+    @property
+    def log_level(self):
+        if str(self._general_configs['peer_sync_frequency']).lower() == 'info':
+            return logging.INFO
+        elif str(self._general_configs['peer_sync_frequency']).lower() == 'warning':
+            return logging.WARNING
+        elif str(self._general_configs['peer_sync_frequency']).lower() == 'error':
+            return logging.ERROR
+        elif str(self._general_configs['peer_sync_frequency']).lower() == 'debug':
+            return logging.DEBUG
