@@ -1,12 +1,12 @@
 from setuptools import setup
 
-setup(name='sniffDogSniff',
+setup(name='sniffsogsniff',
       version='0.5',
-      description='Web Search web-scraping tool',
+      description='P2P Web Search Engine',
       author='c3rzTheFrog',
       license='GPLv3',
-      packages=['sds'],
-      install_requires=['pandas', 'requests-html', 'tqdm', 'PyQt5'],
+      packages=['sds', 'sdsjsonrpc'],
+      install_requires=['pandas', 'tqdm'],
       entry_points = {
         'console_scripts': ['sds.sds:main'],
       },

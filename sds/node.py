@@ -86,7 +86,8 @@ class NodeRpcServer(Thread):
         Thread.__init__(self, name='NodeRpcServer')
 
         self._server = Server(('localhost', node_manger.configs.peer_to_peer_port))
-        self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
+        self._server.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type',
+                                                               'score'])
         self._server.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         self._server.add_handler(self.request_node_searches_db_data, 'request_node_searches_db_data')
         self._server.add_handler(self.request_node_peers_db_data, 'request_node_peers_db_data')
@@ -99,7 +100,7 @@ class NodeRpcServer(Thread):
         self._logger.info('Starting Rpc Server')
         self._server.serve()
 
-    def notify_availability(self, requesting_peer: Peer):
+    def handshake(self, requesting_peer: Peer):
         """
         If the requesting peer is a discoverable peer it will send a rpc request notify_availability
         to the request handling peer, and the handling peer will register it as a suitable
@@ -162,13 +163,13 @@ class PeerSyncManager(Thread):
         hashes = self._node_manager.get_hashes()
         self._node_manager.lock()
         s_time = 0
-        for p in peers_list:
+        for p in peers_list[:7]:
             self._logger.info(f'Syncing from {p.address}')
 
             try:
                 client = self._get_client_for(p)
                 if self._discoverability:
-                    client.notify_availability(self._self_peer)
+                    client.handshake(self._self_peer)
                 s_time = time.time()
                 self._node_manager.sync_searches_db_from(client.request_node_searches_db_data(hashes))
                 self._node_manager.sync_peers_db_from(client.request_node_peers_db_data)
@@ -186,7 +187,7 @@ class PeerSyncManager(Thread):
         client = Client(string_to_host_port_tuple(p.address), key=None)
         if p.has_proxy():
             client.set_proxy(string_to_proxy_type(p.proxy_type), string_to_host_port_tuple(p.proxy_address))
-        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type'])
+        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type', 'score'])
         client.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         return client
 

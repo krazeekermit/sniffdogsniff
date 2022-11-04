@@ -9,11 +9,18 @@ class SearchResult:
         self._title = kwargs['title']
         self._url = kwargs['url']
         self._description = kwargs['description']
-        self._content_type = kwargs['content_type']
+        self._content_type = kwargs.get('content_type', 'text/html')
+        self._score = kwargs.get('score', 0)
         self._auto_hash()
 
     def calculate_hash(self):
-        to_hash = self._url + self._title
+        """
+        Merkle tree style hashing of search result
+        :return: the sha256 hash as string
+        """
+        to_hash = ''
+        for value in [self._url, self._title, self._description, self._content_type]:
+            to_hash += hashlib.sha256(value.encode()).hexdigest()
         return hashlib.sha256(to_hash.encode()).hexdigest()
 
     def _auto_hash(self):
@@ -25,7 +32,8 @@ class SearchResult:
             'title': self._title,
             'url': self._url,
             'description': self._description,
-            'content_type': self._content_type
+            'content_type': self._content_type,
+            'score': self._score
         }
 
     def is_consistent(self) -> bool:
@@ -66,3 +74,16 @@ class SearchResult:
     @property
     def content_type(self):
         return self._content_type
+
+    def update_score(self, score: int):
+        if score > self._score:
+            self._score = score
+
+    @property
+    def score(self):
+        return self._score
+
+
+if __name__ == '__main__':
+    sr = SearchResult(title='Title', url='http://www.google.com/', description='The world worst search engine')
+    print(sr.hash)

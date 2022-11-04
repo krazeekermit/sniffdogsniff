@@ -14,7 +14,8 @@ class LocalSearchDatabase:
         if not exists(self._db_path):
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
             self._conn.execute(
-                'create table search_cache(hash text, title text, search_url text, description text, content_type text)'
+                'create table search_cache(hash text, title text, search_url text, description text,'
+                ' content_type text, score int)'
             )
             self._conn.commit()
         else:
@@ -25,7 +26,7 @@ class LocalSearchDatabase:
         for sr in results.values():
             self._conn.execute(
                 f'insert into search_cache values("{sr.hash}", "{sr.title}", "{sr.url}", "{sr.description}",'
-                f' "{sr.content_type}")'
+                f' "{sr.content_type}", {sr.score})'
             )
 
         self._conn.commit()
@@ -35,7 +36,8 @@ class LocalSearchDatabase:
         cur.execute(sql_query)
         searches = dict()
         for row in cur.fetchall():
-            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3], content_type=row[4])
+            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3], content_type=row[4],
+                              score=row[5])
             searches[sr.hash] = sr
 
         return searches
@@ -57,7 +59,10 @@ class LocalSearchDatabase:
 
     def sync(self, new_searches: dict):
         searches = self._do_query('select * from search_cache')
-        searches.update(new_searches)
+        for h, v in new_searches.items():
+            if h in searches.keys():
+                v.update_score(searches[h])
+            searches[h] = v
         self._insert_records_and_commit(searches)
 
     def sync_from(self, new_searches: dict):
