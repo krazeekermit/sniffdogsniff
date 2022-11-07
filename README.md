@@ -16,7 +16,7 @@ python3 webui/__init__.py
 
 
 ### The config file (config.ini)
-```
+```ini
 [general]
 web_service_http_port = 4000
 searches_database_path = ./custom_path.db
