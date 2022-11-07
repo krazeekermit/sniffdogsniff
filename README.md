@@ -58,3 +58,6 @@ If you want to contribute the code you are Welcome!
 * leave comments in the code and let us know what the piece of code you have written does
 * do not commit .db files please!
 * feel free to add comment in some part of the code that are uncommented
+
+#### Special thanks
+* https://github.com/joshmarshall/jsonrpctcp for json-rpc code base for the sdsjsonrpc 
