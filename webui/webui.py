@@ -1,16 +1,22 @@
+import logging
+
 from sds.node import NodeManager
+from werkzeug.serving import make_server
 from flask import Flask, render_template, redirect, url_for
 from flask.globals import request
+from logging import Logger
 
 
-class SdsWebApp:
+class SdsWebService:
     def __init__(self, node: NodeManager):
         self._node = node
+        self._logger = logging.getLogger('Web Service')
         self._app = Flask(__name__)
         self._app.jinja_env.globals.update(content_type_img_path=self.content_type_img_path)
         self._app.add_url_rule('/', view_func=self.search_home)
         self._app.add_url_rule('/search', view_func=self.do_search)
         self._app.add_url_rule('/insert_link', view_func=self.search_home, methods=['GET', 'POST'])
+        self._server = None
 
     @staticmethod
     def content_type_img_path(c: str):
@@ -36,5 +42,11 @@ class SdsWebApp:
         else:
             return render_template('insert_link.html')
 
-    def start_ui(self, address, port):
-        self._app.run(address, port)
+    def start_web_service(self, address, port):
+        self._logger.info(f'Started web server on http://{address}:{port}')
+        self._server = make_server(address, port, self._app)
+        self._server.serve_forever()
+
+    def stop_web_service(self):
+        self._logger.info('Shutting down web service...')
+        self._server.shutdown()

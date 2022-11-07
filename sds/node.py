@@ -5,7 +5,7 @@ from sds.peers_db import PeersDB, Peer
 from sds.local_db import LocalSearchDatabase, SearchResult
 from sds.sniffingdog import SniffingDog
 
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 import logging
 import time
 from sds.utils import string_to_host_port_tuple, string_to_proxy_type
@@ -97,8 +97,12 @@ class NodeRpcServer(Thread):
         self._node_manager = node_manger
 
     def run(self):
-        self._logger.info('Starting Rpc Server')
+        self._logger.info('Starting Rpc Server...')
         self._server.serve()
+
+    def stop_server(self):
+        self._logger.info("Stopping Rpc Server...")
+        self._server.shutdown()
 
     def handshake(self, requesting_peer: Peer):
         """
@@ -137,19 +141,27 @@ class NodeRpcServer(Thread):
         return data
 
 
-class PeerSyncManager(Thread):
+class PeerSyncClient(Thread):
     def __init__(self, node_manager: NodeManager):
-        Thread.__init__(self, name='PeerSyncManager')
+        Thread.__init__(self, name='Syncing Client')
         self._logger = logging.getLogger(name=self.name)
         self._node_manager = node_manager
         self._sync_freq = node_manager.configs.peer_sync_frequency
         self._self_peer = node_manager.configs.self_peer
         self._discoverability = node_manager.configs.node_discoverable
+        self._stop_event = Event()
 
     def run(self) -> None:
-        while True:
+        self._logger.info('Started Sync Client...')
+        while not self._stop_event.is_set():
             time.sleep(self._sync_freq)
             self._sync_with_other_peers()
+
+        self._logger.info('done!')
+
+    def stop_client(self):
+        self._logger.info('Stopping...')
+        self._stop_event.set()
 
     def _sync_with_other_peers(self):
         """
@@ -187,13 +199,8 @@ class PeerSyncManager(Thread):
         client = Client(string_to_host_port_tuple(p.address), key=None)
         if p.has_proxy():
             client.set_proxy(string_to_proxy_type(p.proxy_type), string_to_host_port_tuple(p.proxy_address))
-        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type', 'score'])
+        client.serializer.register_object(SearchResult, ['hash', 'title', 'url', 'description', 'content_type',
+                                                         'score'])
         client.serializer.register_object(Peer, ['address', 'rank', 'proxy_type', 'proxy_address'])
         return client
 
-
-def start_sds_node(node_manager: NodeManager):
-    server = NodeRpcServer(node_manager)
-    peer_manager = PeerSyncManager(node_manager)
-    server.start()
-    peer_manager.start()

@@ -95,11 +95,11 @@ class NodeConfigurations:
 
     @property
     def log_level(self):
-        if str(self._general_configs['peer_sync_frequency']).lower() == 'info':
+        if str(self._general_configs['log_level']).lower() == 'info':
             return logging.INFO
-        elif str(self._general_configs['peer_sync_frequency']).lower() == 'warning':
+        elif str(self._general_configs['log_level']).lower() == 'warning':
             return logging.WARNING
-        elif str(self._general_configs['peer_sync_frequency']).lower() == 'error':
+        elif str(self._general_configs['log_level']).lower() == 'error':
             return logging.ERROR
-        elif str(self._general_configs['peer_sync_frequency']).lower() == 'debug':
+        elif str(self._general_configs['log_level']).lower() == 'debug':
             return logging.DEBUG

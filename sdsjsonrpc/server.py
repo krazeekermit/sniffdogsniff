@@ -64,6 +64,7 @@ class Server(object):
         """ The principle wait cycle. """
         while True:
             if self._shutdown:
+                print("sutdowning cicle rpc server...")
                 break            
             clientsock, addr = self.socket.accept()
             args = (clientsock, addr)
