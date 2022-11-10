@@ -43,6 +43,10 @@ class SearchResult:
     def hash(self):
         return self._hash
 
+    @property
+    def hash_bytes(self):
+        return bytes.fromhex(self._hash)
+
     @hash.setter
     def hash(self, h):
         self._hash = h

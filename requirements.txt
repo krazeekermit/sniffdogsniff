@@ -3,3 +3,4 @@ requests-html
 flask~=2.1.3
 setuptools~=57.0.0
 pysocks
+msgpack
