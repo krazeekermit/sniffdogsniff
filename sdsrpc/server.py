@@ -3,7 +3,7 @@ import zlib
 from threading import Thread, Lock
 import socket
 from collections import deque
-from sdsrpc import serialization
+from sdsrpc import serialization, request_code
 from sdsrpc.dispatcher import RequestDispatcher
 
 
@@ -22,7 +22,7 @@ class ClientsHandler(Thread):
 
     def run(self):
         while not self._stop:
-            print(f'queue waiting {len(self._clients_queue)}')
+            # print(f'queue waiting {len(self._clients_queue)}')
             if len(self._clients_queue) > 0:
                 self._lock.acquire()
                 client_socket = self._clients_queue.pop()
@@ -30,13 +30,28 @@ class ClientsHandler(Thread):
 
                 buffer = b''
                 while True:
-                    b_chunk = client_socket.recv(2 * 1024)
+                    try:
+                        b_chunk = client_socket.recv(2 * 1024)
+                        print(f'received something {len(b_chunk)}')
+                    except socket.timeout:
+                        break
                     if not b_chunk:
                         break
                     buffer += b_chunk
-                request = serialization.deserialize(zlib.decompress(buffer))
-                response = self._dispatcher.dispatch(request)
-                client_socket.send(zlib.compress(serialization.serialize(response)))
+                    if len(b_chunk) < 2 * 1024:
+                        break
+                print(f'preparing req')
+                op, fun_code, args = serialization.deserialize(zlib.decompress(buffer))
+                if op == request_code.CALL_CODE:
+                    try:
+                        response = request_code.RETURN_CODE, fun_code, self._dispatcher.dispatch(fun_code, args)
+                    except KeyError as ex:
+                        response = request_code.ERROR_CODE, fun_code, f'Function {fun_code} not exists: {str(ex)}'
+                    except Exception as ex:
+                        response = request_code.ERROR_CODE, fun_code, f'Function {fun_code}: {str(ex)}'
+                    finally:
+                        client_socket.send(zlib.compress(serialization.serialize(response)))
+
                 client_socket.close()
 
     def stop_handler(self):

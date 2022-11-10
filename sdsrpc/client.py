@@ -1,5 +1,8 @@
+import zlib
+
 from sdsrpc import request_code
 from sdsrpc import serialization
+from sdsrpc.exceptions import RpcRequestException
 import socks
 
 
@@ -19,6 +22,28 @@ class RpcTcpClient:
 
     def _connect_and_perform_request(self, request_data):
         socket = socks.socksocket()
+        if self.use_proxy():
+            socket.set_proxy(self._proxy_type, addr=self._proxy_host, port=self._proxy_port)
         
         socket.connect((self._host, self._port))
-        return None
+        socket.send(zlib.compress(serialization.serialize(request_data)))
+
+        buffer = b''
+        while True:
+            try:
+                b_chunk = socket.recv(2 * 1024)
+            except socket.timeout:
+                break
+            if not b_chunk:
+                break
+            buffer += b_chunk
+            if len(b_chunk) < 2 * 1024:
+                break
+        print(f'Compressed data len :: {len(buffer)}')
+        print(f'Uncompressed data len :: {len(zlib.decompress(buffer))}')
+
+        op, fun_code, ret = serialization.deserialize(zlib.decompress(buffer))
+        if op == request_code.RETURN_CODE:
+            return ret
+        else:
+            raise RpcRequestException(ret, fun_code)
