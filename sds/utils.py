@@ -29,7 +29,7 @@ def string_to_host_port_tuple(addr: str):
 
 
 def string_to_proxy_type(proxy_type: str):
-    return socks.PROXY_TYPES.get(proxy_type.upper())
+    return socks.PROXY_TYPES.get(proxy_type.upper()) or -1
 
 
 def content_type_to_mime_type(content_type: str):

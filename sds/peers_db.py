@@ -1,5 +1,5 @@
 import sqlite3
-import uuid
+from sds import utils
 from os.path import exists
 
 
@@ -7,7 +7,7 @@ class Peer:
     def __init__(self, **kwargs):
         self._address = kwargs['address']
         self._rank = kwargs.get('rank', 0)
-        self._proxy_type = kwargs['proxy_type']
+        self._proxy_type = utils.string_to_proxy_type(kwargs['proxy_type'])
         self._proxy_address = kwargs['proxy_address']
 
     def __dict__(self):
@@ -28,6 +28,10 @@ class Peer:
     @rank.setter
     def rank(self, rank: int):
         self._rank = rank
+
+    @property
+    def has_proxy(self):
+        return self._proxy_type != -1
 
     @property
     def proxy_type(self):

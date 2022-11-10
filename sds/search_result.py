@@ -87,7 +87,3 @@ class SearchResult:
     def score(self):
         return self._score
 
-
-if __name__ == '__main__':
-    sr = SearchResult(title='Title', url='http://www.google.com/', description='The world worst search engine')
-    print(sr.hash)

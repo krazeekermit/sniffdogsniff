@@ -1,8 +1,9 @@
 import select
+import zlib
 from threading import Thread, Lock
 import socket
 from collections import deque
-from sdsrpc import utils
+from sdsrpc import serialization
 from sdsrpc.dispatcher import RequestDispatcher
 
 
@@ -27,12 +28,16 @@ class ClientsHandler(Thread):
                 client_socket = self._clients_queue.pop()
                 self._lock.release()
 
-                self._process_request(client_socket)
+                buffer = b''
+                while True:
+                    b_chunk = client_socket.recv(2 * 1024)
+                    if not b_chunk:
+                        break
+                    buffer += b_chunk
+                request = serialization.deserialize(zlib.decompress(buffer))
+                response = self._dispatcher.dispatch(request)
+                client_socket.send(zlib.compress(serialization.serialize(response)))
                 client_socket.close()
-
-    def _process_request(self, client_socket: socket.socket):
-        for _, func_code, args in utils.receive_and_unpack_data(client_socket):
-            client_socket.send(utils.pack_data(self._dispatcher.dispatch(func_code, args)))
 
     def stop_handler(self):
         self._stop = True
