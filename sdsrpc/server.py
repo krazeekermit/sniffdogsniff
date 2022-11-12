@@ -13,7 +13,7 @@ class ClientsHandler(Thread):
         self._lock = Lock()
         self._clients_queue = deque()
         self._dispatcher = dispatcher
-        self._stop = False
+        self._keep_alive = True
 
     def put(self, client_socket: socket.socket):
         self._lock.acquire()
@@ -21,7 +21,7 @@ class ClientsHandler(Thread):
         self._lock.release()
 
     def run(self):
-        while not self._stop:
+        while not self._keep_alive:
             # print(f'queue waiting {len(self._clients_queue)}')
             if len(self._clients_queue) > 0:
                 self._lock.acquire()
@@ -55,7 +55,7 @@ class ClientsHandler(Thread):
                 client_socket.close()
 
     def stop_handler(self):
-        self._stop = True
+        self._keep_alive = False
 
 
 class RpcTcpServer:

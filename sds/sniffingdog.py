@@ -1,4 +1,4 @@
-from sds.local_db import LocalSearchDatabase
+from sds.local_db import LocalResultsDB
 from urllib.parse import urlparse
 from requests_html import HTMLSession
 import logging
@@ -35,7 +35,7 @@ class SearchEngine:
                     resp = session.get(search_url, headers=self._http_headers, timeout=0.75)
                     content_type = content_type_to_mime_type(resp.headers['content-type'])
                     search_desc = clean_string(resp.html.xpath('//meta[@name="description"]/@content', first=True))
-                except:
+                except Exception as ex:
                     content_type = 'text/html'
                     search_desc = search_title
 
@@ -51,7 +51,7 @@ class SearchEngine:
 
 class SniffingDog:
 
-    def __init__(self, engines: list, local_db: LocalSearchDatabase, minimum_search_results_threshold: int):
+    def __init__(self, engines: list, local_db: LocalResultsDB, minimum_search_results_threshold: int):
         self._engines = engines
         self._local_db = local_db
         self._minimum_search_results_thr = minimum_search_results_threshold

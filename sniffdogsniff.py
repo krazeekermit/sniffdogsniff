@@ -4,7 +4,8 @@ import sys
 
 from sds.configs import NodeConfigurations
 from argparse import ArgumentParser
-from sds.node import NodeManager, NodeRpcServer, PeerSyncClient
+from sds.node import LocalNode
+from sds.node_sync import NodeSyncServer, NodeSyncWorker
 from webui.webui import SdsWebService
 
 
@@ -16,11 +17,11 @@ def parse_args():
 
 
 def start_node():
-    node_manager = NodeManager(configs)
-    server = NodeRpcServer(node_manager)
-    sync_client = PeerSyncClient(node_manager)
+    local_node = LocalNode(configs)
+    server = NodeSyncServer(local_node)
+    sync_client = NodeSyncWorker(local_node)
 
-    app = SdsWebService(node_manager)
+    app = SdsWebService(local_node)
     try:
         server.start()
         sync_client.start()

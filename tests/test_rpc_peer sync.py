@@ -2,10 +2,9 @@ import time
 import unittest
 from unittest import TestCase
 from unittest.mock import Mock, MagicMock
-from sdsjsonrpc import connect
 
 
-from sds.node import NodeManager
+from sds.node import LocalNode
 from sds.configs import NodeConfigurations
 from sds.search_result import SearchResult
 import utils_for_tests
@@ -16,8 +15,8 @@ def setup_server():
     logging.basicConfig(logging.DEBUG)
     configs = NodeConfigurations()
     configs.read_from_file('./config.test.ini')
-    node_manager = NodeManager(configs)
-    node_manager.request_node_searches = MagicMock(return_value={
+    node_manager = LocalNode(configs)
+    node_manager.get_results_for_sync = MagicMock(return_value={
         'c1f537dbc72e4b72eeaeb4b61f33a068268da566b5c05f200bd21844cf534634': SearchResult(
             hash='c1f537dbc72e4b72eeaeb4b61f33a068268da566b5c05f200bd21844cf534634',
             title='title1',

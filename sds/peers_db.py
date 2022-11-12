@@ -3,7 +3,7 @@ from sds import utils
 from os.path import exists
 
 
-class Peer:
+class PeerInfo:
     def __init__(self, **kwargs):
         self._address = kwargs['address']
         self._rank = kwargs.get('rank', 0)
@@ -63,7 +63,7 @@ class PeersDB:
         cur.execute('select * from peers')
         peers = list()
         for row in cur.fetchall():
-            peers.append(Peer(address=row[0], rank=row[1], proxy_type=row[2], proxy_address=row[3]))
+            peers.append(PeerInfo(address=row[0], rank=row[1], proxy_type=row[2], proxy_address=row[3]))
         peers.sort(key=lambda p: p.rank)
         return peers
 
@@ -83,7 +83,7 @@ class PeersDB:
 
         self._conn.commit()
 
-    def update_peer_rank(self, peer: Peer):
+    def update_peer_rank(self, peer: PeerInfo):
         self._conn.execute(f'update peers set rank={peer.rank} where address = "{peer.address}"')
         self._conn.commit()
 

@@ -1,14 +1,13 @@
 import logging
 
-from sds.node import NodeManager
+from sds.node import LocalNode
 from werkzeug.serving import make_server
 from flask import Flask, render_template, redirect, url_for
 from flask.globals import request
-from logging import Logger
 
 
 class SdsWebService:
-    def __init__(self, node: NodeManager):
+    def __init__(self, node: LocalNode):
         self._node = node
         self._logger = logging.getLogger('Web Service')
         self._app = Flask(__name__)

@@ -1,5 +1,5 @@
 from sds.search_result import SearchResult
-from sds.peers_db import Peer
+from sds.peers_db import PeerInfo
 import msgpack
 
 
@@ -17,7 +17,7 @@ def _serialize_ext_object(obj):
             obj.content_type,
             obj.score
         )))
-    elif isinstance(obj, Peer):
+    elif isinstance(obj, PeerInfo):
         return msgpack.ExtType(2, msgpack.packb((
             obj.address,
             obj.rank,
@@ -43,7 +43,7 @@ def _deserialize_ext_object(code, raw_data):
         )
     elif code == 2:
         addr, rank, pt, p_addr = msgpack.unpackb(raw_data)
-        return Peer(
+        return PeerInfo(
             address=addr,
             rank=rank,
             proxy_type=pt,

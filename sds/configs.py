@@ -2,7 +2,7 @@ from configparser import ConfigParser
 import os
 import logging
 from sds.sniffingdog import SearchEngine
-from sds.peers_db import Peer
+from sds.peers_db import PeerInfo
 
 sections_to_exclude = ['general', 'proxy', 'known_peers']
 general_section_keys = ['web_service_http_port', 'searches_database_path', 'minimum_search_results_threshold',
@@ -45,8 +45,8 @@ class NodeConfigurations:
                 proxy_addr = None
                 if proxy_type != 'none':
                     proxy_addr = sec['proxy_address']
-                self._known_peers.append(Peer(address=sec['address'], rank=0, proxy_type=proxy_type,
-                                              proxy_address=proxy_addr))
+                self._known_peers.append(PeerInfo(address=sec['address'], rank=0, proxy_type=proxy_type,
+                                                  proxy_address=proxy_addr))
 
     @property
     def search_engines(self) -> list:
@@ -77,9 +77,9 @@ class NodeConfigurations:
         return self._node_configs['discoverable']
 
     @property
-    def self_peer(self) -> Peer:
-        return Peer(address=self._node_configs['node_address'], proxy_type=self._node_configs['proxy_type'],
-                    proxy_address=self._node_configs['proxy_address'])
+    def self_peer(self) -> PeerInfo:
+        return PeerInfo(address=self._node_configs['node_address'], proxy_type=self._node_configs['proxy_type'],
+                        proxy_address=self._node_configs['proxy_address'])
 
     @property
     def peer_db_path(self):

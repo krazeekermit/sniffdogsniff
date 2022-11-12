@@ -23,9 +23,14 @@ def find_suitable_string(results: list):
                 return text
 
 
-def string_to_host_port_tuple(addr: str):
+def host_from_url(addr: str) -> str:
     parsed_url = urlparse(addr)
-    return parsed_url.hostname, parsed_url.port
+    return parsed_url.hostname
+
+
+def port_from_url(addr: str) -> int:
+    parsed_url = urlparse(addr)
+    return parsed_url.port
 
 
 def string_to_proxy_type(proxy_type: str):

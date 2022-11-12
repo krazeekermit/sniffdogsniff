@@ -3,7 +3,7 @@ import sqlite3
 from .search_result import SearchResult
 
 
-class LocalSearchDatabase:
+class LocalResultsDB:
 
     def __init__(self, db_path):
         self._db_path = db_path
