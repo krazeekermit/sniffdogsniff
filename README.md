@@ -10,8 +10,8 @@ pip3 install -r requirements.txt
 ```
 
 ### How to use
-```
-python3 webui/__init__.py
+```bash
+python3 sniffdogsniff.py -c <path_to_config_file>
 ```
 
 
