@@ -19,7 +19,7 @@
     </nav>
     <div>
         <ul id="navigation" class="list-group">
-        {% for item in searches.values() %}
+        {% for item in searches %}
             <li class="list-group-item list-group-item-action"><div>
                 <small class="disabled">{{ item|attr('url') }}<br/></small>
                 <img src="{{ content_type_img_path(item|attr('content_type')) }}" width="16" height="16">

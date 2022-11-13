@@ -5,47 +5,38 @@ import json
 class SearchResult:
 
     def __init__(self, **kwargs):
-        self._hash = kwargs.get('hash', '')
+        self._hash = kwargs.get('hash', None)
         self._title = kwargs['title']
         self._url = kwargs['url']
         self._description = kwargs['description']
         self._content_type = kwargs.get('content_type', 'text/html')
         self._score = kwargs.get('score', 0)
-        self._auto_hash()
+        if self._hash is None:
+            self._hash = self.calculate_hash()
 
     def calculate_hash(self):
         """
         Merkle tree style hashing of search result
-        :return: the sha256 hash as string
+        :return: the sha256 hash as bytes
         """
-        to_hash = ''
+        to_hash = b''
         for value in [self._url, self._title, self._description, self._content_type]:
-            to_hash += hashlib.sha256(value.encode()).hexdigest()
-        return hashlib.sha256(to_hash.encode()).hexdigest()
-
-    def _auto_hash(self):
-        self._hash = self.calculate_hash()
-
-    def __dict__(self):
-        return {
-            'hash': self._hash,
-            'title': self._title,
-            'url': self._url,
-            'description': self._description,
-            'content_type': self._content_type,
-            'score': self._score
-        }
+            to_hash += hashlib.sha256(value.encode()).digest()
+        return hashlib.sha256(to_hash.encode()).digest()
 
     def is_consistent(self) -> bool:
         return self._hash == self.calculate_hash()
 
+    def __str__(self):
+        return f'SearchResult: hash={self._hash.hex()}, title={self._title}, desc={self._description},' \
+               f' mime={self._content_type}, score={self._score}'
+
+    def __repr__(self):
+        return self.__str__()
+
     @property
     def hash(self):
         return self._hash
-
-    @property
-    def hash_bytes(self):
-        return bytes.fromhex(self._hash)
 
     @hash.setter
     def hash(self, h):

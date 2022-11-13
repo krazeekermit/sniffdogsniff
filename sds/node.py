@@ -27,6 +27,7 @@ class LocalNode(RequestDispatcher):
         self._sniffing_dog = SniffingDog(configs.search_engines, self._local_db,
                                          configs.minimum_search_results_threshold)
 
+        # *** configuration of remote callable functions *** #
         self.register_function(GET_RESULTS_FOR_SYNC, self.get_results_for_sync)
         self.register_function(GET_PEERS_FOR_SYNC, self.get_peers_for_sync)
 
@@ -39,11 +40,10 @@ class LocalNode(RequestDispatcher):
                 retrieved from LocalResultsDB
         """
         self._lock.acquire()
-        searches = dict()
-        for h, rs in self._local_db.get_searches().items():
-            logging.debug(f'Answering search request -> sync hash: {h}')
-            if h not in hashes:
-                searches[h] = rs
+        searches = list()
+        for sr in self._local_db.get_searches():
+            if sr.hash not in hashes:
+                searches.append(sr)
 
         self._lock.release()
         return searches
@@ -66,10 +66,10 @@ class LocalNode(RequestDispatcher):
         self._lock.release()
 
     def insert_new_search_result(self, title: str, url: str, description: str, content_type: str):
-        self.unlock()
+        self._lock.acquire()
         res = SearchResult(title=title, url=url, description=description, content_type=content_type)
         self._local_db.sync({res.hash: res})
-        self.lock()
+        self._lock.release()
 
     def get_peers(self) -> list:
         return self._peers_db.get_peers()

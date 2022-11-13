@@ -70,6 +70,6 @@ class NodeSyncWorker(Thread):
                 self._local_node.sync_searches_db_from(remote_node.get_results_for_sync(hashes))
                 self._local_node.sync_peers_db_from(remote_node.get_peers_for_sync())
             except Exception as ex:
-                self._logger.info(f'{ex.__str__()}')
+                self._logger.warning(f'{ex.__str__()}')
             finally:
                 p_info.rank = int((time.time() - s_time) * 1000)

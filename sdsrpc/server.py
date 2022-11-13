@@ -21,9 +21,9 @@ class ClientsHandler(Thread):
         self._lock.release()
 
     def run(self):
-        while not self._keep_alive:
-            # print(f'queue waiting {len(self._clients_queue)}')
+        while self._keep_alive:
             if len(self._clients_queue) > 0:
+                print(f'someone requesting something')
                 self._lock.acquire()
                 client_socket = self._clients_queue.pop()
                 self._lock.release()
@@ -42,6 +42,7 @@ class ClientsHandler(Thread):
                         break
                 print(f'preparing req')
                 op, fun_code, args = serialization.deserialize(zlib.decompress(buffer))
+                print(f'request function::{fun_code}')
                 if op == request_code.CALL_CODE:
                     try:
                         response = request_code.RETURN_CODE, fun_code, self._dispatcher.dispatch(fun_code, args)

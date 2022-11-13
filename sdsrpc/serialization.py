@@ -10,7 +10,7 @@ def serialize(obj):
 def _serialize_ext_object(obj):
     if isinstance(obj, SearchResult):
         return msgpack.ExtType(1, msgpack.packb((
-            bytes.fromhex(obj.hash),
+            obj.hash,
             obj.title,
             obj.url,
             obj.description,
@@ -34,7 +34,7 @@ def _deserialize_ext_object(code, raw_data):
     if code == 1:
         b_hash, title, url, desc, ct, score = msgpack.unpackb(raw_data)
         return SearchResult(
-            hash=b_hash.hex(),
+            hash=b_hash,
             title=title,
             url=url,
             description=desc,

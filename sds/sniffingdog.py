@@ -18,7 +18,7 @@ class SearchEngine:
         self._http_headers = {"User-Agent": user_agent}
 
     def search(self, query: str):
-        searches = dict()
+        searches = []
         session = HTMLSession()
         r = session.get(self._query_url + query,
                         headers=self._http_headers)
@@ -41,7 +41,7 @@ class SearchEngine:
 
                 result = SearchResult(title=search_title, url=search_url, description=search_desc,
                                       content_type=content_type)
-                searches[result.hash] = result
+                searches.append(result)
         return searches
 
     @property
@@ -57,15 +57,15 @@ class SniffingDog:
         self._minimum_search_results_thr = minimum_search_results_threshold
 
     def do_search(self, search_query: str, filter_content_types=[]) -> dict:
-        searches = {}
-        searches.update(self._local_db.search(search_query))
+        searches = []
+        searches.extend(self._local_db.search(search_query))
 
         if not len(searches) > self._minimum_search_results_thr:
             for e in self._engines:
                 logging.debug(f'Searching results from {e.name}')
                 try:
                     res = e.search(search_query)
-                    searches.update(res)
+                    searches.extend(res)
                 except Exception as ex:
                     print(f'error in {e.name}= {ex.args}')
 

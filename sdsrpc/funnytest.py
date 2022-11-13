@@ -2,6 +2,8 @@ import json
 import time
 import threading
 import zlib
+from sds.node import RemoteNode
+from sds.peers_db import PeerInfo
 
 import msgpack
 
@@ -18,15 +20,21 @@ def junkmethod():
         print('Hello')
 
 
+def test3():
+    print(f' *** Asking searches *** ')
+    p = PeerInfo(address='tcp://127.0.0.1:4222', proxy_type='None', proxy_address='')
+    rn = RemoteNode(p)
+    rr = rn.get_results_for_sync([])
+    print(rr)
+    hashes = set()
+    hashes_ls = list()
+    for sr1 in rr:
+        hashes.add(sr1.hash)
+        hashes_ls.append(sr1.hash)
+
+    print(len(hashes_ls) - len(hashes))
+    print(len(rr))
+
+
 if __name__ == '__main__':
-    disp = dispatcher.RequestDispatcher()
-    disp.register_function(101, junkmethod)
-    srv = server.RpcTcpServer(disp)
-    threading.Thread(target=srv.serve, args=('127.0.0.1', 1234)).start()
-
-    time.sleep(3)
-    cli = client.RpcTcpClient('127.0.0.1', 1234, -1, None, None)
-    cli.call_remote(101)
-
-    print(f'Server shutdown test')
-    srv.shutdown()
+    test3()

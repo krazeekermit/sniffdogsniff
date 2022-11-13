@@ -1,6 +1,7 @@
+import base64
 from os.path import exists
 import sqlite3
-from .search_result import SearchResult
+from sds.search_result import SearchResult
 
 
 class LocalResultsDB:
@@ -21,12 +22,12 @@ class LocalResultsDB:
         else:
             self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
 
-    def _insert_records_and_commit(self, results: dict):
-        self._conn.execute('delete from search_cache')
-        for sr in results.values():
+    def _insert_records_and_commit(self, results: list):
+        # self._conn.execute('delete from search_cache')
+        for sr in results:
             self._conn.execute(
-                f'insert into search_cache values("{sr.hash}", "{sr.title}", "{sr.url}", "{sr.description}",'
-                f' "{sr.content_type}", {sr.score})'
+                f'insert or ignore into search_cache values("{base64.urlsafe_b64encode(sr.hash).decode()}",'
+                f' "{sr.title}", "{sr.url}", "{sr.description}", "{sr.content_type}", {sr.score})'
             )
 
         self._conn.commit()
@@ -34,42 +35,43 @@ class LocalResultsDB:
     def _do_query(self, sql_query: str) -> dict:
         cur = self._conn.cursor()
         cur.execute(sql_query)
-        searches = dict()
+        searches = []
         for row in cur.fetchall():
-            sr = SearchResult(hash=row[0], title=row[1], url=row[2], description=row[3], content_type=row[4],
-                              score=row[5])
-            searches[sr.hash] = sr
+            searches.append(SearchResult(hash=base64.urlsafe_b64decode(row[0]), title=row[1], url=row[2],
+                                         description=row[3], content_type=row[4], score=row[5]))
 
         return searches
 
     def search(self, query) -> dict:
-        return self._do_query(self._build_sql_query(query))
+        search_results = self._do_query(self._build_sql_query(query))
+        print(f'results lenght {len(search_results)}')
+        return search_results
 
-    def get_searches(self) -> dict:
+    def get_searches(self) -> list:
         return self._do_query('select * from search_cache')
 
     def get_hashes(self) -> list:
-        cur = self._conn.cursor()
-        cur.execute('select hash from search_cache')
-        hashes = list()
-        for row in cur.fetchall():
-            hashes.append(row[0])
-
+        hashes = []
+        for sr in self.get_searches():
+            hashes.append(sr.hash)
         return hashes
 
-    def sync(self, new_searches: dict):
-        searches = self._do_query('select * from search_cache')
-        for h, v in new_searches.items():
-            if h in searches.keys():
-                v.update_score(searches[h])
-            searches[h] = v
-        self._insert_records_and_commit(searches)
+    def sync(self, new_searches: list):
+        # for h, v in new_searches.items():
+        #     if h in searches.keys():
+        #         v.update_score(searches[h].score)
+        #     searches[h] = v
+        hashes_set = set(self.get_hashes())
+        for sr in new_searches:
+            if sr.hash in hashes_set:
+                new_searches.remove(sr)
+        self._insert_records_and_commit(new_searches)
 
-    def sync_from(self, new_searches: dict):
-        valid_searches = dict()
-        for h, sr in new_searches.items():
+    def sync_from(self, new_searches: list):
+        valid_searches = list()
+        for sr in new_searches:
             if sr.is_consistent():
-                valid_searches[h] = sr
+                valid_searches.append(sr)
         self.sync(valid_searches)
 
     @staticmethod
@@ -84,4 +86,3 @@ class LocalResultsDB:
         #     query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
         #              f' or lower(search_url) like "%{kw}%"'
         return query
-
