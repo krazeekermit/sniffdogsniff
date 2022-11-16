@@ -39,8 +39,6 @@ class RpcTcpClient:
             buffer += b_chunk
             if len(b_chunk) < 2 * 1024:
                 break
-        print(f'Compressed data len :: {len(buffer)}')
-        print(f'Uncompressed data len :: {len(zlib.decompress(buffer))}')
 
         op, fun_code, ret = serialization.deserialize(zlib.decompress(buffer))
         if op == request_code.RETURN_CODE:

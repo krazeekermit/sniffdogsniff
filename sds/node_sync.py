@@ -53,10 +53,9 @@ class NodeSyncWorker(Thread):
         !!! lower ranking highest speed !!!
         :return: None
         """
-        self._local_node.unlock()
         peers_list = self._local_node.get_peers()
         hashes = self._local_node.get_hashes()
-        self._local_node.lock()
+
         s_time = 0
         for p_info in peers_list[:7]:
             self._logger.info(f'Syncing from {p_info.address}')
@@ -64,12 +63,11 @@ class NodeSyncWorker(Thread):
             try:
                 remote_node = RemoteNode(p_info)
                 if self._discoverability:
-                    pass
-                    # remote_node.handshake(self._self_peer)
+                    remote_node.handshake(self._self_peer)
                 s_time = time.time()
                 self._local_node.sync_searches_db_from(remote_node.get_results_for_sync(hashes))
                 self._local_node.sync_peers_db_from(remote_node.get_peers_for_sync())
             except Exception as ex:
-                self._logger.warning(f'{ex.__str__()}')
+                self._logger.error(f'{ex.__str__()}')
             finally:
                 p_info.rank = int((time.time() - s_time) * 1000)

@@ -22,7 +22,7 @@ class SearchResult:
         to_hash = b''
         for value in [self._url, self._title, self._description, self._content_type]:
             to_hash += hashlib.sha256(value.encode()).digest()
-        return hashlib.sha256(to_hash.encode()).digest()
+        return hashlib.sha256(to_hash).digest()
 
     def is_consistent(self) -> bool:
         return self._hash == self.calculate_hash()
@@ -33,6 +33,12 @@ class SearchResult:
 
     def __repr__(self):
         return self.__str__()
+
+    def __hash__(self):
+        return hash(self._hash)
+
+    def __eq__(self, other):
+        return self._hash == other.hash
 
     @property
     def hash(self):

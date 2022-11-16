@@ -1,7 +1,7 @@
 from sds.configs import NodeConfigurations
 from sds.peers_db import PeersDB, PeerInfo
 from sds.local_db import LocalResultsDB, SearchResult
-from sds.sniffingdog import SniffingDog
+from sds.seeker import SeekerDog
 
 from threading import Lock
 import logging
@@ -13,7 +13,7 @@ from sdsrpc.client import RpcTcpClient
 
 GET_RESULTS_FOR_SYNC = 101
 GET_PEERS_FOR_SYNC = 102
-HANDSHAKE = 101
+HANDSHAKE = 103
 
 
 class LocalNode(RequestDispatcher):
@@ -24,12 +24,27 @@ class LocalNode(RequestDispatcher):
         self._local_db = LocalResultsDB(configs.searches_db_path)
         self._peers_db = PeersDB(configs.peer_db_path, configs.known_peers_dict)
 
-        self._sniffing_dog = SniffingDog(configs.search_engines, self._local_db,
-                                         configs.minimum_search_results_threshold)
+        self._sniffing_dog = SeekerDog(configs.search_engines, self._local_db,
+                                       configs.minimum_search_results_threshold)
 
         # *** configuration of remote callable functions *** #
+        self.register_function(HANDSHAKE, self.handshake)
         self.register_function(GET_RESULTS_FOR_SYNC, self.get_results_for_sync)
         self.register_function(GET_PEERS_FOR_SYNC, self.get_peers_for_sync)
+
+    def handshake(self, peer: PeerInfo) -> dict:
+        """
+        get_results_for_sync: remote callable function
+        :param peer:
+        :return: list of search result that are not in the hash list
+                (hashes (remote) - hashes (local) = results to send back)
+                retrieved from LocalResultsDB
+        """
+        self._lock.acquire()
+        try:
+            self._peers_db.sync_peers_from([peer])
+        finally:
+            self._lock.release()
 
     def get_results_for_sync(self, hashes: list) -> dict:
         """
@@ -72,10 +87,18 @@ class LocalNode(RequestDispatcher):
         self._lock.release()
 
     def get_peers(self) -> list:
-        return self._peers_db.get_peers()
+        self._lock.acquire()
+        peer_list = []
+        peer_list.extend(self._peers_db.get_peers())
+        self._lock.release()
+        return peer_list
 
     def get_hashes(self):
-        return self._local_db.get_hashes()
+        self._lock.acquire()
+        hashes = []
+        hashes.extend(self._local_db.get_hashes())
+        self._lock.release()
+        return hashes
 
     def sync_searches_db_from(self, new_searches: dict):
         self._lock.acquire()
@@ -115,6 +138,9 @@ class RemoteNode:
             utils.host_from_url(peer_info.proxy_address),
             utils.port_from_url(peer_info.proxy_address)
         )
+
+    def handshake(self, peer: PeerInfo):
+        return self._client.call_remote(HANDSHAKE, peer)
 
     def get_results_for_sync(self, hashes: list) -> dict:
         return self._client.call_remote(GET_RESULTS_FOR_SYNC, hashes)

@@ -1,3 +1,4 @@
+import logging
 import select
 import zlib
 from threading import Thread, Lock
@@ -23,7 +24,6 @@ class ClientsHandler(Thread):
     def run(self):
         while self._keep_alive:
             if len(self._clients_queue) > 0:
-                print(f'someone requesting something')
                 self._lock.acquire()
                 client_socket = self._clients_queue.pop()
                 self._lock.release()
@@ -32,7 +32,6 @@ class ClientsHandler(Thread):
                 while True:
                     try:
                         b_chunk = client_socket.recv(2 * 1024)
-                        print(f'received something {len(b_chunk)}')
                     except socket.timeout:
                         break
                     if not b_chunk:
@@ -40,9 +39,7 @@ class ClientsHandler(Thread):
                     buffer += b_chunk
                     if len(b_chunk) < 2 * 1024:
                         break
-                print(f'preparing req')
                 op, fun_code, args = serialization.deserialize(zlib.decompress(buffer))
-                print(f'request function::{fun_code}')
                 if op == request_code.CALL_CODE:
                     try:
                         response = request_code.RETURN_CODE, fun_code, self._dispatcher.dispatch(fun_code, args)
@@ -85,7 +82,6 @@ class RpcTcpServer:
             for s in readable:
                 if s is self._server_socket:
                     connection, client_address = s.accept()
-                    print(f'connection from {client_address}')
                     self._clients_handler.put(connection)
 
     def shutdown(self):

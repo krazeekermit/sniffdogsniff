@@ -1,7 +1,7 @@
 from configparser import ConfigParser
 import os
 import logging
-from sds.sniffingdog import SearchEngine
+from sds.seeker import SearchEngine
 from sds.peers_db import PeerInfo
 
 sections_to_exclude = ['general', 'proxy', 'known_peers']

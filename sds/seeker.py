@@ -7,7 +7,6 @@ from sds.utils import clean_string, content_type_to_mime_type
 
 
 class SearchEngine:
-
     def __init__(self, name: str, query_url: str, result_container_filter: str, result_url_filter: str,
                  result_title_filter: str, user_agent: str):
         self._name = name
@@ -49,25 +48,25 @@ class SearchEngine:
         return self._name
 
 
-class SniffingDog:
-
+class SeekerDog:
     def __init__(self, engines: list, local_db: LocalResultsDB, minimum_search_results_threshold: int):
+        self._logger = logging.getLogger('ResultsSeeker')
         self._engines = engines
         self._local_db = local_db
         self._minimum_search_results_thr = minimum_search_results_threshold
 
     def do_search(self, search_query: str, filter_content_types=[]) -> dict:
-        searches = []
-        searches.extend(self._local_db.search(search_query))
+        searches = set()
+        searches.update(self._local_db.search(search_query))
 
         if not len(searches) > self._minimum_search_results_thr:
             for e in self._engines:
-                logging.debug(f'Searching results from {e.name}')
+                self._logger.debug(f'Searching results from {e.name}')
                 try:
                     res = e.search(search_query)
-                    searches.extend(res)
+                    searches.update(res)
                 except Exception as ex:
-                    print(f'error in {e.name}= {ex.args}')
+                    self._logger.error(f'{str(ex)}')
 
         self._local_db.sync(searches)
 
