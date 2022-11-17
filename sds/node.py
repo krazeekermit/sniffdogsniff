@@ -86,6 +86,13 @@ class LocalNode(RequestDispatcher):
         self._local_db.sync({res.hash: res})
         self._lock.release()
 
+    def update_result_score(self, r_hash, increment: int):
+        self._lock.acquire()
+        try:
+            self._local_db.update_result_score(r_hash, increment)
+        finally:
+            self._lock.release()
+
     def get_peers(self) -> list:
         self._lock.acquire()
         peer_list = []

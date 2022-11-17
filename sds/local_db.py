@@ -26,10 +26,15 @@ class LocalResultsDB:
         # self._conn.execute('delete from search_cache')
         for sr in results:
             self._conn.execute(
-                f'insert or ignore into search_cache values("{base64.urlsafe_b64encode(sr.hash).decode()}",'
+                f'insert or ignore into search_cache values("{self._hash_to_base64_str(sr.hash)}",'
                 f' "{sr.title}", "{sr.url}", "{sr.description}", "{sr.content_type}", {sr.score})'
             )
 
+        self._conn.commit()
+
+    def update_result_score(self, r_hash, increment: int):
+        self._conn.execute(f'update search_cache set score=score+{increment}'
+                           f' where hash = "{self._hash_to_base64_str(r_hash)}"')
         self._conn.commit()
 
     def _do_query(self, sql_query: str) -> dict:
@@ -37,7 +42,7 @@ class LocalResultsDB:
         cur.execute(sql_query)
         searches = []
         for row in cur.fetchall():
-            searches.append(SearchResult(hash=base64.urlsafe_b64decode(row[0]), title=row[1], url=row[2],
+            searches.append(SearchResult(hash=self._hash_from_base64_str(row[0]), title=row[1], url=row[2],
                                          description=row[3], content_type=row[4], score=row[5]))
 
         return searches
@@ -73,6 +78,14 @@ class LocalResultsDB:
             if sr.is_consistent():
                 valid_searches.append(sr)
         self.sync(valid_searches)
+
+    @staticmethod
+    def _hash_to_base64_str(r_hash):
+        return base64.urlsafe_b64encode(r_hash).decode()
+
+    @staticmethod
+    def _hash_from_base64_str(b64_hash: str):
+        return base64.urlsafe_b64decode(b64_hash)
 
     @staticmethod
     def _build_sql_query(query_text: str) -> str:
