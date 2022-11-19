@@ -66,11 +66,8 @@ class LocalResultsDB:
         #     if h in searches.keys():
         #         v.update_score(searches[h].score)
         #     searches[h] = v
-        hashes_set = set(self.get_hashes())
-        for sr in new_searches:
-            if sr.hash in hashes_set:
-                new_searches.remove(sr)
-        self._insert_records_and_commit(new_searches)
+        to_insert = set(new_searches).difference(self.get_searches())
+        self._insert_records_and_commit(to_insert)
 
     def sync_from(self, new_searches: list):
         valid_searches = list()
@@ -93,9 +90,9 @@ class LocalResultsDB:
         print(txt)
         query = f'select * from search_cache where lower(description)' \
                 f' like "%{txt}%" or lower(title) like "%{txt}%" or lower(search_url) like "%{txt}%"'
-        # for kw in txt.split(' '):
-        #     if kw.isnumeric():
-        #         continue
-        #     query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
-        #              f' or lower(search_url) like "%{kw}%"'
+        for kw in txt.split(' '):
+            if kw.isnumeric():
+                continue
+            query += f' or lower(description) like "%{kw}%" or lower(title) like "%{kw}%"' \
+                     f' or lower(search_url) like "%{kw}%"'
         return query

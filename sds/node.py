@@ -67,11 +67,7 @@ class LocalNode(RequestDispatcher):
         get_peers_for_sync: remote callable function
         :return: the list of peers known by PeersDB
         """
-        self._lock.acquire()
-        peer_list = []
-        peer_list.extend(self.get_peers())
-        self._lock.release()
-        return peer_list
+        return self.get_peers()
 
     def unlock(self):
         self._lock.acquire()

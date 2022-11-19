@@ -7,7 +7,7 @@ class PeerInfo:
     def __init__(self, **kwargs):
         self._address = kwargs['address']
         self._rank = kwargs.get('rank', 0)
-        self._proxy_type = utils.string_to_proxy_type(kwargs['proxy_type'])
+        self._proxy_type = kwargs.get('proxy_type', -1)
         self._proxy_address = kwargs['proxy_address']
 
     def __dict__(self):
