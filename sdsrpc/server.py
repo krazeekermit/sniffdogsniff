@@ -82,6 +82,7 @@ class RpcTcpServer:
             for s in readable:
                 if s is self._server_socket:
                     connection, client_address = s.accept()
+                    print(f'connection from {client_address}')
                     self._clients_handler.put(connection)
 
     def shutdown(self):

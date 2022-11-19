@@ -3,6 +3,7 @@ import os
 import logging
 from sds.seeker import SearchEngine
 from sds.peers_db import PeerInfo
+from sds import utils
 
 sections_to_exclude = ['general', 'proxy', 'known_peers']
 general_section_keys = ['web_service_http_port', 'searches_database_path', 'minimum_search_results_threshold',
@@ -45,7 +46,8 @@ class NodeConfigurations:
                 proxy_addr = None
                 if proxy_type != 'none':
                     proxy_addr = sec['proxy_address']
-                self._known_peers.append(PeerInfo(address=sec['address'], rank=0, proxy_type=proxy_type,
+                self._known_peers.append(PeerInfo(address=sec['address'], rank=0,
+                                                  proxy_type=utils.string_to_proxy_type(proxy_type),
                                                   proxy_address=proxy_addr))
 
     @property
@@ -78,8 +80,11 @@ class NodeConfigurations:
 
     @property
     def self_peer(self) -> PeerInfo:
-        return PeerInfo(address=self._node_configs['node_address'], proxy_type=self._node_configs['proxy_type'],
-                        proxy_address=self._node_configs['proxy_address'])
+        return PeerInfo(
+            address=self._node_configs['node_address'],
+            proxy_type=utils.string_to_proxy_type(self._node_configs['proxy_type']),
+            proxy_address=self._node_configs['proxy_address']
+        )
 
     @property
     def peer_db_path(self):
