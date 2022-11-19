@@ -1,5 +1,7 @@
+import time
 import zlib
 
+from sdsrpc import RECV_CHUNK_LEN
 from sdsrpc import request_code
 from sdsrpc import serialization
 from sdsrpc.exceptions import RpcRequestException
@@ -13,6 +15,8 @@ class RpcTcpClient:
         self._proxy_type = proxy_type
         self._proxy_host = proxy_host
         self._proxy_port = proxy_port
+
+        self._last_request_dl_speed = -1000
 
     def use_proxy(self):
         return self._proxy_type != -1
@@ -28,20 +32,30 @@ class RpcTcpClient:
         socket.connect((self._host, self._port))
         socket.send(zlib.compress(serialization.serialize(request_data)))
 
+        start_time = 0
+
         buffer = b''
         while True:
             try:
-                b_chunk = socket.recv(2 * 1024)
+                b_chunk = socket.recv(RECV_CHUNK_LEN)
+                start_time = time.time()
             except socket.timeout:
                 break
             if not b_chunk:
                 break
             buffer += b_chunk
-            if len(b_chunk) < 2 * 1024:
+            if len(b_chunk) < RECV_CHUNK_LEN:
                 break
 
-        op, fun_code, ret = serialization.deserialize(zlib.decompress(buffer))
+        elapsed_time = (time.time() - start_time) * 1000
+        uncompressed_data = zlib.decompress(buffer)
+        self._last_request_dl_speed = int((len(uncompressed_data) - RECV_CHUNK_LEN) / 1024 / elapsed_time)
+
+        op, fun_code, ret = serialization.deserialize(uncompressed_data)
         if op == request_code.RETURN_CODE:
             return ret
         else:
             raise RpcRequestException(ret, fun_code)
+
+    def get_last_request_download_speed(self):
+        return self._last_request_dl_speed

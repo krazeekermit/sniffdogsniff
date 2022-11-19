@@ -32,8 +32,7 @@ def test3():
         hashes.add(sr1.hash)
         hashes_ls.append(sr1.hash)
 
-    print(len(hashes_ls) - len(hashes))
-    print(len(rr))
+    print(f'Speed = {rn.get_download_speed() / 1024} MB/s')
 
 
 if __name__ == '__main__':

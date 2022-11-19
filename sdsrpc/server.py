@@ -6,6 +6,7 @@ import socket
 from collections import deque
 from sdsrpc import serialization, request_code
 from sdsrpc.dispatcher import RequestDispatcher
+from sdsrpc import RECV_CHUNK_LEN
 
 
 class ClientsHandler(Thread):
@@ -31,13 +32,13 @@ class ClientsHandler(Thread):
                 buffer = b''
                 while True:
                     try:
-                        b_chunk = client_socket.recv(2 * 1024)
+                        b_chunk = client_socket.recv(RECV_CHUNK_LEN)
                     except socket.timeout:
                         break
                     if not b_chunk:
                         break
                     buffer += b_chunk
-                    if len(b_chunk) < 2 * 1024:
+                    if len(b_chunk) < RECV_CHUNK_LEN:
                         break
                 op, fun_code, args = serialization.deserialize(zlib.decompress(buffer))
                 if op == request_code.CALL_CODE:

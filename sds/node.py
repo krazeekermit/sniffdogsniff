@@ -35,10 +35,9 @@ class LocalNode(RequestDispatcher):
     def handshake(self, peer: PeerInfo) -> dict:
         """
         get_results_for_sync: remote callable function
-        :param peer:
-        :return: list of search result that are not in the hash list
-                (hashes (remote) - hashes (local) = results to send back)
-                retrieved from LocalResultsDB
+        :param peer: peer information about the requesting peer (if discoverable), if is not already in peerDb it will be
+                    added
+        :return: void
         """
         self._lock.acquire()
         try:
@@ -145,6 +144,9 @@ class RemoteNode:
             utils.host_from_url(peer_info.proxy_address),
             utils.port_from_url(peer_info.proxy_address)
         )
+
+    def get_download_speed(self):
+        return self._client.get_last_request_download_speed()
 
     def handshake(self, peer: PeerInfo):
         return self._client.call_remote(HANDSHAKE, peer)
