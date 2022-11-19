@@ -10,3 +10,12 @@ class RpcRequestException(Exception):
     @property
     def function_code(self):
         return self._fun_code
+
+
+class RpcClientConnectionException(Exception):
+    def __init__(self, host: str, payload: str):
+        self._payload = payload
+        self._host = host
+
+    def __str__(self):
+        return f'Failed connecting to {self._host}: {self._payload}'

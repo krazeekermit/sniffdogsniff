@@ -1,4 +1,3 @@
-import logging
 import select
 import zlib
 from threading import Thread, Lock
@@ -83,14 +82,9 @@ class RpcTcpServer:
             for s in readable:
                 if s is self._server_socket:
                     connection, client_address = s.accept()
-                    print(f'connection from {client_address}')
                     self._clients_handler.put(connection)
 
     def shutdown(self):
         self._keep_alive = False
 
-
-if __name__ == '__main__':
-    server = RpcTcpServer(RequestDispatcher())
-    server.serve('127.0.0.1', 45002)
 

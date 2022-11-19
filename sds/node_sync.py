@@ -3,7 +3,7 @@ import logging
 import time
 
 from sdsrpc.server import RpcTcpServer
-
+from sdsrpc.exceptions import RpcRequestException, RpcClientConnectionException
 from sds.node import LocalNode, RemoteNode
 
 
@@ -56,18 +56,25 @@ class NodeSyncWorker(Thread):
         peers_list = self._local_node.get_peers()
         hashes = self._local_node.get_hashes()
 
-        s_time = 0
         for p_info in peers_list[:7]:
             self._logger.info(f'Syncing from {p_info.address}')
+            rank = p_info.rank
 
             try:
                 remote_node = RemoteNode(p_info)
                 if self._discoverability:
                     remote_node.handshake(self._self_peer)
-                s_time = time.time()
                 self._local_node.sync_searches_db_from(remote_node.get_results_for_sync(hashes))
                 self._local_node.sync_peers_db_from(remote_node.get_peers_for_sync())
+                rank -= remote_node.get_download_speed()
+            except RpcRequestException as ex:
+                self._logger.error(f'{str(ex)}')
+                rank += 100
+            except RpcClientConnectionException as ex:
+                self._logger.error(f'{str(ex)}')
+                rank += 1000
             except Exception as ex:
-                self._logger.error(f'{ex.__str__()}')
+                self._logger.error(f'{str(ex)}')
             finally:
-                p_info.rank = int((time.time() - s_time) * 1000)
+                p_info.rank = rank
+                self._local_node.update_peer_rank(p_info)

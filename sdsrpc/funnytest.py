@@ -22,7 +22,7 @@ def junkmethod():
 
 def test3():
     print(f' *** Asking searches *** ')
-    p = PeerInfo(address='tcp://127.0.0.1:4222', proxy_type='None', proxy_address='')
+    p = PeerInfo(address='tcp://127.0.0.1:4222', proxy_type=-1, proxy_address='')
     rn = RemoteNode(p)
     rr = rn.get_results_for_sync([])
     print(rr)
@@ -32,7 +32,7 @@ def test3():
         hashes.add(sr1.hash)
         hashes_ls.append(sr1.hash)
 
-    print(f'Speed = {rn.get_download_speed() / 1024} MB/s')
+    print(f'Speed = {rn.get_download_speed()} MB/s')
 
 
 if __name__ == '__main__':
