@@ -11,9 +11,10 @@ from sdsrpc.dispatcher import RequestDispatcher
 from sdsrpc.client import RpcTcpClient
 
 
-GET_RESULTS_FOR_SYNC = 101
-GET_PEERS_FOR_SYNC = 102
-HANDSHAKE = 103
+HANDSHAKE = 101
+GET_RESULTS_FOR_SYNC = 102
+GET_SCORES_FOR_SYNC = 103
+GET_PEERS_FOR_SYNC = 104
 
 
 class LocalNode(RequestDispatcher):
@@ -30,6 +31,7 @@ class LocalNode(RequestDispatcher):
         # *** configuration of remote callable functions *** #
         self.register_function(HANDSHAKE, self.handshake)
         self.register_function(GET_RESULTS_FOR_SYNC, self.get_results_for_sync)
+        self.register_function(GET_SCORES_FOR_SYNC, self.get_scores_for_sync)
         self.register_function(GET_PEERS_FOR_SYNC, self.get_peers_for_sync)
 
     def handshake(self, peer: PeerInfo) -> dict:
@@ -61,6 +63,17 @@ class LocalNode(RequestDispatcher):
 
         self._lock.release()
         return searches
+
+    def get_scores_for_sync(self):
+        """
+        get_scores_for_sync: remote callable function
+        :return: dictionary <hash, score>
+        """
+        self._lock.acquire()
+        scores_dict = {}
+        scores_dict.update(self._local_db.get_scores())
+        self._lock.release()
+        return scores_dict
 
     def get_peers_for_sync(self):
         """
@@ -149,6 +162,9 @@ class RemoteNode:
 
     def get_results_for_sync(self, hashes: list) -> dict:
         return self._client.call_remote(GET_RESULTS_FOR_SYNC, hashes)
+
+    def get_scores_for_sync(self):
+        return self._client.call_remote(GET_SCORES_FOR_SYNC)
 
     def get_peers_for_sync(self):
         return self._client.call_remote(GET_PEERS_FOR_SYNC)

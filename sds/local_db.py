@@ -62,10 +62,6 @@ class LocalResultsDB:
         return hashes
 
     def sync(self, new_searches: list):
-        # for h, v in new_searches.items():
-        #     if h in searches.keys():
-        #         v.update_score(searches[h].score)
-        #     searches[h] = v
         to_insert = set(new_searches).difference(self.get_searches())
         self._insert_records_and_commit(to_insert)
 
@@ -75,6 +71,17 @@ class LocalResultsDB:
             if sr.is_consistent():
                 valid_searches.append(sr)
         self.sync(valid_searches)
+
+    def get_scores(self) -> dict:
+        scores_dict = {}
+        for sr in self.get_searches():
+            scores_dict[sr.hash] = sr.score
+        return scores_dict
+
+    def sync_scores_from(self, scores: dict):
+        for h, score in scores.items():
+            self._conn.execute(f'update search_cache set score={score} where hash = "{self._hash_to_base64_str(h)}"')
+        self._conn.commit()
 
     @staticmethod
     def _hash_to_base64_str(r_hash):
