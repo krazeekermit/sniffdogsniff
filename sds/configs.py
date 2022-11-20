@@ -37,7 +37,7 @@ class NodeConfigurations:
                 sec = self._config_parser[sn.strip()]
                 engine = SearchEngine(sec['name'], sec['search_query_url'], sec['results_container_filter'],
                                       sec['result_url_filter'], sec['result_title_filter'], sec['user_agent'])
-            self._search_engines.append(engine)
+                self._search_engines.append(engine)
 
         if self._config_parser['general']['peers'] is not None:
             for pn in self._config_parser['general']['peers'].split(','):
