@@ -7,6 +7,7 @@ import (
 )
 
 type LocalNode struct {
+	proxySettings ProxySettings
 	tsLock        sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB      SearchDB
 	searchEngines map[string]SearchEngine
@@ -19,6 +20,7 @@ func InitNode(configs SdsConfig) LocalNode {
 	var ln LocalNode
 	ln.searchDB.Open(configs.searchDatabasePath)
 	ln.peerDB.Open(configs.peersDatabasePath, configs.KnownPeers)
+	ln.proxySettings = configs.proxySettings
 	ln.tsLock = sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
@@ -82,9 +84,9 @@ func (ln LocalNode) SyncWithPeers() {
 			ln.tsLock.Lock()
 			hashes := ln.searchDB.GetAllHashes()
 			ln.tsLock.Unlock()
-			p.Handshake(ln.selfPeer)
-			newSearches := p.GetResultsForSync(hashes)
-			newPeers := p.GetPeersForSync()
+			p.Handshake(ln.proxySettings, ln.selfPeer)
+			newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
+			newPeers := p.GetPeersForSync(ln.proxySettings)
 
 			ln.tsLock.Lock()
 			ln.searchDB.SyncFrom(newSearches)

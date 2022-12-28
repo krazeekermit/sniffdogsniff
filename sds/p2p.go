@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	NONE_PROXY_TYPE    int = -1
-	SOCKS_5_PROXY_TYPE int = 0
+	NONE_PROXY_TYPE        int = -1
+	TOR_SOCKS_5_PROXY_TYPE int = 0
+	I2P_SOCKS_5_PROXY_TYPE int = 1
 )
 
 const BUFFER_SIZE = 256
@@ -169,30 +170,29 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 /***************************** Peers ******************************/
 
 type Peer struct {
-	Address      string
-	ProxyType    int
-	ProxyAddress string
-	Rank         int64
+	Address   string
+	ProxyType int
+	Rank      int64
 }
 
 func NewPeer(address string) Peer {
 	return Peer{
-		Address:      address,
-		ProxyType:    -1,
-		ProxyAddress: "",
+		Address:   address,
+		ProxyType: -1,
 	}
 }
 
 // the LocalNode rpc method equivalent
-func (rn *Peer) GetResultsForSync(hashes [][32]byte) []SearchResult {
+// Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
+func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, hashes [][32]byte) []SearchResult {
 	argsBytes, err := msgpack.Marshal(hashes)
-	funCode, errCode, respBytes, err := rn.sendRequest(FCODE_GET_RESULTS_FOR_SYNC, argsBytes)
+	funCode, errCode, respBytes, err := rn.sendRequest(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, argsBytes)
 	if err != nil {
 		logError(err.Error())
 		return nil
 	}
 	if errCode != 0 {
-		logError(fmt.Sprint("Rpc error code %d for function %d", errCode, funCode))
+		logError(fmt.Sprintf("Rpc error code %d for function %d", errCode, funCode))
 	}
 
 	var results []SearchResult
@@ -204,14 +204,14 @@ func (rn *Peer) GetResultsForSync(hashes [][32]byte) []SearchResult {
 	return results
 }
 
-func (rn *Peer) GetPeersForSync() []Peer {
-	funCode, errCode, respBytes, err := rn.sendRequest(FCODE_GET_PEERS_FOR_SYNC, nil)
+func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
+	funCode, errCode, respBytes, err := rn.sendRequest(proxySettings, FCODE_GET_PEERS_FOR_SYNC, nil)
 	if err != nil {
 		logError(err.Error())
 		return nil
 	}
 	if errCode != 0 {
-		logError(fmt.Sprint("Rpc error code %d for function %d", errCode, funCode))
+		logError(fmt.Sprintf("Rpc error code %d for function %d", errCode, funCode))
 	}
 
 	var peers []Peer
@@ -223,19 +223,19 @@ func (rn *Peer) GetPeersForSync() []Peer {
 	return peers
 }
 
-func (rn *Peer) Handshake(peer Peer) {
+func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) {
 	argsBytes, err := msgpack.Marshal(peer)
-	funCode, errCode, _, err := rn.sendRequest(FCODE_HANDSHAKE, argsBytes)
+	funCode, errCode, _, err := rn.sendRequest(proxySettings, FCODE_HANDSHAKE, argsBytes)
 	if err != nil {
 		logError(err.Error())
 	}
 	if errCode != 0 {
-		logError(fmt.Sprint("Rpc error code %d for function %d", errCode, funCode))
+		logError(fmt.Sprintf("Rpc error code %d for function %d", errCode, funCode))
 	}
 }
 
-func (rn *Peer) sendRequest(funCode byte, args []byte) (byte, byte, []byte, error) {
-	conn, err := rn.connect()
+func (rn *Peer) sendRequest(proxySettings ProxySettings, funCode byte, args []byte) (byte, byte, []byte, error) {
+	conn, err := rn.connect(proxySettings)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -266,9 +266,11 @@ func (rn *Peer) sendRequest(funCode byte, args []byte) (byte, byte, []byte, erro
 	return funCode, errCode, respBytes[2:], nil
 }
 
-func (rn Peer) connect() (net.Conn, error) {
-	if rn.ProxyType == SOCKS_5_PROXY_TYPE {
-		dialer, err := proxy.SOCKS5("tcp", rn.ProxyAddress, nil, &net.Dialer{
+func (rn Peer) connect(settings ProxySettings) (net.Conn, error) {
+	if rn.ProxyType == NONE_PROXY_TYPE {
+		return net.Dial("tcp", rn.Address)
+	} else {
+		dialer, err := proxy.SOCKS5("tcp", settings.AddrByType(rn.ProxyType), nil, &net.Dialer{
 			Timeout:   60 * time.Second,
 			KeepAlive: 30 * time.Second,
 		})
@@ -277,10 +279,7 @@ func (rn Peer) connect() (net.Conn, error) {
 			return nil, err
 		}
 		return dialer.Dial("tcp", rn.Address)
-	} else if rn.ProxyType == NONE_PROXY_TYPE {
-		return net.Dial("tcp", rn.Address)
 	}
-	return nil, nil
 }
 
 type PeerDB struct {
@@ -295,7 +294,7 @@ func (sd *PeerDB) Open(path string, knownPeers []Peer) {
 	} else {
 		sd.dbObject = sql
 	}
-	_, err = sql.Exec("create table PEERS(ADDRESS text, PROXY_TYPE int, PROXY_ADDRESS text, RANK int)")
+	_, err = sql.Exec("create table PEERS(ADDRESS text, PROXY_TYPE int, RANK int)")
 	if err != nil {
 		logWarn(err.Error())
 	}
@@ -311,8 +310,8 @@ func (pdb PeerDB) GetAll() []Peer {
 func (pdb PeerDB) SyncFrom(peers []Peer) {
 	for _, p := range peers {
 		pL := pdb.DoQuery(fmt.Sprintf(
-			"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d and PROXY_ADDRESS='%s'",
-			p.Address, p.ProxyType, p.ProxyAddress))
+			"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d",
+			p.Address, p.ProxyType))
 		if len(pL) == 0 {
 			pdb.insertRow(p)
 		}
@@ -321,11 +320,11 @@ func (pdb PeerDB) SyncFrom(peers []Peer) {
 
 func (pdb PeerDB) UpdateRank(p Peer) {
 	pL := pdb.DoQuery(fmt.Sprintf(
-		"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d and PROXY_ADDRESS='%s'",
-		p.Address, p.ProxyType, p.ProxyAddress))
+		"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d",
+		p.Address, p.ProxyType))
 	if len(pL) == 0 {
-		pdb.dbObject.Exec("update PEERS set RANK=%d where ADDRESS='%s' and PROXY_TYPE=%d and PROXY_ADDRESS='%s'",
-			p.Rank, p.Address, p.ProxyType, p.ProxyAddress)
+		pdb.dbObject.Exec("update PEERS set RANK=%d where ADDRESS='%s' and PROXY_TYPE=%d",
+			p.Rank, p.Address, p.ProxyType)
 	}
 }
 
@@ -340,20 +339,18 @@ func (sd PeerDB) DoQuery(queryString string) []Peer {
 
 	var address string
 	var proxyType int
-	var proxyAddress string
 	var rank int64
 
 	for rows.Next() {
-		err := rows.Scan(&address, &proxyType, &proxyAddress, &rank)
+		err := rows.Scan(&address, &proxyType, &rank)
 
 		if err != nil {
 			continue
 		}
 		results = append(results, Peer{
-			Address:      address,
-			ProxyType:    proxyType,
-			ProxyAddress: proxyAddress,
-			Rank:         rank,
+			Address:   address,
+			ProxyType: proxyType,
+			Rank:      rank,
 		})
 	}
 	return results
@@ -361,8 +358,8 @@ func (sd PeerDB) DoQuery(queryString string) []Peer {
 
 func (pdb PeerDB) insertRow(p Peer) {
 	pdb.dbObject.Exec(fmt.Sprintf(
-		"insert into PEERS values('%s', %d, '%s', %d)",
-		p.Address, p.ProxyType, p.ProxyAddress, p.Rank))
+		"insert into PEERS values('%s', %d, %d)",
+		p.Address, p.ProxyType, p.Rank))
 }
 
 /* Common client/server routines **/

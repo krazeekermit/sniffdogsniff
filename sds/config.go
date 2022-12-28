@@ -10,12 +10,28 @@ const SERVICE_RPC_PORT = "service_rpc_port"
 const SEARCH_DATABASE_PATH = "search_database_path"
 const PEERS_DATABASE_PATH = "peers_database_path"
 
+type ProxySettings struct {
+	i2pSocks5Addr string
+	torSocks5Addr string
+}
+
+func (ps ProxySettings) AddrByType(proxyType int) string {
+	switch proxyType {
+	case I2P_SOCKS_5_PROXY_TYPE:
+		return ps.i2pSocks5Addr
+	case TOR_SOCKS_5_PROXY_TYPE:
+		return ps.torSocks5Addr
+	}
+	return ""
+}
+
 type SdsConfig struct {
 	searchDatabasePath      string
 	peersDatabasePath       string
 	WebServiceBindAddress   string
 	KnownPeers              []Peer
 	NodeServiceEnabled      bool
+	proxySettings           ProxySettings
 	AutoCreateHiddenService bool
 	TorControlPort          int
 	TorControlPassword      string
@@ -34,13 +50,19 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 	iniData, err := ini.Load(path)
 
 	if err != nil {
-
+		panic("Failed to load config file!")
 	}
 
 	cfg.searchDatabasePath = iniData.Section(ini.DEFAULT_SECTION).Key(SEARCH_DATABASE_PATH).String()
 	cfg.peersDatabasePath = iniData.Section(ini.DEFAULT_SECTION).Key(PEERS_DATABASE_PATH).String()
 
 	cfg.WebServiceBindAddress = iniData.Section(ini.DEFAULT_SECTION).Key("web_service_bind_address").String()
+
+	proxyConfigs := iniData.Section("proxy_settings")
+	cfg.proxySettings = ProxySettings{
+		i2pSocks5Addr: proxyConfigs.Key("i2p_socks5_proxy").String(),
+		torSocks5Addr: proxyConfigs.Key("tor_socks5_proxy").String(),
+	}
 
 	nodeServiceSection := iniData.Section("node_service")
 	cfg.NodeServiceEnabled, err = nodeServiceSection.Key("enabled").Bool()
@@ -96,22 +118,19 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 
 func parsePeer(sec *ini.Section, addressKey string) Peer {
 	proxyType := stringToProxyTyeInt(sec.Key("proxy_type").String())
-	proxyAddr := ""
-	if proxyType != NONE_PROXY_TYPE {
-		proxyAddr = sec.Key("proxy_address").String()
-	}
 	return Peer{
-		Address:      sec.Key(addressKey).String(),
-		ProxyType:    proxyType,
-		ProxyAddress: proxyAddr,
+		Address:   sec.Key(addressKey).String(),
+		ProxyType: proxyType,
 	}
 }
 
 /* Utils */
 func stringToProxyTyeInt(proxyType string) int {
 	switch strings.ToUpper(proxyType) {
-	case "SOCKS5":
-		return SOCKS_5_PROXY_TYPE
+	case "TOR":
+		return TOR_SOCKS_5_PROXY_TYPE
+	case "I2P":
+		return I2P_SOCKS_5_PROXY_TYPE
 	case "NONE":
 	default:
 		return NONE_PROXY_TYPE
