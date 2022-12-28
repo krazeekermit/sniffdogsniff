@@ -1,3 +1,5 @@
+![SniffDogSniff logo](sniffdogsniff_icon.png "Logo")
+
 # sniffDogSniff
 
 Sniff Dog Sniff is a customizable, decentralized search engine
