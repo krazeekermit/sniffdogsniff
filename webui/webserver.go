@@ -1,8 +1,10 @@
-package main
+package webui
 
 import (
 	"fmt"
 	"net/http"
+
+	"gitlab.com/sniffdogsniff/sds"
 )
 
 type SdsWebServer struct {

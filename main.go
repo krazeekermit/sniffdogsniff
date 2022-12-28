@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"gitlab.com/sniffdogsniff/sds"
+	"gitlab.com/sniffdogsniff/webui"
 )
 
 func showHelp() {
