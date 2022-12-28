@@ -1,4 +1,4 @@
-![SniffDogSniff logo](sniffdogsniff_icon.png "Logo")
+![SniffDogSniff logo](sds_header.png "Logo")
 
 # sniffDogSniff
 
