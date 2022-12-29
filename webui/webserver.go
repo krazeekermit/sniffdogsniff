@@ -1,10 +1,10 @@
 package webui
 
 import (
-	"fmt"
 	"net/http"
 
 	"gitlab.com/sniffdogsniff/sds"
+	"gitlab.com/sniffdogsniff/util/logging"
 )
 
 type SdsWebServer struct {
@@ -39,7 +39,7 @@ func (server *SdsWebServer) ServeWebUi(address string) {
 	srvmux.HandleFunc("/search", server.searchHandleFunc)
 	srvmux.HandleFunc("/insert_link", server.insertLinkHandleFunc)
 
-	sds.LogInfo(fmt.Sprintf("Web Server is listening on %s", address))
+	logging.LogInfo("Web Server is listening on", address)
 	http.ListenAndServe(address, srvmux)
 
 }

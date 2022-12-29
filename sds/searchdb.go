@@ -14,6 +14,7 @@ import (
 
 	//_ "github.com/go-gorp/gorp"
 	_ "github.com/mattn/go-sqlite3"
+	"gitlab.com/sniffdogsniff/util/logging"
 )
 
 type SearchResult struct {
@@ -53,14 +54,14 @@ type SearchDB struct {
 func (sd *SearchDB) Open(path string) {
 	sql, err := sql.Open("sqlite3", path)
 	if err != nil {
-		logError(err.Error())
+		logging.LogError(err.Error())
 		return
 	} else {
 		sd.dbObject = sql
 	}
 	_, err = sql.Exec("create table SEARCHES(HASH text, TITLE text, URL text, DESCRIPTION text)")
 	if err != nil {
-		logWarn(err.Error())
+		logging.LogWarn(err.Error())
 	}
 
 }
@@ -78,7 +79,7 @@ func (sd SearchDB) GetByHash(rHash string) (bool, SearchResult) {
 func (sd SearchDB) DoSearch(text string) []SearchResult {
 	queryString := fmt.Sprintf("select * from SEARCHES where TITLE like '%s' or URL like '%s' or DESCRIPTION like '%s'", text, text, text)
 	query := sd.DoQuery(queryString)
-	logInfo(fmt.Sprintf("SearchDB query results=%d", len(query)))
+	logging.LogInfo(fmt.Sprintf("SearchDB query results=%d", len(query)))
 	return query
 }
 
@@ -131,7 +132,7 @@ func (sd SearchDB) InsertRow(sr SearchResult) {
 func (sd SearchDB) DoQuery(queryString string) []SearchResult {
 	rows, err := sd.dbObject.Query(queryString)
 	if err != nil {
-		logError(fmt.Sprintf("SearchDB %s", err.Error()))
+		logging.LogError(fmt.Sprintf("SearchDB %s", err.Error()))
 		return make([]SearchResult, 0)
 	}
 

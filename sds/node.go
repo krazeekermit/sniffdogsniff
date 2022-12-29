@@ -1,9 +1,10 @@
 package sds
 
 import (
-	"fmt"
 	"sync"
 	"time"
+
+	"gitlab.com/sniffdogsniff/util/logging"
 )
 
 type LocalNode struct {
@@ -17,7 +18,7 @@ type LocalNode struct {
 }
 
 func InitNode(configs SdsConfig) LocalNode {
-	var ln LocalNode
+	ln := LocalNode{}
 	ln.searchDB.Open(configs.searchDatabasePath)
 	ln.peerDB.Open(configs.peersDatabasePath, configs.KnownPeers)
 	ln.proxySettings = configs.proxySettings
@@ -54,7 +55,7 @@ func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 	ln.tsLock.Unlock()
 }
 
-func (ln LocalNode) DoSearch(query string) []SearchResult {
+func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	results := make([]SearchResult, 0)
 
 	ln.tsLock.Lock() // tread safe access to SearchDB
@@ -72,7 +73,7 @@ func (ln LocalNode) DoSearch(query string) []SearchResult {
 	return results
 }
 
-func (ln LocalNode) SyncWithPeers() {
+func (ln *LocalNode) SyncWithPeers() {
 	for {
 		time.Sleep(30 * time.Second)
 
@@ -80,13 +81,15 @@ func (ln LocalNode) SyncWithPeers() {
 		peers := ln.peerDB.GetAll()
 		ln.tsLock.Unlock()
 		for _, p := range peers {
-			logInfo(fmt.Sprintf("Sync with %s", p.Address))
+			logging.LogInfo("Sync with ", p.Address)
 			ln.tsLock.Lock()
 			hashes := ln.searchDB.GetAllHashes()
 			ln.tsLock.Unlock()
 			p.Handshake(ln.proxySettings, ln.selfPeer)
 			newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
+			logging.LogTrace("Received", len(newSearches), "searches")
 			newPeers := p.GetPeersForSync(ln.proxySettings)
+			logging.LogTrace("Received", len(newPeers), "peers")
 
 			ln.tsLock.Lock()
 			ln.searchDB.SyncFrom(newSearches)

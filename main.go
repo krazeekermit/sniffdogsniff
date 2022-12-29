@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gitlab.com/sniffdogsniff/sds"
+	"gitlab.com/sniffdogsniff/util/logging"
 	"gitlab.com/sniffdogsniff/webui"
 )
 
@@ -42,6 +43,8 @@ func main() {
 	cfgFilePath, _ := parseArgs()
 
 	confs := sds.NewSdsConfig(cfgFilePath)
+
+	logging.InitLogging(logging.TRACE)
 
 	node := sds.InitNode(confs)
 

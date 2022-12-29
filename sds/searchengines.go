@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
+	"gitlab.com/sniffdogsniff/util/logging"
 )
 
 type SearchEngine struct {
@@ -29,11 +30,11 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 	c.UserAgent = se.userAgent
 
 	c.OnError(func(_ *colly.Response, err error) {
-		fmt.Println("Something went wrong:", err)
+		logging.LogError(err.Error())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		fmt.Println("Visited", r.Request.URL)
+		logging.LogTrace(fmt.Sprintf("Visited %s", r.Request.URL.String()))
 	})
 
 	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
@@ -54,7 +55,7 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 	})
 
 	searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
-	logInfo("Receiving results from " + searchUrlString)
+	logging.LogInfo("Receiving results from " + searchUrlString)
 
 	c.Visit(searchUrlString)
 	c.Wait()
@@ -64,7 +65,7 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 func validUrl(urlString string) bool {
 	u, err := url.Parse(urlString)
 	if err != nil {
-		logWarn("Found invalid url " + urlString)
+		logging.LogTrace("Found invalid url " + urlString)
 		return false
 	}
 	switch u.Scheme {

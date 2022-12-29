@@ -4,32 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"io/ioutil"
-	"log"
 )
-
-const (
-	ANSI_RED    string = "\033[31m"
-	ANSI_YELLOW string = "\033[33m"
-	ANSI_WHITE  string = "\033[97m"
-	ANSI_CYAN   string = "\033[36m"
-	ANSI_END    string = "\033[0m"
-)
-
-func logInfo(text string) {
-	log.Println(ANSI_WHITE, "[INFO]", text, ANSI_END)
-}
-
-func LogInfo(text string) {
-	log.Println(ANSI_WHITE, "[INFO]", text, ANSI_END)
-}
-
-func logWarn(text string) {
-	log.Println(ANSI_YELLOW, "[WARN]", text, ANSI_END)
-}
-
-func logError(text string) {
-	log.Println(ANSI_RED, "[ERROR]", text, ANSI_END)
-}
 
 func Array32Contains(array [][32]byte, entry [32]byte) bool {
 	for _, elem := range array {
