@@ -35,7 +35,6 @@ type SdsConfig struct {
 	AutoCreateHiddenService bool
 	TorControlPort          int
 	TorControlPassword      string
-	NodeServiceBindAddress  string
 	NodePeerInfo            Peer
 	searchEngines           map[string]SearchEngine
 }
@@ -80,10 +79,8 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 				cfg.TorControlPort = 9051
 			}
 			cfg.TorControlPassword = nodeServiceSection.Key("tor_control_auth_password").String()
-			cfg.NodeServiceBindAddress = nodeServiceSection.Key("bind_address").String()
-		} else {
-			cfg.NodePeerInfo = parsePeer(nodeServiceSection, "bind_address")
 		}
+		cfg.NodePeerInfo = parsePeer(nodeServiceSection, "bind_address")
 	}
 
 	peerNames := iniData.Section(ini.DEFAULT_SECTION).Key("known_peers").Strings(",")
@@ -117,7 +114,7 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 }
 
 func parsePeer(sec *ini.Section, addressKey string) Peer {
-	proxyType := stringToProxyTyeInt(sec.Key("proxy_type").String())
+	proxyType := stringToProxyTypeInt(sec.Key("proxy_type").String())
 	return Peer{
 		Address:   sec.Key(addressKey).String(),
 		ProxyType: proxyType,
@@ -125,15 +122,15 @@ func parsePeer(sec *ini.Section, addressKey string) Peer {
 }
 
 /* Utils */
-func stringToProxyTyeInt(proxyType string) int {
+func stringToProxyTypeInt(proxyType string) int {
 	switch strings.ToUpper(proxyType) {
 	case "TOR":
 		return TOR_SOCKS_5_PROXY_TYPE
 	case "I2P":
 		return I2P_SOCKS_5_PROXY_TYPE
 	case "NONE":
+		return NONE_PROXY_TYPE
 	default:
 		return NONE_PROXY_TYPE
 	}
-	return NONE_PROXY_TYPE
 }

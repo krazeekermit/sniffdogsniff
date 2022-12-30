@@ -14,7 +14,7 @@ type LocalNode struct {
 	searchEngines map[string]SearchEngine
 	minResultsThr int
 	peerDB        PeerDB
-	selfPeer      Peer
+	SelfPeer      Peer
 }
 
 func InitNode(configs SdsConfig) LocalNode {
@@ -25,7 +25,7 @@ func InitNode(configs SdsConfig) LocalNode {
 	ln.tsLock = sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
-	ln.selfPeer = configs.NodePeerInfo
+	ln.SelfPeer = configs.NodePeerInfo
 	return ln
 }
 
@@ -85,7 +85,7 @@ func (ln *LocalNode) SyncWithPeers() {
 			ln.tsLock.Lock()
 			hashes := ln.searchDB.GetAllHashes()
 			ln.tsLock.Unlock()
-			p.Handshake(ln.proxySettings, ln.selfPeer)
+			p.Handshake(ln.proxySettings, ln.SelfPeer)
 			newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
 			logging.LogTrace("Received", len(newSearches), "searches")
 			newPeers := p.GetPeersForSync(ln.proxySettings)
