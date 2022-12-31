@@ -11,11 +11,35 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	//_ "github.com/go-gorp/gorp"
 	_ "github.com/mattn/go-sqlite3"
 	"gitlab.com/sniffdogsniff/util/logging"
 )
+
+func hashToB64UrlsafeString(hash [32]byte) string {
+	return base64.URLEncoding.EncodeToString(hash[:])
+}
+
+func b64UrlsafeStringToHash(b64 string) [32]byte {
+	bytes, _ := base64.URLEncoding.DecodeString(b64)
+	return SliceToArray32(bytes)
+}
+
+func buildSearchQuery(text string) string {
+	queryString := fmt.Sprint("select * from SEARCHES where TITLE like '%", text, "%' or URL like '%", text, "%' or DESCRIPTION like '%", text, "%'")
+	tokens := strings.Split(text, " ")
+	if len(tokens) == 1 {
+		return queryString
+	}
+	for _, token := range tokens {
+		queryString += " union "
+		queryString += fmt.Sprint("select * from SEARCHES where TITLE like '%", token, "%' or URL like '%", token, "%' or DESCRIPTION like '%", token, "%'")
+	}
+	logging.LogTrace(queryString)
+	return queryString
+}
 
 type SearchResult struct {
 	ResultHash  [32]byte
@@ -72,14 +96,13 @@ func (sd SearchDB) HasHash(rHash string) bool {
 }
 
 func (sd SearchDB) GetByHash(rHash string) (bool, SearchResult) {
-	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where RHASH == '%s'", rHash))
+	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where HASH == '%s'", rHash))
 	return len(query) > 0, query[0]
 }
 
 func (sd SearchDB) DoSearch(text string) []SearchResult {
-	queryString := fmt.Sprintf("select * from SEARCHES where TITLE like '%s' or URL like '%s' or DESCRIPTION like '%s'", text, text, text)
-	query := sd.DoQuery(queryString)
-	logging.LogInfo(fmt.Sprintf("SearchDB query results=%d", len(query)))
+	query := sd.DoQuery(buildSearchQuery(text))
+	logging.LogInfo("SearchDB", len(query), "results found in decentralized database")
 	return query
 }
 
@@ -124,15 +147,18 @@ func (sd SearchDB) SyncFrom(results []SearchResult) {
 }
 
 func (sd SearchDB) InsertRow(sr SearchResult) {
-	sd.dbObject.Exec(fmt.Sprintf(
+	_, err := sd.dbObject.Exec(fmt.Sprintf(
 		"insert or ignore into SEARCHES values('%s', '%s', '%s', '%s')",
 		hashToB64UrlsafeString(sr.ResultHash), sr.Title, sr.Url, sr.Description))
+	if err != nil {
+		logging.LogTrace(err)
+	}
 }
 
 func (sd SearchDB) DoQuery(queryString string) []SearchResult {
 	rows, err := sd.dbObject.Query(queryString)
 	if err != nil {
-		logging.LogError(fmt.Sprintf("SearchDB %s", err.Error()))
+		logging.LogError("SearchDB", err.Error())
 		return make([]SearchResult, 0)
 	}
 
@@ -157,13 +183,4 @@ func (sd SearchDB) DoQuery(queryString string) []SearchResult {
 		})
 	}
 	return results
-}
-
-func hashToB64UrlsafeString(hash [32]byte) string {
-	return base64.URLEncoding.EncodeToString(hash[:])
-}
-
-func b64UrlsafeStringToHash(b64 string) [32]byte {
-	bytes, _ := base64.URLEncoding.DecodeString(b64)
-	return SliceToArray32(bytes)
 }

@@ -11,56 +11,7 @@ import (
 	"gitlab.com/sniffdogsniff/util/logging"
 )
 
-type SearchEngine struct {
-	name                    string
-	userAgent               string
-	searchQueryUrl          string
-	resultsContainerElement string
-	resultContainerElement  string
-	resultUrlElement        string
-	resultUrlProperty       string
-	resultTitleElement      string
-	resultTitleProperty     string
-}
-
-func (se SearchEngine) DoSearch(query string) []SearchResult {
-	searchResults := make([]SearchResult, 0)
-
-	c := colly.NewCollector()
-	c.UserAgent = se.userAgent
-
-	c.OnError(func(_ *colly.Response, err error) {
-		logging.LogError(err.Error())
-	})
-
-	c.OnResponse(func(r *colly.Response) {
-		logging.LogTrace(fmt.Sprintf("Visited %s", r.Request.URL.String()))
-	})
-
-	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
-		e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
-			url := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
-			title := ""
-			if se.resultTitleProperty == "text" {
-				title = elContainer.ChildText(se.resultUrlElement)
-			} else {
-				title = elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
-			}
-			if validUrl(url) {
-				result := NewSearchResult(title, url, "")
-				result.ReHash()
-				searchResults = append(searchResults, result)
-			}
-		})
-	})
-
-	searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
-	logging.LogInfo("Receiving results from " + searchUrlString)
-
-	c.Visit(searchUrlString)
-	c.Wait()
-	return searchResults
-}
+const NO_DESCRIPTION_AVAILABLE string = "No description available"
 
 func validUrl(urlString string) bool {
 	u, err := url.Parse(urlString)
@@ -94,4 +45,86 @@ func normalizeString(text string) string {
 		text = text[0:endIndex]
 	}
 	return text
+}
+
+type SearchEngine struct {
+	name                    string
+	userAgent               string
+	searchQueryUrl          string
+	resultsContainerElement string
+	resultContainerElement  string
+	resultUrlElement        string
+	resultUrlProperty       string
+	resultTitleElement      string
+	resultTitleProperty     string
+}
+
+func (se SearchEngine) extractDescription(url string) string {
+	c := colly.NewCollector()
+	c.UserAgent = se.userAgent
+
+	description := ""
+
+	c.OnError(func(_ *colly.Response, err error) {
+		logging.LogError(err.Error())
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		logging.LogTrace(fmt.Sprintf("Connecting to %s", r.Request.URL.String()))
+	})
+
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		description = e.ChildAttr("meta[name=\"description\"]", "content")
+		if description == "" {
+			description = e.ChildText("h1")
+		}
+	})
+
+	c.Visit(url)
+	c.Wait()
+
+	if description == "" {
+		description = NO_DESCRIPTION_AVAILABLE
+	}
+	return normalizeString(description)
+}
+
+func (se SearchEngine) DoSearch(query string) []SearchResult {
+	searchResults := make([]SearchResult, 0)
+
+	c := colly.NewCollector()
+	c.UserAgent = se.userAgent
+
+	c.OnError(func(_ *colly.Response, err error) {
+		logging.LogError(err.Error())
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		logging.LogTrace(fmt.Sprintf("Visited %s", r.Request.URL.String()))
+	})
+
+	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
+		e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
+			url := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+			title := ""
+			if se.resultTitleProperty == "text" {
+				title = elContainer.ChildText(se.resultUrlElement)
+			} else {
+				title = elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+			}
+			if validUrl(url) {
+				desc := se.extractDescription(url)
+				result := NewSearchResult(title, url, desc)
+				result.ReHash()
+				searchResults = append(searchResults, result)
+			}
+		})
+	})
+
+	searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
+	logging.LogInfo("Receiving results from " + searchUrlString)
+
+	c.Visit(searchUrlString)
+	c.Wait()
+	return searchResults
 }
