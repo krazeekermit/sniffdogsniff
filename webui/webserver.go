@@ -18,15 +18,21 @@ func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
 }
 
 func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Request) {
-	results := server.node.DoSearch(r.URL.Query().Get("q"))
+	query := r.URL.Query().Get("q")
+	urlFilter := r.URL.Query().Get("link_filter")
+	results := filterSearchResults(server.node.DoSearch(query), urlFilter)
 	renderTemplate(w, "results.html", results)
 }
 
 func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		title := r.Form.Get("link_title")
-		url := r.Form.Get("link_url")
-		description := r.Form.Get("link_description")
+		err := r.ParseForm()
+		if err != nil {
+			logging.LogError(err.Error())
+		}
+		title := r.FormValue("link_title")
+		url := r.FormValue("link_url")
+		description := r.FormValue("link_description")
 		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description))
 	}
 	renderTemplate(w, "insert_link.html", nil)
