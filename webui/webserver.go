@@ -24,6 +24,13 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 	renderTemplate(w, "results.html", results)
 }
 
+func (server *SdsWebServer) redirectHandleFunc(w http.ResponseWriter, r *http.Request) {
+	url := r.URL.Query().Get("url")
+	hash := r.URL.Query().Get("hash")
+	server.node.UpdateResultScore(hash)
+	http.Redirect(w, r, url, http.StatusSeeOther)
+}
+
 func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		err := r.ParseForm()
@@ -43,6 +50,7 @@ func (server *SdsWebServer) ServeWebUi(address string) {
 
 	srvmux.Handle("/", http.FileServer(http.FS(staticDir())))
 	srvmux.HandleFunc("/search", server.searchHandleFunc)
+	srvmux.HandleFunc("/redirect", server.redirectHandleFunc)
 	srvmux.HandleFunc("/insert_link", server.insertLinkHandleFunc)
 
 	logging.LogInfo("Web Server is listening on", address)

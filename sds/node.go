@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/sniffdogsniff/util"
 	"gitlab.com/sniffdogsniff/util/logging"
 )
 
@@ -29,6 +30,13 @@ func InitNode(configs SdsConfig) LocalNode {
 	return ln
 }
 
+func (ln *LocalNode) GetResultsMetadataForSync() []ResultMeta {
+	ln.tsLock.Lock()
+	metadata := ln.searchDB.GetAllResultsMetadata()
+	ln.tsLock.Unlock()
+	return metadata
+}
+
 func (ln *LocalNode) GetResultsForSync(hashes [][32]byte) []SearchResult {
 	ln.tsLock.Lock()
 	results := ln.searchDB.GetForSync(hashes)
@@ -52,6 +60,12 @@ func (ln *LocalNode) Handshake(peer Peer) {
 func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 	ln.tsLock.Lock()
 	ln.searchDB.InsertRow(sr)
+	ln.tsLock.Unlock()
+}
+
+func (ln *LocalNode) UpdateResultScore(hash string) {
+	ln.tsLock.Lock()
+	ln.searchDB.UpdateResultScore(util.B64UrlsafeStringToHash(hash), 1)
 	ln.tsLock.Unlock()
 }
 
@@ -88,11 +102,14 @@ func (ln *LocalNode) SyncWithPeers() {
 			p.Handshake(ln.proxySettings, ln.SelfPeer)
 			newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
 			logging.LogTrace("Received", len(newSearches), "searches")
+			newMetadata := p.GetResultsMetadataForSync(ln.proxySettings)
+			logging.LogTrace("Received", len(newMetadata), "results metadata")
 			newPeers := p.GetPeersForSync(ln.proxySettings)
 			logging.LogTrace("Received", len(newPeers), "peers")
 
 			ln.tsLock.Lock()
 			ln.searchDB.SyncFrom(newSearches)
+			ln.searchDB.SyncResultsMetadataFrom(newMetadata)
 			ln.peerDB.SyncFrom(newPeers)
 			ln.peerDB.UpdateRank(p)
 			ln.tsLock.Unlock()

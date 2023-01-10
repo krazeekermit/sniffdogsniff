@@ -23,7 +23,7 @@
             <li class="list-group-item list-group-item-action"><div>
                 <small class="disabled">{{$result.Url}}<br/></small>
                 <img src="" width="16" height="16">
-                <a href="{{$result.Url}}">{{$result.Title}}</a>
+                <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
                 <p class="mb-1">
                     {{$result.Description}}
                 </p>

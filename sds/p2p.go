@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"gitlab.com/sniffdogsniff/util"
 	"gitlab.com/sniffdogsniff/util/logging"
 	"golang.org/x/net/proxy"
 
@@ -27,6 +28,7 @@ const MAX_THREAD_POOL_SIZE = 1
 const FCODE_HANDSHAKE = 100
 const FCODE_GET_RESULTS_FOR_SYNC = 101
 const FCODE_GET_PEERS_FOR_SYNC = 102
+const FCODE_GET_METADATA_FOR_SYNC = 103
 
 const ERRCODE_NULL = 0
 const ERRCODE_MARSHAL = 51
@@ -87,7 +89,7 @@ func receiveAndDecompress(conn net.Conn) ([]byte, int64, error) { //bytes, bytes
 		speed = int64(len(recvBytes)) / timeDelta
 	}
 
-	req_bytes, err := zlibDecompress(recvBytes)
+	req_bytes, err := util.ZlibDecompress(recvBytes)
 	if err != nil {
 		return nil, speed, err
 	}
@@ -98,7 +100,7 @@ func receiveAndDecompress(conn net.Conn) ([]byte, int64, error) { //bytes, bytes
  * compress and sends data
  */
 func compressAndSend(stream []byte, conn net.Conn) error {
-	buf, err := zlibCompress(stream)
+	buf, err := util.ZlibCompress(stream)
 	if err != nil {
 		return err
 	}
@@ -192,6 +194,8 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			returned = srv.node.GetResultsForSync(args.([][32]byte))
 		case FCODE_GET_PEERS_FOR_SYNC:
 			returned = srv.node.getPeersForSync()
+		case FCODE_GET_METADATA_FOR_SYNC:
+			returned = srv.node.GetResultsMetadataForSync()
 		default:
 			returned = nil
 			errCode = ERRCODE_NOFUNCT
@@ -240,6 +244,15 @@ func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, hashes [][32]byte
 		return nil
 	}
 	return searches.([]SearchResult)
+}
+
+func (rn *Peer) GetResultsMetadataForSync(proxySettings ProxySettings) []ResultMeta {
+	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, nil)
+	if err != nil {
+		logging.LogError(err.Error())
+		return nil
+	}
+	return metadata.([]ResultMeta)
 }
 
 func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {

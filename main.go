@@ -49,7 +49,9 @@ func shutdownHook(configs sds.SdsConfig, p sds.Peer) {
 		for {
 			s := <-sigchnl
 			if s == syscall.SIGINT {
-				sds.RemoveHiddenService(configs, p)
+				if configs.AutoCreateHiddenService {
+					sds.RemoveHiddenService(configs, p)
+				}
 				logging.LogInfo("Shutting down...")
 				os.Exit(0)
 			}
