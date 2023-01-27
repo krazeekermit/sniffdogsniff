@@ -279,6 +279,8 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 
 	conn, err := rn.connect(proxySettings)
 	if err != nil {
+		logging.LogTrace("connection error")
+		rn.Rank -= 500
 		return nil, err
 	}
 
@@ -294,15 +296,15 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 	respBytes, speed, err := receiveAndDecompress(conn)
 	if err != nil {
 		conn.Close()
-		speed -= 100
+		rn.Rank -= 100
 		return nil, err
 	}
 	conn.Close()
 
 	funCode = respBytes[0]
 	errCode := respBytes[1]
-	speed -= int64(errCode) * 100
-	rn.Rank = speed
+	speed -= int64(errCode) * 10
+	rn.Rank += speed
 
 	if errCode != ERRCODE_NULL {
 		return nil, errCodeToError(funCode, errCode)
@@ -373,9 +375,9 @@ func (pdb PeerDB) UpdateRank(p Peer) {
 	pL := pdb.DoQuery(fmt.Sprintf(
 		"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d",
 		p.Address, p.ProxyType))
-	if len(pL) == 0 {
-		pdb.dbObject.Exec("update PEERS set RANK=%d where ADDRESS='%s' and PROXY_TYPE=%d",
-			p.Rank, p.Address, p.ProxyType)
+	if len(pL) != 0 {
+		pdb.dbObject.Exec(fmt.Sprintf("update PEERS set RANK=%d where ADDRESS='%s' and PROXY_TYPE=%d",
+			p.Rank, p.Address, p.ProxyType))
 	}
 }
 

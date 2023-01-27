@@ -18,7 +18,7 @@ type LocalNode struct {
 	SelfPeer      Peer
 }
 
-func InitNode(configs SdsConfig) LocalNode {
+func GetNodeInstance(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
 	ln.searchDB.Open(configs.searchDatabasePath)
 	ln.peerDB.Open(configs.peersDatabasePath, configs.KnownPeers)
@@ -26,8 +26,8 @@ func InitNode(configs SdsConfig) LocalNode {
 	ln.tsLock = sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
-	ln.SelfPeer = configs.NodePeerInfo
-	return ln
+	ln.SelfPeer = configs.ServiceSettings.PeerInfo
+	return &ln
 }
 
 func (ln *LocalNode) GetResultsMetadataForSync() []ResultMeta {

@@ -49,8 +49,8 @@ func shutdownHook(configs sds.SdsConfig, p sds.Peer) {
 		for {
 			s := <-sigchnl
 			if s == syscall.SIGINT {
-				if configs.AutoCreateHiddenService {
-					sds.RemoveHiddenService(configs, p)
+				if configs.ServiceSettings.CreateHiddenService {
+					sds.RemoveHiddenService(configs.ServiceSettings, p)
 				}
 				logging.LogInfo("Shutting down...")
 				os.Exit(0)
@@ -60,26 +60,27 @@ func shutdownHook(configs sds.SdsConfig, p sds.Peer) {
 }
 
 func main() {
+	logging.InitLogging(logging.TRACE)
 	cfgFilePath, _ := parseArgs()
 
-	logging.InitLogging(logging.TRACE)
 	confs := sds.NewSdsConfig(cfgFilePath)
 
-	nodeServerBindAddress := confs.NodePeerInfo.Address
-	logging.LogTrace(nodeServerBindAddress)
-	if confs.AutoCreateHiddenService {
-		confs.NodePeerInfo = sds.CreateHiddenService(confs)
+	nodeServerBindAddress := confs.ServiceSettings.PeerInfo.Address
+
+	if confs.ServiceSettings.CreateHiddenService {
+		confs.ServiceSettings.PeerInfo = sds.CreateHiddenService(confs.ServiceSettings)
 	}
 
-	node := sds.InitNode(confs)
+	node := sds.GetNodeInstance(confs)
 
-	p2pServer := sds.InitNodeServer(&node)
+	p2pServer := sds.InitNodeServer(node)
 	go p2pServer.Serve(nodeServerBindAddress)
 
-	webServer := webui.InitSdsWebServer(&node)
+	webServer := webui.InitSdsWebServer(node)
 	go webServer.ServeWebUi(confs.WebServiceBindAddress)
 
 	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")
+
 	shutdownHook(confs, node.SelfPeer)
 
 	node.SyncWithPeers()

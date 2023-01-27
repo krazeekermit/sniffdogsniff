@@ -25,18 +25,22 @@ func (ps ProxySettings) AddrByType(proxyType int) string {
 	return ""
 }
 
+type NodeServiceSettings struct {
+	Enabled             bool
+	CreateHiddenService bool
+	TorControlPort      int
+	TorControlPassword  string
+	PeerInfo            Peer
+}
+
 type SdsConfig struct {
-	searchDatabasePath      string
-	peersDatabasePath       string
-	WebServiceBindAddress   string
-	KnownPeers              []Peer
-	NodeServiceEnabled      bool
-	proxySettings           ProxySettings
-	AutoCreateHiddenService bool
-	TorControlPort          int
-	TorControlPassword      string
-	NodePeerInfo            Peer
-	searchEngines           map[string]SearchEngine
+	searchDatabasePath    string
+	peersDatabasePath     string
+	WebServiceBindAddress string
+	KnownPeers            []Peer
+	proxySettings         ProxySettings
+	ServiceSettings       NodeServiceSettings
+	searchEngines         map[string]SearchEngine
 }
 
 func NewSdsConfig(path string) SdsConfig {
@@ -64,23 +68,24 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 	}
 
 	nodeServiceSection := iniData.Section("node_service")
-	cfg.NodeServiceEnabled, err = nodeServiceSection.Key("enabled").Bool()
+	cfg.ServiceSettings = NodeServiceSettings{}
+	cfg.ServiceSettings.Enabled, err = nodeServiceSection.Key("enabled").Bool()
 	if err != nil {
-		cfg.NodeServiceEnabled = true
+		cfg.ServiceSettings.Enabled = true
 	}
-	if cfg.NodeServiceEnabled {
-		cfg.AutoCreateHiddenService, err = nodeServiceSection.Key("create_hidden_service").Bool()
+	if cfg.ServiceSettings.Enabled {
+		cfg.ServiceSettings.CreateHiddenService, err = nodeServiceSection.Key("create_hidden_service").Bool()
 		if err != nil {
-			cfg.AutoCreateHiddenService = false
+			cfg.ServiceSettings.CreateHiddenService = false
 		}
-		if cfg.AutoCreateHiddenService {
-			cfg.TorControlPort, err = nodeServiceSection.Key("tor_control_port").Int()
+		if cfg.ServiceSettings.CreateHiddenService {
+			cfg.ServiceSettings.TorControlPort, err = nodeServiceSection.Key("tor_control_port").Int()
 			if err != nil {
-				cfg.TorControlPort = 9051
+				cfg.ServiceSettings.TorControlPort = 9051
 			}
-			cfg.TorControlPassword = nodeServiceSection.Key("tor_control_auth_password").String()
+			cfg.ServiceSettings.TorControlPassword = nodeServiceSection.Key("tor_control_auth_password").String()
 		}
-		cfg.NodePeerInfo = parsePeer(nodeServiceSection, "bind_address")
+		cfg.ServiceSettings.PeerInfo = parsePeer(nodeServiceSection, "bind_address")
 	}
 
 	peerNames := iniData.Section(ini.DEFAULT_SECTION).Key("known_peers").Strings(",")
