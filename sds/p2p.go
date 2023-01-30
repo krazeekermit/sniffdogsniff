@@ -369,7 +369,7 @@ func (pdb PeerDB) GetARandomSet(number int) []Peer {
 	if nPeers < number {
 		n = 1
 	}
-	for i := 0; i < number; i++ {
+	for i := 0; i < n; i++ {
 		randoms[i] = peers[rand.Intn(nPeers)]
 	}
 	return randoms

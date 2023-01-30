@@ -5,8 +5,9 @@ You need to setup go development environment first [see here](https://go.dev/doc
 This is how to build in linux and unix Operating Systems:
 
 ```bash
-cd <your goroot>
+cd <your goroot>/src/
+mkdir gitlab.com && cd gitlab.com
 git clone https://gitlab.com/c3rzthefrog/sniffdogsniff.git
 cd sniffdogsniff
-go build .
+./build.sh build # This simple script avoid creation of untracked files
 ```

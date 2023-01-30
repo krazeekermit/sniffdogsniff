@@ -53,7 +53,7 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 	iniData, err := ini.Load(path)
 
 	if err != nil {
-		panic("Failed to load config file!")
+		panic(err.Error())
 	}
 
 	cfg.searchDatabasePath = iniData.Section(ini.DEFAULT_SECTION).Key(SEARCH_DATABASE_PATH).String()

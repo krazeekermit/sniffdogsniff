@@ -23,13 +23,11 @@ func parseArgs() (string, bool) {
 
 	for i := 0; i < len(os.Args); i++ {
 		switch arg := os.Args[i]; arg {
-		case "-c":
-		case "--config":
+		case "-c", "--config":
 			cfgFilePath = os.Args[i+1]
 			i++
 			break
-		case "-d":
-		case "--daemon":
+		case "-d", "--daemon":
 			runAsDaemon = true
 			break
 		case "-h":
