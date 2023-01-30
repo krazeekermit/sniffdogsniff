@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -358,6 +359,20 @@ func (sd *PeerDB) Open(path string, knownPeers []Peer) {
 
 func (pdb PeerDB) GetAll() []Peer {
 	return pdb.DoQuery("select * from PEERS")
+}
+
+func (pdb PeerDB) GetARandomSet(number int) []Peer {
+	peers := pdb.GetAll()
+	nPeers := len(peers)
+	randoms := make([]Peer, number)
+	n := number
+	if nPeers < number {
+		n = 1
+	}
+	for i := 0; i < number; i++ {
+		randoms[i] = peers[rand.Intn(nPeers)]
+	}
+	return randoms
 }
 
 func (pdb PeerDB) SyncFrom(peers []Peer) {

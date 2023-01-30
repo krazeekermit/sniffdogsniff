@@ -92,7 +92,7 @@ func (ln *LocalNode) SyncWithPeers() {
 		time.Sleep(30 * time.Second)
 
 		ln.tsLock.Lock()
-		peers := ln.peerDB.GetAll()
+		peers := ln.peerDB.GetARandomSet(5)
 		ln.tsLock.Unlock()
 		for _, p := range peers {
 			logging.LogInfo("Sync with ", p.Address)
