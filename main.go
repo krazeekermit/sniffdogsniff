@@ -26,14 +26,10 @@ func parseArgs() (string, bool) {
 		case "-c", "--config":
 			cfgFilePath = os.Args[i+1]
 			i++
-			break
 		case "-d", "--daemon":
 			runAsDaemon = true
-			break
-		case "-h":
-		case "--help":
+		case "-h", "--help":
 			showHelp()
-			break
 		}
 	}
 	return cfgFilePath, runAsDaemon
@@ -74,13 +70,12 @@ func main() {
 	p2pServer := sds.InitNodeServer(node)
 	go p2pServer.Serve(nodeServerBindAddress)
 
-	webServer := webui.InitSdsWebServer(node)
-	go webServer.ServeWebUi(confs.WebServiceBindAddress)
+	node.StartSyncTask()
 
 	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")
-
 	shutdownHook(confs, node.SelfPeer)
 
-	node.SyncWithPeers()
+	webServer := webui.InitSdsWebServer(node)
+	webServer.ServeWebUi(confs.WebServiceBindAddress)
 
 }

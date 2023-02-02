@@ -17,6 +17,11 @@ import (
 	"github.com/vmihailenco/msgpack"
 )
 
+/*
+ * SniffDogSniff uses Epidemic Gossip protocol SI model
+ * pull method for syncing SearchResults and Peers
+ */
+
 const (
 	NONE_PROXY_TYPE        int = -1
 	TOR_SOCKS_5_PROXY_TYPE int = 0
@@ -129,7 +134,7 @@ func (srv *NodeServer) Serve(bindAddress string) {
 	 * Initialize the request handlig function, to avoid infinite thread spawning
 	 * the server works with a queued thread pool: the handler waits until one or more
 	 * clients are connected then he process the request. For now we decided to leave
-	 * thread pool size to 1: in future maybe we can add more threads by simply increase
+	 * thread pool size to 1: in future maybe we can add more threads by simply increasing
 	 * MAX_THREAD_POOL_SIZE
 	 */
 	for tn := 0; tn < MAX_THREAD_POOL_SIZE; tn++ {
@@ -157,7 +162,7 @@ func (srv *NodeServer) Serve(bindAddress string) {
 }
 
 func (srv *NodeServer) handleAndDispatchRequests() {
-	for true {
+	for {
 		srv.cond.L.Lock()
 		for srv.connQueue.isEmpty() {
 			srv.cond.Wait()
@@ -265,11 +270,12 @@ func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
 	return peers.([]Peer)
 }
 
-func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) {
+func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
 	_, err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer)
 	if err != nil {
 		logging.LogError(err.Error())
 	}
+	return err
 }
 
 func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, args interface{}) (interface{}, error) {
@@ -361,18 +367,12 @@ func (pdb PeerDB) GetAll() []Peer {
 	return pdb.DoQuery("select * from PEERS")
 }
 
-func (pdb PeerDB) GetARandomSet(number int) []Peer {
+/**
+ * Gets a random peer from PeerDB (for node sync)
+ */
+func (pdb PeerDB) GetRandomPeer() Peer {
 	peers := pdb.GetAll()
-	nPeers := len(peers)
-	randoms := make([]Peer, number)
-	n := number
-	if nPeers < number {
-		n = 1
-	}
-	for i := 0; i < n; i++ {
-		randoms[i] = peers[rand.Intn(nPeers)]
-	}
-	return randoms
+	return peers[rand.Intn(len(peers)-1)]
 }
 
 func (pdb PeerDB) SyncFrom(peers []Peer) {

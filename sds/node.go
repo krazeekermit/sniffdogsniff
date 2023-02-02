@@ -87,32 +87,41 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	return results
 }
 
-func (ln *LocalNode) SyncWithPeers() {
-	for {
-		time.Sleep(30 * time.Second)
+func (ln *LocalNode) SyncWithPeer() {
+	ln.tsLock.Lock()
+	p := ln.peerDB.GetRandomPeer()
+	ln.tsLock.Unlock()
+	logging.LogInfo("Sync with ", p.Address)
 
-		ln.tsLock.Lock()
-		peers := ln.peerDB.GetARandomSet(5)
-		ln.tsLock.Unlock()
-		for _, p := range peers {
-			logging.LogInfo("Sync with ", p.Address)
-			ln.tsLock.Lock()
-			hashes := ln.searchDB.GetAllHashes()
-			ln.tsLock.Unlock()
-			p.Handshake(ln.proxySettings, ln.SelfPeer)
-			newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
-			logging.LogTrace("Received", len(newSearches), "searches")
-			newMetadata := p.GetResultsMetadataForSync(ln.proxySettings)
-			logging.LogTrace("Received", len(newMetadata), "results metadata")
-			newPeers := p.GetPeersForSync(ln.proxySettings)
-			logging.LogTrace("Received", len(newPeers), "peers")
-
-			ln.tsLock.Lock()
-			ln.searchDB.SyncFrom(newSearches)
-			ln.searchDB.SyncResultsMetadataFrom(newMetadata)
-			ln.peerDB.SyncFrom(newPeers)
-			ln.peerDB.UpdateRank(p)
-			ln.tsLock.Unlock()
-		}
+	err := p.Handshake(ln.proxySettings, ln.SelfPeer)
+	if err != nil {
+		logging.LogTrace("Unsuccessful peer handshake: aborting sync")
+		return
 	}
+
+	ln.tsLock.Lock()
+	hashes := ln.searchDB.GetAllHashes()
+	ln.tsLock.Unlock()
+	newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
+	logging.LogTrace("Received", len(newSearches), "searches")
+	newMetadata := p.GetResultsMetadataForSync(ln.proxySettings)
+	logging.LogTrace("Received", len(newMetadata), "results metadata")
+	newPeers := p.GetPeersForSync(ln.proxySettings)
+	logging.LogTrace("Received", len(newPeers), "peers")
+
+	ln.tsLock.Lock()
+	ln.searchDB.SyncFrom(newSearches)
+	ln.searchDB.SyncResultsMetadataFrom(newMetadata)
+	ln.peerDB.SyncFrom(newPeers)
+	ln.peerDB.UpdateRank(p)
+	ln.tsLock.Unlock()
+}
+
+func (ln *LocalNode) StartSyncTask() {
+	ticker := time.NewTicker(30 * time.Second)
+	go func() {
+		for range ticker.C {
+			ln.SyncWithPeer()
+		}
+	}()
 }
