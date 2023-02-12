@@ -35,7 +35,7 @@ func parseArgs() (string, bool) {
 	return cfgFilePath, runAsDaemon
 }
 
-func shutdownHook(configs sds.SdsConfig, p sds.Peer) {
+func shutdownHook(configs sds.SdsConfig, node *sds.LocalNode) {
 	sigchnl := make(chan os.Signal, 1)
 	signal.Notify(sigchnl)
 
@@ -44,8 +44,9 @@ func shutdownHook(configs sds.SdsConfig, p sds.Peer) {
 			s := <-sigchnl
 			if s == syscall.SIGINT {
 				if configs.ServiceSettings.CreateHiddenService {
-					sds.RemoveHiddenService(configs.ServiceSettings, p)
+					sds.RemoveHiddenService(configs.ServiceSettings, node.SelfPeer)
 				}
+				node.Shutdown()
 				logging.LogInfo("Shutting down...")
 				os.Exit(0)
 			}
@@ -73,7 +74,7 @@ func main() {
 	node.StartSyncTask()
 
 	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")
-	shutdownHook(confs, node.SelfPeer)
+	shutdownHook(confs, node)
 
 	webServer := webui.InitSdsWebServer(node)
 	webServer.ServeWebUi(confs.WebServiceBindAddress)

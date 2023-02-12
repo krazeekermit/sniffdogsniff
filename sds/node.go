@@ -59,7 +59,7 @@ func (ln *LocalNode) Handshake(peer Peer) {
 
 func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 	ln.tsLock.Lock()
-	ln.searchDB.InsertRow(sr)
+	ln.searchDB.InsertResult(sr)
 	ln.tsLock.Unlock()
 }
 
@@ -119,9 +119,19 @@ func (ln *LocalNode) SyncWithPeer() {
 
 func (ln *LocalNode) StartSyncTask() {
 	ticker := time.NewTicker(30 * time.Second)
+	syncCycles := 0
 	go func() {
 		for range ticker.C {
 			ln.SyncWithPeer()
+			syncCycles++
+			if syncCycles >= 5 { // every 5 cycles the data is flushed to disk (number choice is totally hempiric)
+				ln.searchDB.FlushToDisk()
+				syncCycles = 0
+			}
 		}
 	}()
+}
+
+func (ln *LocalNode) Shutdown() {
+	ln.searchDB.FlushToDisk()
 }

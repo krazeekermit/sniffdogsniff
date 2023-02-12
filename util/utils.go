@@ -75,3 +75,18 @@ func B64UrlsafeStringToHash(b64 string) [32]byte {
 	bytes, _ := base64.URLEncoding.DecodeString(b64)
 	return SliceToArray32(bytes)
 }
+
+func MergeMaps[K comparable, V interface{}](m1, m2 map[K]V) map[K]V {
+	for k, v := range m2 {
+		m1[k] = v
+	}
+	return m1
+}
+
+func MapToSlice[K comparable, V interface{}](m map[K]V) []V {
+	s := make([]V, 0)
+	for _, v := range m {
+		s = append(s, v)
+	}
+	return s
+}
