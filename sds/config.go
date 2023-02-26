@@ -1,10 +1,14 @@
 package sds
 
 import (
+	"strconv"
 	"strings"
 
+	"gitlab.com/sniffdogsniff/util/logging"
 	"gopkg.in/ini.v1"
 )
+
+const MAX_RAM_DB_SIZE = 268435456 // 256 MB
 
 const SERVICE_RPC_PORT = "service_rpc_port"
 const SEARCH_DATABASE_PATH = "search_database_path"
@@ -25,6 +29,45 @@ func (ps ProxySettings) AddrByType(proxyType int) string {
 	return ""
 }
 
+func parsePeer(sec *ini.Section, addressKey string) Peer {
+	proxyType := stringToProxyTypeInt(sec.Key("proxy_type").String())
+	return Peer{
+		Address:   sec.Key(addressKey).String(),
+		ProxyType: proxyType,
+	}
+}
+
+func stringToProxyTypeInt(proxyType string) int {
+	switch strings.ToUpper(proxyType) {
+	case "TOR":
+		return TOR_SOCKS_5_PROXY_TYPE
+	case "I2P":
+		return I2P_SOCKS_5_PROXY_TYPE
+	case "NONE":
+		return NONE_PROXY_TYPE
+	default:
+		return NONE_PROXY_TYPE
+	}
+}
+
+func stringToByteSize(text string) int {
+	cleanStr := strings.Trim(text, " ")
+	size, err := strconv.Atoi(cleanStr[0 : len(cleanStr)-2])
+	if err != nil {
+		logging.LogWarn("Cannot parse db cache size")
+		return MAX_RAM_DB_SIZE
+	}
+	if strings.HasSuffix(cleanStr, "G") { // Gigs
+		return size * 1024 * 1024 * 1024
+	} else if strings.HasSuffix(cleanStr, "M") { // Megs
+		return size * 1024 * 1024
+	} else if strings.HasSuffix(cleanStr, "K") { // Kilos
+		return size * 1024
+	} else { // Bytes
+		return size
+	}
+}
+
 type NodeServiceSettings struct {
 	Enabled             bool
 	CreateHiddenService bool
@@ -35,6 +78,7 @@ type NodeServiceSettings struct {
 
 type SdsConfig struct {
 	searchDatabasePath    string
+	searchDBMaxCacheSize  int
 	peersDatabasePath     string
 	WebServiceBindAddress string
 	KnownPeers            []Peer
@@ -56,10 +100,12 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 		panic(err.Error())
 	}
 
-	cfg.searchDatabasePath = iniData.Section(ini.DEFAULT_SECTION).Key(SEARCH_DATABASE_PATH).String()
-	cfg.peersDatabasePath = iniData.Section(ini.DEFAULT_SECTION).Key(PEERS_DATABASE_PATH).String()
+	cfg.searchDatabasePath = iniData.Section(ini.DefaultSection).Key(SEARCH_DATABASE_PATH).String()
+	cfg.searchDBMaxCacheSize = stringToByteSize(
+		iniData.Section(ini.DefaultSection).Key("search_database_max_ram_cache_size").String())
+	cfg.peersDatabasePath = iniData.Section(ini.DefaultSection).Key(PEERS_DATABASE_PATH).String()
 
-	cfg.WebServiceBindAddress = iniData.Section(ini.DEFAULT_SECTION).Key("web_service_bind_address").String()
+	cfg.WebServiceBindAddress = iniData.Section(ini.DefaultSection).Key("web_service_bind_address").String()
 
 	proxyConfigs := iniData.Section("proxy_settings")
 	cfg.proxySettings = ProxySettings{
@@ -88,7 +134,7 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 		cfg.ServiceSettings.PeerInfo = parsePeer(nodeServiceSection, "bind_address")
 	}
 
-	peerNames := iniData.Section(ini.DEFAULT_SECTION).Key("known_peers").Strings(",")
+	peerNames := iniData.Section(ini.DefaultSection).Key("known_peers").Strings(",")
 
 	cfg.KnownPeers = make([]Peer, 0)
 	for _, peerName := range peerNames {
@@ -96,7 +142,7 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 		cfg.KnownPeers = append(cfg.KnownPeers, parsePeer(peer, "address"))
 	}
 
-	engineNames := iniData.Section(ini.DEFAULT_SECTION).Key("external_search_engines").Strings(",")
+	engineNames := iniData.Section(ini.DefaultSection).Key("external_search_engines").Strings(",")
 
 	cfg.searchEngines = make(map[string]SearchEngine)
 	for _, engineName := range engineNames {
@@ -116,26 +162,4 @@ func (cfg *SdsConfig) fromConfigFile(path string) {
 
 	}
 
-}
-
-func parsePeer(sec *ini.Section, addressKey string) Peer {
-	proxyType := stringToProxyTypeInt(sec.Key("proxy_type").String())
-	return Peer{
-		Address:   sec.Key(addressKey).String(),
-		ProxyType: proxyType,
-	}
-}
-
-/* Utils */
-func stringToProxyTypeInt(proxyType string) int {
-	switch strings.ToUpper(proxyType) {
-	case "TOR":
-		return TOR_SOCKS_5_PROXY_TYPE
-	case "I2P":
-		return I2P_SOCKS_5_PROXY_TYPE
-	case "NONE":
-		return NONE_PROXY_TYPE
-	default:
-		return NONE_PROXY_TYPE
-	}
 }

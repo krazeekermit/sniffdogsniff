@@ -33,13 +33,13 @@ func InitLogging(level int) {
 
 func LogInfo(a ...any) {
 	if logLevel >= INFO {
-		log.Println(ANSI_WHITE, "[INFO]", SprintTrimmed(a...), ANSI_END)
+		log.Println(ANSI_WHITE, "[INFO] ", SprintTrimmed(a...), ANSI_END)
 	}
 }
 
 func LogWarn(a ...any) {
 	if logLevel >= WARN {
-		log.Println(ANSI_YELLOW, "[WARN]", SprintTrimmed(a...), ANSI_END)
+		log.Println(ANSI_YELLOW, "[WARN] ", SprintTrimmed(a...), ANSI_END)
 	}
 }
 

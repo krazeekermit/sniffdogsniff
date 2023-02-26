@@ -1,4 +1,5 @@
 search_database_path = ./searches.db
+search_database_max_ram_cache_size = 512M
 p2p_rpc_port = 4222
 peers_database_path = ./peers.db
 web_service_bind_address = 0.0.0.0:8081

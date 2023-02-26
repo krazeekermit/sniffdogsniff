@@ -197,11 +197,11 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 		case FCODE_HANDSHAKE:
 			srv.node.Handshake(args.(Peer))
 		case FCODE_GET_RESULTS_FOR_SYNC:
-			returned = srv.node.GetResultsForSync(args.([][32]byte))
+			returned = srv.node.GetResultsForSync(args.(uint64))
 		case FCODE_GET_PEERS_FOR_SYNC:
 			returned = srv.node.getPeersForSync()
 		case FCODE_GET_METADATA_FOR_SYNC:
-			returned = srv.node.GetResultsMetadataForSync()
+			returned = srv.node.GetMetadataForSync(args.(uint64))
 		default:
 			returned = nil
 			errCode = ERRCODE_NOFUNCT
@@ -243,8 +243,8 @@ func NewPeer(address string) Peer {
 
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
-func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, hashes [][32]byte) []SearchResult {
-	searches, err := rn.callRemoteFunction(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, hashes)
+func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, timestamp uint64) []SearchResult {
+	searches, err := rn.callRemoteFunction(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, timestamp)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
@@ -252,8 +252,8 @@ func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, hashes [][32]byte
 	return searches.([]SearchResult)
 }
 
-func (rn *Peer) GetResultsMetadataForSync(proxySettings ProxySettings) []ResultMeta {
-	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, nil)
+func (rn *Peer) GetMetadataForSync(proxySettings ProxySettings, timestamp uint64) []ResultMeta {
+	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, timestamp)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil

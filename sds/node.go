@@ -20,7 +20,7 @@ type LocalNode struct {
 
 func GetNodeInstance(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
-	ln.searchDB.Open(configs.searchDatabasePath)
+	ln.searchDB.Open(configs.searchDatabasePath, configs.searchDBMaxCacheSize)
 	ln.peerDB.Open(configs.peersDatabasePath, configs.KnownPeers)
 	ln.proxySettings = configs.proxySettings
 	ln.tsLock = sync.Mutex{}
@@ -30,16 +30,16 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 	return &ln
 }
 
-func (ln *LocalNode) GetResultsMetadataForSync() []ResultMeta {
+func (ln *LocalNode) GetMetadataForSync(ts uint64) []ResultMeta {
 	ln.tsLock.Lock()
-	metadata := ln.searchDB.GetAllResultsMetadata()
+	metadata := ln.searchDB.GetMetadataForSync(ts)
 	ln.tsLock.Unlock()
 	return metadata
 }
 
-func (ln *LocalNode) GetResultsForSync(hashes [][32]byte) []SearchResult {
+func (ln *LocalNode) GetResultsForSync(timestamp uint64) []SearchResult {
 	ln.tsLock.Lock()
-	results := ln.searchDB.GetForSync(hashes)
+	results := ln.searchDB.GetForSync(timestamp)
 	ln.tsLock.Unlock()
 	return results
 }
@@ -95,16 +95,16 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	err := p.Handshake(ln.proxySettings, ln.SelfPeer)
 	if err != nil {
-		logging.LogTrace("Unsuccessful peer handshake: aborting sync")
+		logging.LogWarn("Unsuccessful peer handshake: aborting sync")
 		return
 	}
 
-	ln.tsLock.Lock()
-	hashes := ln.searchDB.GetAllHashes()
-	ln.tsLock.Unlock()
-	newSearches := p.GetResultsForSync(ln.proxySettings, hashes)
+	searchesTimestamp := ln.searchDB.LastTimestamp
+	metasTimestamp := ln.searchDB.LastMetaTimestamp
+
+	newSearches := p.GetResultsForSync(ln.proxySettings, searchesTimestamp)
 	logging.LogTrace("Received", len(newSearches), "searches")
-	newMetadata := p.GetResultsMetadataForSync(ln.proxySettings)
+	newMetadata := p.GetMetadataForSync(ln.proxySettings, metasTimestamp)
 	logging.LogTrace("Received", len(newMetadata), "results metadata")
 	newPeers := p.GetPeersForSync(ln.proxySettings)
 	logging.LogTrace("Received", len(newPeers), "peers")
@@ -125,7 +125,9 @@ func (ln *LocalNode) StartSyncTask() {
 			ln.SyncWithPeer()
 			syncCycles++
 			if syncCycles >= 5 { // every 5 cycles the data is flushed to disk (number choice is totally hempiric)
-				ln.searchDB.FlushToDisk()
+				ln.tsLock.Lock()
+				ln.searchDB.Flush()
+				ln.tsLock.Unlock()
 				syncCycles = 0
 			}
 		}
@@ -133,5 +135,5 @@ func (ln *LocalNode) StartSyncTask() {
 }
 
 func (ln *LocalNode) Shutdown() {
-	ln.searchDB.FlushToDisk()
+	ln.searchDB.Flush()
 }
