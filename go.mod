@@ -1,4 +1,4 @@
-module gitlab.com/sniffdogsniff
+module github.com/sniffdogsniff
 
 go 1.19
 

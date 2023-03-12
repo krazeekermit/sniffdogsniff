@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/sniffdogsniff/util"
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/util"
+	"github.com/sniffdogsniff/util/logging"
 )
 
 type LocalNode struct {

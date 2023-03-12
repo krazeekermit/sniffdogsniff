@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/gocolly/colly"
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/util/logging"
 )
 
 const NO_DESCRIPTION_AVAILABLE string = "No description available"

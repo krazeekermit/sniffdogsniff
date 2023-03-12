@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/sds"
 )
 
 const TEST_FILE = "./test.db"

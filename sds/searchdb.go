@@ -14,8 +14,8 @@ import (
 	//_ "github.com/go-gorp/gorp"
 
 	_ "github.com/mattn/go-sqlite3"
-	"gitlab.com/sniffdogsniff/util"
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/util"
+	"github.com/sniffdogsniff/util/logging"
 )
 
 func buildSearchQuery(text string) string {

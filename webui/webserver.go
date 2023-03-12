@@ -3,9 +3,9 @@ package webui
 import (
 	"net/http"
 
-	"gitlab.com/sniffdogsniff/sds"
-	"gitlab.com/sniffdogsniff/util"
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/util"
+	"github.com/sniffdogsniff/util/logging"
 )
 
 type SdsWebServer struct {

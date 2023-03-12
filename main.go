@@ -6,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitlab.com/sniffdogsniff/sds"
-	"gitlab.com/sniffdogsniff/util/logging"
-	"gitlab.com/sniffdogsniff/webui"
+	"github.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/webui"
 )
 
 func showHelp() {

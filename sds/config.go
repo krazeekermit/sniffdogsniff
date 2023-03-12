@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/util/logging"
 	"gopkg.in/ini.v1"
 )
 

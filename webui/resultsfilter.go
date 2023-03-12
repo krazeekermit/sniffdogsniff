@@ -4,8 +4,8 @@ import (
 	"net/url"
 	"strings"
 
-	"gitlab.com/sniffdogsniff/sds"
-	"gitlab.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/util/logging"
 )
 
 const RULE_ALL string = "all"
