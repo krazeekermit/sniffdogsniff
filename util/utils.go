@@ -90,3 +90,11 @@ func MapToSlice[K comparable, V interface{}](m map[K]V) []V {
 	}
 	return s
 }
+
+func MapKeys[K comparable, V interface{}](m map[K]V) []K {
+	s := make([]K, 0)
+	for k := range m {
+		s = append(s, k)
+	}
+	return s
+}

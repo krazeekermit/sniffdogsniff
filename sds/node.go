@@ -30,6 +30,13 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 	return &ln
 }
 
+func (ln *LocalNode) GetMetadataOf(hashes [][32]byte) []ResultMeta {
+	ln.tsLock.Lock()
+	metadata := ln.searchDB.GetMetadataOf(hashes)
+	ln.tsLock.Unlock()
+	return metadata
+}
+
 func (ln *LocalNode) GetMetadataForSync(ts uint64) []ResultMeta {
 	ln.tsLock.Lock()
 	metadata := ln.searchDB.GetMetadataForSync(ts)
@@ -63,6 +70,12 @@ func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 	ln.tsLock.Unlock()
 }
 
+func (ln *LocalNode) InvalidateSearchResult(h [32]byte) {
+	ln.tsLock.Lock()
+	ln.searchDB.InvalidateResult(h)
+	ln.tsLock.Unlock()
+}
+
 func (ln *LocalNode) UpdateResultScore(hash string) {
 	ln.tsLock.Lock()
 	ln.searchDB.UpdateResultScore(util.B64UrlsafeStringToHash(hash), 1)
@@ -89,6 +102,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 
 func (ln *LocalNode) SyncWithPeer() {
 	ln.tsLock.Lock()
+	allPeers := ln.peerDB.GetAll()
 	p := ln.peerDB.GetRandomPeer()
 	ln.tsLock.Unlock()
 	logging.LogInfo("Sync with ", p.Address)
@@ -109,12 +123,40 @@ func (ln *LocalNode) SyncWithPeer() {
 	newPeers := p.GetPeersForSync(ln.proxySettings)
 	logging.LogTrace("Received", len(newPeers), "peers")
 
-	ln.tsLock.Lock()
-	ln.searchDB.SyncFrom(newSearches)
-	ln.searchDB.SyncResultsMetadataFrom(newMetadata)
-	ln.peerDB.SyncFrom(newPeers)
-	ln.peerDB.UpdateRank(p)
-	ln.tsLock.Unlock()
+	if true { // invalidation link feature can be disabled by the user
+		invalidationTable := make(map[[32]byte]int, 0)
+		invalidationTableKeyList := util.MapKeys(invalidationTable)
+		newMetadataPtrMap := make(map[[32]byte]*ResultMeta)
+
+		for _, m := range newMetadata {
+			newMetadataPtrMap[m.ResultHash] = &m
+			if m.Invalidated != NONE {
+				invalidationTable[m.ResultHash] = 0
+			}
+		}
+		for _, po := range allPeers {
+			for _, mo := range po.GetMetadataOf(ln.proxySettings, invalidationTableKeyList) {
+				if mo.Invalidated == INVALIDATED {
+					invalidationTable[mo.ResultHash] += 1
+				}
+			}
+		}
+		for rHash, inv := range invalidationTable {
+			if inv > (len(allPeers) / 2) {
+				if newMetadataPtrMap[rHash].Invalidated < INVALIDATED {
+					newMetadataPtrMap[rHash].Invalidated += 1
+				} else if newMetadataPtrMap[rHash].Invalidated == INVALIDATED {
+					newMetadataPtrMap[rHash].Invalidated = PENDING
+				}
+			}
+		}
+
+		ln.tsLock.Lock()
+		ln.searchDB.SyncFrom(newSearches)
+		ln.searchDB.SyncResultsMetadataFrom(newMetadata)
+		ln.peerDB.SyncFrom(newPeers)
+		ln.tsLock.Unlock()
+	}
 }
 
 func (ln *LocalNode) StartSyncTask() {

@@ -35,6 +35,7 @@ const FCODE_HANDSHAKE = 100
 const FCODE_GET_RESULTS_FOR_SYNC = 101
 const FCODE_GET_PEERS_FOR_SYNC = 102
 const FCODE_GET_METADATA_FOR_SYNC = 103
+const FCODE_GET_METADATA_OF = 104
 
 const ERRCODE_NULL = 0
 const ERRCODE_MARSHAL = 51
@@ -43,9 +44,9 @@ const ERRCODE_NOFUNCT = 72
 func errCodeToError(funCode, errCode byte) error {
 	switch errCode {
 	case ERRCODE_MARSHAL:
-		return errors.New("Remote error - Msgpack marshal error")
+		return errors.New("remote error - msgpack marshal error")
 	case ERRCODE_NOFUNCT:
-		return errors.New(fmt.Sprintf("Remote error - No function %d", funCode))
+		return fmt.Errorf("remote error - no function %d", funCode)
 	}
 	return nil
 }
@@ -69,7 +70,7 @@ func (d *Deque) popFirst() net.Conn {
 }
 
 func (d *Deque) isEmpty() bool {
-	return 0 == len(d.indexes)
+	return len(d.indexes) == 0
 }
 
 /*
@@ -148,7 +149,7 @@ func (srv *NodeServer) Serve(bindAddress string) {
 		return
 	}
 	defer listener.Close()
-	for true {
+	for {
 		conn, err := listener.Accept()
 		logging.LogTrace("New connection from", conn.RemoteAddr().String())
 		if err != nil {
@@ -202,6 +203,8 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			returned = srv.node.getPeersForSync()
 		case FCODE_GET_METADATA_FOR_SYNC:
 			returned = srv.node.GetMetadataForSync(args.(uint64))
+		case FCODE_GET_METADATA_OF:
+			returned = srv.node.GetMetadataOf(args.([][32]byte))
 		default:
 			returned = nil
 			errCode = ERRCODE_NOFUNCT
@@ -276,6 +279,15 @@ func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
 		logging.LogError(err.Error())
 	}
 	return err
+}
+
+func (rn *Peer) GetMetadataOf(proxySettings ProxySettings, hashes [][32]byte) []ResultMeta {
+	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_OF, hashes)
+	if err != nil {
+		logging.LogError(err.Error())
+		return nil
+	}
+	return metadata.([]ResultMeta)
 }
 
 func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, args interface{}) (interface{}, error) {
@@ -383,16 +395,6 @@ func (pdb PeerDB) SyncFrom(peers []Peer) {
 		if len(pL) == 0 {
 			pdb.insertRow(p)
 		}
-	}
-}
-
-func (pdb PeerDB) UpdateRank(p Peer) {
-	pL := pdb.DoQuery(fmt.Sprintf(
-		"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d",
-		p.Address, p.ProxyType))
-	if len(pL) != 0 {
-		pdb.dbObject.Exec(fmt.Sprintf("update PEERS set RANK=%d where ADDRESS='%s' and PROXY_TYPE=%d",
-			p.Rank, p.Address, p.ProxyType))
 	}
 }
 

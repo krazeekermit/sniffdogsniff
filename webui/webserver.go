@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"gitlab.com/sniffdogsniff/sds"
+	"gitlab.com/sniffdogsniff/util"
 	"gitlab.com/sniffdogsniff/util/logging"
 )
 
@@ -45,6 +46,11 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 	renderTemplate(w, "insert_link.html", nil)
 }
 
+func (server *SdsWebServer) invalidateLinkHandleFunc(w http.ResponseWriter, r *http.Request) {
+	server.node.InvalidateSearchResult(util.B64UrlsafeStringToHash(r.URL.Query().Get("hash")))
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func (server *SdsWebServer) ServeWebUi(address string) {
 	srvmux := http.NewServeMux()
 
@@ -52,6 +58,7 @@ func (server *SdsWebServer) ServeWebUi(address string) {
 	srvmux.HandleFunc("/search", server.searchHandleFunc)
 	srvmux.HandleFunc("/redirect", server.redirectHandleFunc)
 	srvmux.HandleFunc("/insert_link", server.insertLinkHandleFunc)
+	srvmux.HandleFunc("/invalidate", server.invalidateLinkHandleFunc)
 
 	logging.LogInfo("Web Server is listening on", address)
 	http.ListenAndServe(address, srvmux)

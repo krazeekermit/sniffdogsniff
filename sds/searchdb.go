@@ -1,11 +1,7 @@
 package sds
 
-// TABLE SEARCHES (RHASH, URL, TITLE, DESCRIPTION)
-// TABLE SEARCHES_META (RHASH, SCORE, INVALIDATED)
-/*
-	change design to not include the score (see python implementation)
-	in search DB to keep it smaller
-*/
+// TABLE SEARCHES (RHASH, TIMESTAMP, URL, TITLE, DESCRIPTION)
+// TABLE SEARCHES_META (RHASH, TIMESTAMP, SCORE, INVALIDATED)
 
 import (
 	"crypto/sha256"
@@ -71,14 +67,22 @@ func (sr *SearchResult) HashAsB64UrlSafeStr() string {
 	return util.HashToB64UrlsafeString(sr.ResultHash)
 }
 
+type Invalidation int
+
+const (
+	NONE        Invalidation = 0
+	PENDING     Invalidation = 1
+	INVALIDATED Invalidation = 2
+)
+
 type ResultMeta struct {
 	ResultHash  [32]byte
 	Timestamp   uint64
 	Score       int
-	Invalidated int
+	Invalidated Invalidation
 }
 
-func NewResultMetadata(hash [32]byte, score, invalidated int) ResultMeta {
+func NewResultMetadata(hash [32]byte, score int, invalidated Invalidation) ResultMeta {
 	return ResultMeta{ResultHash: hash, Timestamp: uint64(time.Now().Unix()), Score: score, Invalidated: invalidated}
 }
 
@@ -97,6 +101,7 @@ func (sd *searchDBPrivate) Open(path string) {
 
 	_, err = sql.Exec("create table SEARCHES(HASH text, TIMESTAMP bigint unsigned, TITLE text, URL text, DESCRIPTION text)")
 	if err != nil {
+		logging.LogTrace("DB size :: ", sd.GetDBSizeInBytes())
 		logging.LogWarn(err.Error())
 	}
 
@@ -114,6 +119,12 @@ func (sd *searchDBPrivate) HasHash(rHash string) bool {
 func (sd *searchDBPrivate) GetByHash(rHash string) (bool, SearchResult) {
 	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where HASH == '%s'", rHash))
 	return len(query) > 0, query[util.B64UrlsafeStringToHash(rHash)]
+}
+
+func (sd *searchDBPrivate) GetMetaByHash(h [32]byte) (bool, ResultMeta) {
+	query := sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where HASH = '%s'",
+		util.HashToB64UrlsafeString(h)))
+	return len(query) > 0, query[h]
 }
 
 func (sd *searchDBPrivate) GetLastTimestamp() uint64 {
@@ -248,7 +259,7 @@ func (sd *searchDBPrivate) QueryMetaTable(query string) map[[32]byte]ResultMeta 
 	var b64Hash string
 	var timestamp uint64
 	var score int
-	var invalidated int
+	var invalidated Invalidation
 
 	for rows.Next() {
 		err := rows.Scan(&b64Hash, &timestamp, &score, &invalidated)
@@ -280,13 +291,11 @@ func (sd *searchDBPrivate) SyncResultsMetadataFrom(metas []ResultMeta) {
 		if err != nil {
 			logging.LogTrace(err.Error())
 		}
-		// link invalidation not supported for now, invalidation requires to solve a distributed sort-of consensus
-		// problem and this is not simple (for now trying to take inspiration from poker game)
-		// _, err = sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set INVALIDATED = INVALIDATED + %d / 2 where HASH = '%s'",
-		// 	mt.Invalidated, hash))
-		// if err != nil {
-		// 	logging.LogTrace(err.Error())
-		// }
+		_, err = sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set INVALIDATED = %d where HASH = '%s'",
+			mt.Invalidated, hash))
+		if err != nil {
+			logging.LogTrace(err.Error())
+		}
 	}
 }
 
@@ -300,7 +309,20 @@ func (sd *searchDBPrivate) InsertRow(sr SearchResult) {
 	}
 	_, err = sd.dbObject.Exec(fmt.Sprintf(
 		"insert or ignore into SEARCHES_META values('%s', %d, %d, %d)",
-		hashStr, 0, 0, 0))
+		hashStr, 0, 0, NONE))
+	if err != nil {
+		logging.LogTrace(err)
+	}
+}
+
+func (sd *searchDBPrivate) DeleteInvalidated() {
+	_, err := sd.dbObject.Exec(fmt.Sprintf(
+		"delete from SEARCHES as s1 where s1.HASH in (select s2.HASH from SEARCHES_META as s2 where INVALIDATED = %d)", INVALIDATED))
+	if err != nil {
+		logging.LogTrace(err)
+	}
+	_, err = sd.dbObject.Exec(fmt.Sprintf(
+		"delete from SEARCHES_META where INVALIDATED = %d", INVALIDATED))
 	if err != nil {
 		logging.LogTrace(err)
 	}
@@ -309,6 +331,14 @@ func (sd *searchDBPrivate) InsertRow(sr SearchResult) {
 func (sd *searchDBPrivate) UpdateResultScore(hash [32]byte, increment int) {
 	_, err := sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set TIMESTAMP = %d, SCORE = SCORE + %d where HASH = '%s'",
 		time.Now().Unix(), increment, util.HashToB64UrlsafeString(hash)))
+	if err != nil {
+		logging.LogTrace(err.Error())
+	}
+}
+
+func (sd *searchDBPrivate) SetInvalidationLevel(hash [32]byte, level Invalidation) {
+	_, err := sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set INVALIDATED = %d where HASH = '%s'",
+		level, util.HashToB64UrlsafeString(hash)))
 	if err != nil {
 		logging.LogTrace(err.Error())
 	}
@@ -359,34 +389,25 @@ func (sd *searchDBPrivate) ClearTables() {
 	}
 }
 
-/*
- * GetDBSizeInBytes estimates the sqlite3 db size in bytes. For now dbstat table is not available in mattn/go-sqlite3
- * so the size is estimated by summing the size of table records + average empty db size.
- *
- */
 func (sd *searchDBPrivate) GetDBSizeInBytes() int {
-	dbSize := 12288 //average empty db size
-	res, err := sd.dbObject.Query("select sum(length(HASH)+lenght(TIMESTAMP)+length(TITLE)+length(URL)+length(DESCRIPTION)) from SEARCHES;")
+	res, err := sd.dbObject.Query("PRAGMA PAGE_SIZE;")
 	if err != nil {
-		logging.LogTrace(err.Error())
 		return -1
 	}
-	var ts int
+	var pageSize int
 	for res.Next() {
-		res.Scan(&ts)
+		res.Scan(&pageSize)
 	}
-	dbSize += ts
-	res, err = sd.dbObject.Query("select sum(length(HASH)+lenght(TIMESTAMP)+length(SCORE)+length(INVALIDATED)) from SEARCHES_META;")
+	res, err = sd.dbObject.Query("PRAGMA PAGE_COUNT;")
 	if err != nil {
-		logging.LogTrace(err.Error())
 		return -1
 	}
+	var pageCount int
 	for res.Next() {
-		res.Scan(&ts)
+		res.Scan(&pageCount)
 	}
-	dbSize += ts
 
-	return dbSize
+	return pageSize * pageCount
 }
 
 /**
@@ -443,6 +464,23 @@ func (sdb *SearchDB) SyncFrom(results []SearchResult) {
 	sdb.setUpdated()
 }
 
+func (sdb *SearchDB) GetMetadataOf(hashes [][32]byte) []ResultMeta {
+	metas := make(map[[32]byte]ResultMeta, 0)
+	for _, h := range hashes {
+		present, meta := sdb.cache.GetMetaByHash(h)
+		if present {
+			metas[meta.ResultHash] = meta
+		}
+	}
+	for _, h := range hashes {
+		present, meta := sdb.db.GetMetaByHash(h)
+		if present {
+			metas[meta.ResultHash] = meta
+		}
+	}
+	return util.MapToSlice(metas)
+}
+
 func (sdb *SearchDB) GetMetadataForSync(ts uint64) []ResultMeta {
 	return util.MapToSlice(
 		util.MergeMaps(sdb.db.GetResultsMetadataForSync(ts), sdb.cache.GetResultsMetadataForSync(ts)))
@@ -482,6 +520,14 @@ func (sdb *SearchDB) GetCacheDB() *searchDBPrivate {
 	return sdb.cache
 }
 
+func (sdb *SearchDB) GetDB() *searchDBPrivate {
+	return sdb.db
+}
+
+func (sdb *SearchDB) InvalidateResult(rHash [32]byte) {
+	sdb.cache.SetInvalidationLevel(rHash, INVALIDATED)
+}
+
 func (sdb *SearchDB) Flush() {
 	if sdb.flushed {
 		return
@@ -492,6 +538,8 @@ func (sdb *SearchDB) Flush() {
 	 */
 	sdb.db.SyncFrom(util.MapToSlice(sdb.cache.GetAll()))
 	sdb.db.SyncResultsMetadataFrom(util.MapToSlice(sdb.cache.GetAllMetadata()))
+
+	sdb.db.DeleteInvalidated()
 
 	sdb.LastTimestamp = sdb.db.GetLastTimestamp()
 	sdb.LastMetaTimestamp = sdb.db.GetLastMetaTimestamp()
