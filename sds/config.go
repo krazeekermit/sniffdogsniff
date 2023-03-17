@@ -42,17 +42,17 @@ const (
 	I2P_SAM_PASSWORD                   = "i2p_sam_password"
 )
 
-type ProxySettings struct {
-	i2pSocks5Addr string
-	torSocks5Addr string
-}
-
 func panicNoKey(key string) {
 	panic(fmt.Sprint("Config file parse error: required key: ", key))
 }
 
 func panicNoSection(key string) {
 	panic(fmt.Sprint("Config file parse error: required section: ", key))
+}
+
+type ProxySettings struct {
+	i2pSocks5Addr string
+	torSocks5Addr string
 }
 
 func (ps ProxySettings) AddrByType(proxyType int) string {
