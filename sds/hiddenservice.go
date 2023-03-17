@@ -8,6 +8,16 @@ import (
 	"github.com/sniffdogsniff/util/logging"
 )
 
+type HiddenService_settings struct {
+	IsTor              bool
+	NeedAuth           bool
+	TorControlPort     int
+	TorControlPassword string
+	SamPort            int
+	SamUser            string
+	SamPassword        string
+}
+
 const TXT_BUFFER_SIZE = 2048
 
 func readDaemonAnswer(conn net.Conn) []string {
@@ -35,10 +45,10 @@ func readDaemonAnswer(conn net.Conn) []string {
 }
 
 func writeToDaemon(conn net.Conn, text string) {
-	logging.LogTrace("Send command to Tor daemon:", text)
+	logging.LogTrace("Send command to daemon:", text)
 	n, err := conn.Write([]byte(text + "\n"))
 	if err != nil || n < len([]byte(text)) {
-		panic("Failed to create hidden service can't communicate to tor daemon")
+		panic("Failed to create hidden service can't communicate to daemon")
 	}
 }
 
@@ -53,7 +63,8 @@ func connectToControlPort(port int, auth string) net.Conn {
 }
 
 func CreateHiddenService(serviceSettings NodeServiceSettings) Peer {
-	conn := connectToControlPort(serviceSettings.TorControlPort, serviceSettings.TorControlPassword)
+	conn := connectToControlPort(serviceSettings.HiddenServiceSettings.TorControlPort,
+		serviceSettings.HiddenServiceSettings.TorControlPassword)
 
 	addr, err := net.ResolveTCPAddr("tcp", serviceSettings.PeerInfo.Address)
 	if err != nil {
@@ -81,7 +92,8 @@ func CreateHiddenService(serviceSettings NodeServiceSettings) Peer {
 }
 
 func RemoveHiddenService(serviceSettings NodeServiceSettings, p Peer) {
-	conn := connectToControlPort(serviceSettings.TorControlPort, serviceSettings.TorControlPassword)
+	conn := connectToControlPort(serviceSettings.HiddenServiceSettings.TorControlPort,
+		serviceSettings.HiddenServiceSettings.TorControlPassword)
 	logging.LogInfo("Removing Hidden Service", p.Address)
 	writeToDaemon(conn, fmt.Sprintf("DEL_ONION %s", strings.Split(p.Address, ".")[0]))
 	readDaemonAnswer(conn)

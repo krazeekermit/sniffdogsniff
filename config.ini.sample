@@ -2,11 +2,13 @@ search_database_path = ./searches.db
 search_database_max_ram_cache_size = 512M
 p2p_rpc_port = 4222
 peers_database_path = ./peers.db
-web_service_bind_address = 0.0.0.0:8081
 min_search_results_threshold = 50
 
 known_peers = peer1, peer2
 external_search_engines = startpage, yandex, onesearch, brave
+
+[web_ui]
+bind_address = 0.0.0.0:8081
 
 [proxy_settings]
 # i2p_socks5_proxy = addr:port
