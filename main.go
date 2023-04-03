@@ -17,9 +17,10 @@ func showHelp() {
 	os.Exit(0)
 }
 
-func parseArgs() (string, bool) {
+func parseArgs() (string, bool, int) {
 	cfgFilePath := "./config.ini"
 	runAsDaemon := false
+	logLevel := logging.INFO
 
 	for i := 0; i < len(os.Args); i++ {
 		switch arg := os.Args[i]; arg {
@@ -30,9 +31,12 @@ func parseArgs() (string, bool) {
 			runAsDaemon = true
 		case "-h", "--help":
 			showHelp()
+		case "--log-level":
+			logLevel = logging.StrToLogLevel(os.Args[i+1])
+			i++
 		}
 	}
-	return cfgFilePath, runAsDaemon
+	return cfgFilePath, runAsDaemon, logLevel
 }
 
 func shutdownHook(configs sds.SdsConfig, node *sds.LocalNode) {
@@ -55,8 +59,8 @@ func shutdownHook(configs sds.SdsConfig, node *sds.LocalNode) {
 }
 
 func main() {
-	logging.InitLogging(logging.TRACE)
-	cfgFilePath, _ := parseArgs()
+	cfgFilePath, _, logLevel := parseArgs()
+	logging.InitLogging(logLevel)
 
 	confs := sds.NewSdsConfig(cfgFilePath)
 

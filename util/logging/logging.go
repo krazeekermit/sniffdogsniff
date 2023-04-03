@@ -23,6 +23,20 @@ const (
 
 var logLevel int
 
+func StrToLogLevel(levelStr string) int {
+	switch strings.ToUpper(levelStr) {
+	case "INFO":
+		return INFO
+	case "WARN":
+		return WARN
+	case "ERROR":
+		return ERROR
+	case "TRACE":
+		return TRACE
+	}
+	return TRACE
+}
+
 func SprintTrimmed(a ...any) string {
 	return strings.Trim(fmt.Sprintln(a...), "\n")
 }
@@ -33,7 +47,7 @@ func InitLogging(level int) {
 
 func LogInfo(a ...any) {
 	if logLevel >= INFO {
-		log.Println(ANSI_WHITE, "[INFO] ", SprintTrimmed(a...), ANSI_END)
+		log.Println(" [INFO] ", SprintTrimmed(a...))
 	}
 }
 

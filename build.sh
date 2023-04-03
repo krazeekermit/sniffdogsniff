@@ -17,6 +17,11 @@ build() {
         mkdir $BUILD_DIR;
     fi
     go build -v -o $BUILD_DIR;
+    if [[ $? -ne 0 ]]
+    then
+      echo " [ERR] Compile errors"
+      exit $?
+    fi
 }
 
 run() {
@@ -24,7 +29,7 @@ run() {
     boldecho " -> Running SniffDogSniff";
     cp $THIS_SCRIPT_DIRECTORY/config.ini.sample $BUILD_DIR/config.ini;
     echo "$BUILD_DIR/config.ini"
-    $BUILD_DIR/sniffdogsniff -c $BUILD_DIR/config.ini;
+    $BUILD_DIR/sniffdogsniff -c $BUILD_DIR/config.ini --log-level TRACE;
 }
 
 for arg in $@
