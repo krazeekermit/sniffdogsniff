@@ -1,7 +1,6 @@
-search_database_path = ./searches.db
+work_dir_path = ./
 search_database_max_ram_cache_size = 512M
 p2p_rpc_port = 4222
-peers_database_path = ./peers.db
 min_search_results_threshold = 50
 
 known_peers = peer1, peer2

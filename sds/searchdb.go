@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,10 @@ import (
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
 )
+
+const SEARCHES_DB_FILE_NAME = "searches.db"
+
+const ENTRY_MAX_SIZE = 512 // bytes
 
 func buildSearchQuery(text string) string {
 	queryString := fmt.Sprint("select * from SEARCHES where TITLE like '%", text, "%' or URL like '%", text, "%' or DESCRIPTION like '%", text, "%'")
@@ -40,7 +45,14 @@ type SearchResult struct {
 	Description string
 }
 
+/*
+SearchResult Structure
+[[HASH (32)][TIMESTAMP (64)][TITLE][URL][DESCRIPTION]] = 512 bytes
+*/
 func NewSearchResult(title, url, description string) SearchResult {
+	if 32+64+len(title)+len(url)+len(description) > ENTRY_MAX_SIZE {
+		description = string(description[:(ENTRY_MAX_SIZE - 32 - 64 - len(title) - len(url) - 1)])
+	}
 	rs := SearchResult{Timestamp: uint64(time.Now().Unix()), Title: title, Url: url, Description: description}
 	rs.ReHash()
 	return rs
@@ -117,13 +129,13 @@ func (sd *searchDBPrivate) HasHash(rHash string) bool {
 }
 
 func (sd *searchDBPrivate) GetByHash(rHash string) (bool, SearchResult) {
-	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where HASH == '%s'", rHash))
+	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where HASH == '%s'", rHash), -1)
 	return len(query) > 0, query[util.B64UrlsafeStringToHash(rHash)]
 }
 
 func (sd *searchDBPrivate) GetMetaByHash(h [32]byte) (bool, ResultMeta) {
 	query := sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where HASH = '%s'",
-		util.HashToB64UrlsafeString(h)))
+		util.HashToB64UrlsafeString(h)), -1)
 	return len(query) > 0, query[h]
 }
 
@@ -208,7 +220,7 @@ func (sd *searchDBPrivate) DoSearch(text string) map[[32]byte]SearchResult {
 }
 
 func (sd *searchDBPrivate) GetAll() map[[32]byte]SearchResult {
-	return sd.DoQuery("select * from SEARCHES")
+	return sd.DoQuery("select * from SEARCHES", -1)
 }
 
 func (sd *searchDBPrivate) GetAllHashes() [][32]byte {
@@ -224,8 +236,8 @@ hashes: hashes that the sync requesting peer has in its database
 the result will be the difference between the results that the peer
 already has and the results that the peer doesn't have
 */
-func (sd *searchDBPrivate) GetForSync(timestamp uint64) map[[32]byte]SearchResult {
-	return sd.DoQuery(fmt.Sprintf("select * from SEARCHES where TIMESTAMP > %d", timestamp))
+func (sd *searchDBPrivate) GetForSync(timestamp uint64, sizeLimit int) map[[32]byte]SearchResult {
+	return sd.DoQuery(fmt.Sprintf("select * from SEARCHES where TIMESTAMP > %d", timestamp), sizeLimit)
 }
 
 func (sd *searchDBPrivate) SyncFrom(results []SearchResult) {
@@ -240,14 +252,14 @@ func (sd *searchDBPrivate) SyncFrom(results []SearchResult) {
 }
 
 func (sd *searchDBPrivate) GetAllMetadata() map[[32]byte]ResultMeta {
-	return sd.QueryMetaTable("select * from SEARCHES_META")
+	return sd.QueryMetaTable("select * from SEARCHES_META", -1)
 }
 
-func (sd *searchDBPrivate) GetResultsMetadataForSync(ts uint64) map[[32]byte]ResultMeta {
-	return sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where TIMESTAMP > %d", ts))
+func (sd *searchDBPrivate) GetResultsMetadataForSync(ts uint64, sizeLimit int) map[[32]byte]ResultMeta {
+	return sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where TIMESTAMP > %d", ts), sizeLimit)
 }
 
-func (sd *searchDBPrivate) QueryMetaTable(query string) map[[32]byte]ResultMeta {
+func (sd *searchDBPrivate) QueryMetaTable(query string, sizeLimit int) map[[32]byte]ResultMeta {
 	rows, err := sd.dbObject.Query(query)
 
 	metas := make(map[[32]byte]ResultMeta, 0)
@@ -256,17 +268,23 @@ func (sd *searchDBPrivate) QueryMetaTable(query string) map[[32]byte]ResultMeta 
 		return metas
 	}
 
+	count := 0
+
 	var b64Hash string
 	var timestamp uint64
 	var score int
 	var invalidated Invalidation
 
 	for rows.Next() {
+
+		if sizeLimit > 0 && count >= sizeLimit {
+			break
+		}
+
 		err := rows.Scan(&b64Hash, &timestamp, &score, &invalidated)
 
 		if err != nil {
 			logging.LogTrace(err.Error())
-			fmt.Println(err.Error())
 			continue
 		}
 
@@ -277,6 +295,7 @@ func (sd *searchDBPrivate) QueryMetaTable(query string) map[[32]byte]ResultMeta 
 			Score:       score,
 			Invalidated: invalidated,
 		}
+		count++
 
 	}
 	return metas
@@ -344,7 +363,7 @@ func (sd *searchDBPrivate) SetInvalidationLevel(hash [32]byte, level Invalidatio
 	}
 }
 
-func (sd *searchDBPrivate) DoQuery(queryString string) map[[32]byte]SearchResult {
+func (sd *searchDBPrivate) DoQuery(queryString string, sizeLimit int) map[[32]byte]SearchResult {
 	rows, err := sd.dbObject.Query(queryString)
 
 	results := make(map[[32]byte]SearchResult, 0)
@@ -354,6 +373,8 @@ func (sd *searchDBPrivate) DoQuery(queryString string) map[[32]byte]SearchResult
 		return results
 	}
 
+	count := 0
+
 	var b64Hash string
 	var timestamp uint64
 	var title string
@@ -361,8 +382,12 @@ func (sd *searchDBPrivate) DoQuery(queryString string) map[[32]byte]SearchResult
 	var description string
 
 	for rows.Next() {
-		err := rows.Scan(&b64Hash, &timestamp, &title, &url, &description)
 
+		if sizeLimit != -1 && count >= sizeLimit {
+			break
+		}
+
+		err := rows.Scan(&b64Hash, &timestamp, &title, &url, &description)
 		if err != nil {
 			logging.LogTrace(err.Error())
 			continue
@@ -376,6 +401,7 @@ func (sd *searchDBPrivate) DoQuery(queryString string) map[[32]byte]SearchResult
 			Title:       title,
 			Description: description,
 		}
+		count++
 	}
 	return results
 }
@@ -387,6 +413,18 @@ func (sd *searchDBPrivate) ClearTables() {
 			logging.LogError(err.Error())
 		}
 	}
+}
+
+func (sd *searchDBPrivate) GetEntriesCount() int {
+	res, err := sd.dbObject.Query("select count(*) from SEARCHES")
+	if err != nil {
+		return 0
+	}
+	var nEntries int
+	for res.Next() {
+		res.Scan(&nEntries)
+	}
+	return nEntries
 }
 
 func (sd *searchDBPrivate) GetDBSizeInBytes() int {
@@ -426,17 +464,21 @@ type SearchDB struct {
 	flushed           bool
 }
 
-func (sdb *SearchDB) Open(path string, maxCacheSize int) {
+func (sdb *SearchDB) Open(workDir string, maxCacheSize int) {
 	sdb.maximumCacheSize = maxCacheSize
 	logging.LogTrace("DEBUG: SearchDB started with", maxCacheSize, "Bytes of cache")
 	sdb.db = new(searchDBPrivate)
 	sdb.cache = new(searchDBPrivate)
 	sdb.flushed = false
-	sdb.db.Open(path)
+	sdb.db.Open(filepath.Join(workDir, SEARCHES_DB_FILE_NAME))
 	sdb.cache.Open("file::memory:?cache=shared") //in ram database cache
 	// last timestamp is initially set to the last timestamp of the on-disk db
 	sdb.LastTimestamp = sdb.db.GetLastTimestamp()
 	sdb.LastMetaTimestamp = sdb.db.GetLastMetaTimestamp()
+}
+
+func (sdb *SearchDB) IsEmpty() bool {
+	return sdb.db.GetEntriesCount() == 0 && sdb.cache.GetEntriesCount() == 0
 }
 
 func (sdb *SearchDB) GetMemCacheApproxSize() int {
@@ -454,9 +496,10 @@ func (sdb *SearchDB) GetAllHashes() [][32]byte {
 	return hashes
 }
 
-func (sdb *SearchDB) GetForSync(timestamp uint64) []SearchResult {
-	return util.MapToSlice(
-		util.MergeMaps(sdb.db.GetForSync(timestamp), sdb.cache.GetForSync(timestamp)))
+func (sdb *SearchDB) GetForSync(timestamp uint64, sizeLimit int) []SearchResult {
+	dbMap := sdb.db.GetForSync(timestamp, sizeLimit)
+	cacheMap := sdb.cache.GetForSync(timestamp, sizeLimit-len(dbMap))
+	return util.MapToSlice(util.MergeMaps(dbMap, cacheMap))
 }
 
 func (sdb *SearchDB) SyncFrom(results []SearchResult) {
@@ -481,9 +524,10 @@ func (sdb *SearchDB) GetMetadataOf(hashes [][32]byte) []ResultMeta {
 	return util.MapToSlice(metas)
 }
 
-func (sdb *SearchDB) GetMetadataForSync(ts uint64) []ResultMeta {
-	return util.MapToSlice(
-		util.MergeMaps(sdb.db.GetResultsMetadataForSync(ts), sdb.cache.GetResultsMetadataForSync(ts)))
+func (sdb *SearchDB) GetMetadataForSync(ts uint64, sizeLimit int) []ResultMeta {
+	dbMap := sdb.db.GetResultsMetadataForSync(ts, sizeLimit)
+	cacheMap := sdb.cache.GetResultsMetadataForSync(ts, sizeLimit-len(dbMap))
+	return util.MapToSlice(util.MergeMaps(dbMap, cacheMap))
 }
 
 func (sdb *SearchDB) SyncResultsMetadataFrom(metas []ResultMeta) {

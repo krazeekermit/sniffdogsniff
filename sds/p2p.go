@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -28,14 +29,17 @@ const (
 	I2P_SOCKS_5_PROXY_TYPE int = 1
 )
 
+const PEER_DB_FILE_NAME = "peers.db"
+
 const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
 
 const FCODE_HANDSHAKE = 100
-const FCODE_GET_RESULTS_FOR_SYNC = 101
-const FCODE_GET_PEERS_FOR_SYNC = 102
-const FCODE_GET_METADATA_FOR_SYNC = 103
-const FCODE_GET_METADATA_OF = 104
+const FCODE_GETSTATUS = 101
+const FCODE_GET_RESULTS_FOR_SYNC = 102
+const FCODE_GET_PEERS_FOR_SYNC = 103
+const FCODE_GET_METADATA_FOR_SYNC = 104
+const FCODE_GET_METADATA_OF = 105
 
 const ERRCODE_NULL = 0
 const ERRCODE_MARSHAL = 51
@@ -196,7 +200,9 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 		var returned interface{}
 		switch funcCode {
 		case FCODE_HANDSHAKE:
-			srv.node.Handshake(args.(Peer))
+			returned = srv.node.Handshake(args.(Peer))
+		case FCODE_GETSTATUS:
+			returned = util.TwoUint64ToArr(srv.node.GetStatus())
 		case FCODE_GET_RESULTS_FOR_SYNC:
 			returned = srv.node.GetResultsForSync(args.(uint64))
 		case FCODE_GET_PEERS_FOR_SYNC:
@@ -244,6 +250,24 @@ func NewPeer(address string) Peer {
 	}
 }
 
+func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
+	remoteErr, err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer)
+	if err != nil {
+		logging.LogError(err.Error())
+	} else {
+		err = remoteErr.(error)
+	}
+	return err
+}
+
+func (rn *Peer) GetStatus(proxySettings ProxySettings) (uint64, uint64) {
+	timestamps, err := rn.callRemoteFunction(proxySettings, FCODE_GETSTATUS, nil)
+	if err != nil {
+		logging.LogError(err.Error())
+	}
+	return util.ArrToTwoUint64(timestamps.([2]uint64))
+}
+
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
 func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, timestamp uint64) []SearchResult {
@@ -271,14 +295,6 @@ func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
 		return nil
 	}
 	return peers.([]Peer)
-}
-
-func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
-	_, err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer)
-	if err != nil {
-		logging.LogError(err.Error())
-	}
-	return err
 }
 
 func (rn *Peer) GetMetadataOf(proxySettings ProxySettings, hashes [][32]byte) []ResultMeta {
@@ -358,8 +374,8 @@ type PeerDB struct {
 	dbObject *sql.DB
 }
 
-func (sd *PeerDB) Open(path string, knownPeers []Peer) {
-	sql, err := sql.Open("sqlite3", path)
+func (sd *PeerDB) Open(workDir string, knownPeers []Peer) {
+	sql, err := sql.Open("sqlite3", filepath.Join(workDir, PEER_DB_FILE_NAME))
 	if err != nil {
 		logging.LogError(err.Error())
 		return

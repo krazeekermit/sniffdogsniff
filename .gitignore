@@ -3,5 +3,6 @@
 venv*
 __pycache__*
 *.db
+*.lock
 #build dir
 build/

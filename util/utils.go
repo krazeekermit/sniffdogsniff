@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"encoding/base64"
 	"io/ioutil"
+	"os"
 )
 
 func Array32Contains(array [][32]byte, entry [32]byte) bool {
@@ -83,6 +84,14 @@ func MergeMaps[K comparable, V interface{}](m1, m2 map[K]V) map[K]V {
 	return m1
 }
 
+func TwoUint64ToArr(a, b uint64) [2]uint64 {
+	return [2]uint64{a, b}
+}
+
+func ArrToTwoUint64(arr [2]uint64) (uint64, uint64) {
+	return arr[0], arr[1]
+}
+
 func MapToSlice[K comparable, V interface{}](m map[K]V) []V {
 	s := make([]V, 0)
 	for _, v := range m {
@@ -97,4 +106,16 @@ func MapKeys[K comparable, V interface{}](m map[K]V) []K {
 		s = append(s, k)
 	}
 	return s
+}
+
+/*
+	File Utilities
+*/
+
+func FileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

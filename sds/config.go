@@ -13,9 +13,8 @@ const MAX_RAM_DB_SIZE = 268435456 // 256 MB
 
 const (
 	SERVICE_RPC_PORT                   = "service_rpc_port"
-	SEARCH_DATABASE_PATH               = "search_database_path"
+	WORK_DIR_PATH                      = "work_dir_path"
 	SEARCH_DATABASE_MAX_RAM_CACHE_SIZE = "search_database_max_ram_cache_size"
-	PEERS_DATABASE_PATH                = "peers_database_path"
 	KNOWN_PEERS                        = "known_peers"
 	ADDRESS                            = "address"
 	EXTERNAL_SEARCH_ENGINES            = "external_search_engines"
@@ -117,9 +116,8 @@ type NodeServiceSettings struct {
 }
 
 type SdsConfig struct {
-	searchDatabasePath    string
+	workDirPath           string
 	searchDBMaxCacheSize  int
-	peersDatabasePath     string
 	WebServiceBindAddress string
 	KnownPeers            []Peer
 	proxySettings         ProxySettings
@@ -136,21 +134,16 @@ func NewSdsConfig(path string) SdsConfig {
 	}
 
 	defaultSection := iniData.Section(ini.DefaultSection)
-	if defaultSection.HasKey(SEARCH_DATABASE_PATH) {
-		cfg.searchDatabasePath = defaultSection.Key(SEARCH_DATABASE_PATH).String()
+	if defaultSection.HasKey(WORK_DIR_PATH) {
+		cfg.workDirPath = defaultSection.Key(WORK_DIR_PATH).String()
 	} else {
-		panicNoKey(SEARCH_DATABASE_PATH)
+		panicNoKey(WORK_DIR_PATH)
 	}
 	if defaultSection.HasKey(SEARCH_DATABASE_MAX_RAM_CACHE_SIZE) {
 		cfg.searchDBMaxCacheSize = stringToByteSize(
 			defaultSection.Key(SEARCH_DATABASE_MAX_RAM_CACHE_SIZE).String())
 	} else {
 		cfg.searchDBMaxCacheSize = MAX_RAM_DB_SIZE
-	}
-	if defaultSection.HasKey(PEERS_DATABASE_PATH) {
-		cfg.peersDatabasePath = defaultSection.Key(PEERS_DATABASE_PATH).String()
-	} else {
-		panicNoKey(PEERS_DATABASE_PATH)
 	}
 	if defaultSection.HasKey(KNOWN_PEERS) {
 		peerNames := iniData.Section(ini.DefaultSection).Key(KNOWN_PEERS).Strings(",")
