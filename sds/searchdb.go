@@ -4,22 +4,22 @@ package sds
 // TABLE SEARCHES_META (RHASH, TIMESTAMP, SCORE, INVALIDATED)
 
 import (
+	"bytes"
 	"crypto/sha256"
-	"database/sql"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	//_ "github.com/go-gorp/gorp"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const SEARCHES_DB_FILE_NAME = "searches.db"
+const METASS_DB_FILE_NAME = "searches_meta.db"
 
 const ENTRY_MAX_SIZE = 512 // bytes
 
@@ -56,6 +56,15 @@ func NewSearchResult(title, url, description string) SearchResult {
 	rs := SearchResult{Timestamp: uint64(time.Now().Unix()), Title: title, Url: url, Description: description}
 	rs.ReHash()
 	return rs
+}
+
+func searchResultFromBytes(bytez []byte) SearchResult {
+	buf := bytes.NewBuffer(bytez)
+	buf.Read
+	hash := util.SliceToArray32(bytez[0:32])
+	titleLen := uint8(bytez[33])
+	title := string(bytez[40 : titleLen-1])
+	urlLen := uint8(bytez[titleLen-1])
 }
 
 func (sr SearchResult) calculateHash() [32]byte {
@@ -98,354 +107,14 @@ func NewResultMetadata(hash [32]byte, score int, invalidated Invalidation) Resul
 	return ResultMeta{ResultHash: hash, Timestamp: uint64(time.Now().Unix()), Score: score, Invalidated: invalidated}
 }
 
-type searchDBPrivate struct {
-	dbObject *sql.DB
-}
+/****************************************************************************************************/
 
-func (sd *searchDBPrivate) Open(path string) {
-	sql, err := sql.Open("sqlite3", path)
+func openDB(dbPath string) *leveldb.DB {
+	db, err := leveldb.OpenFile(dbPath, nil)
 	if err != nil {
-		logging.LogError(err.Error())
-		return
-	} else {
-		sd.dbObject = sql
+		panic(err.Error())
 	}
-
-	_, err = sql.Exec("create table SEARCHES(HASH text, TIMESTAMP bigint unsigned, TITLE text, URL text, DESCRIPTION text)")
-	if err != nil {
-		logging.LogTrace("DB size :: ", sd.GetDBSizeInBytes())
-		logging.LogWarn(err.Error())
-	}
-
-	_, err = sql.Exec("create table SEARCHES_META(HASH text, TIMESTAMP bigint unsigned, SCORE int, INVALIDATED int)")
-	if err != nil {
-		logging.LogWarn(err.Error())
-	}
-}
-
-func (sd *searchDBPrivate) HasHash(rHash string) bool {
-	has, _ := sd.GetByHash(rHash)
-	return has
-}
-
-func (sd *searchDBPrivate) GetByHash(rHash string) (bool, SearchResult) {
-	query := sd.DoQuery(fmt.Sprintf("select * from SEARCHES where HASH == '%s'", rHash), -1)
-	return len(query) > 0, query[util.B64UrlsafeStringToHash(rHash)]
-}
-
-func (sd *searchDBPrivate) GetMetaByHash(h [32]byte) (bool, ResultMeta) {
-	query := sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where HASH = '%s'",
-		util.HashToB64UrlsafeString(h)), -1)
-	return len(query) > 0, query[h]
-}
-
-func (sd *searchDBPrivate) GetLastTimestamp() uint64 {
-	rows, err := sd.dbObject.Query("select max(TIMESTAMP) from SEARCHES")
-	if err != nil {
-		panic("SearchDB: Could not determine last timestamp: DB corruption")
-	}
-	var timestamp uint64
-	for rows.Next() {
-		rows.Scan(&timestamp)
-	}
-	return timestamp
-}
-
-/**
-  * SEARCHES_META time stamps are mutable
-  *
-**/
-func (sd *searchDBPrivate) GetLastMetaTimestamp() uint64 {
-	rows, err := sd.dbObject.Query("select max(TIMESTAMP) from SEARCHES_META")
-	if err != nil {
-		panic("SearchDB: Could not determine last timestamp: DB corruption" + err.Error())
-	}
-	var timestamp uint64
-	for rows.Next() {
-		rows.Scan(&timestamp)
-	}
-	return timestamp
-}
-
-func (sd *searchDBPrivate) DoSearch(text string) map[[32]byte]SearchResult {
-	/*
-	 * ScoredSearchResult is a wrapper struct that helps sorting results by score
-	 */
-	type ScoredSearchResult struct {
-		Result SearchResult
-		Score  int
-	}
-
-	sqlString := fmt.Sprintf("select s1.HASH, TITLE, URL, DESCRIPTION, SCORE from (%s) as s1 join SEARCHES_META as s2 on s1.HASH = s2.HASH",
-		buildSearchQuery(text))
-	rows, err := sd.dbObject.Query(sqlString)
-	if err != nil {
-		return make(map[[32]byte]SearchResult, 0)
-	}
-
-	toSort := make([]ScoredSearchResult, 0)
-
-	var b64Hash string
-	var title string
-	var url string
-	var description string
-	var score int
-
-	for rows.Next() {
-		err := rows.Scan(&b64Hash, &title, &url, &description, &score)
-
-		if err != nil {
-			logging.LogTrace(err.Error())
-			continue
-		}
-		toSort = append(toSort, ScoredSearchResult{
-			Result: SearchResult{
-				ResultHash:  util.B64UrlsafeStringToHash(b64Hash),
-				Url:         url,
-				Title:       title,
-				Description: description,
-			}, Score: score,
-		})
-
-	}
-	sort.Slice(toSort, func(i, j int) bool {
-		return toSort[i].Score > toSort[j].Score
-	})
-	sorted := make(map[[32]byte]SearchResult, 0)
-	for _, v := range toSort {
-		sorted[v.Result.ResultHash] = v.Result
-	}
-	logging.LogInfo("SearchDB", len(sorted), "results found in decentralized database")
-	return sorted
-}
-
-func (sd *searchDBPrivate) GetAll() map[[32]byte]SearchResult {
-	return sd.DoQuery("select * from SEARCHES", -1)
-}
-
-func (sd *searchDBPrivate) GetAllHashes() [][32]byte {
-	hashes := make([][32]byte, 0)
-	for _, result := range sd.GetAll() {
-		hashes = append(hashes, result.ResultHash)
-	}
-	return hashes
-}
-
-/*
-hashes: hashes that the sync requesting peer has in its database
-the result will be the difference between the results that the peer
-already has and the results that the peer doesn't have
-*/
-func (sd *searchDBPrivate) GetForSync(timestamp uint64, sizeLimit int) map[[32]byte]SearchResult {
-	return sd.DoQuery(fmt.Sprintf("select * from SEARCHES where TIMESTAMP > %d", timestamp), sizeLimit)
-}
-
-func (sd *searchDBPrivate) SyncFrom(results []SearchResult) {
-	hashes := sd.GetAllHashes()
-	for _, sr := range results {
-		if !util.Array32Contains(hashes, sr.ResultHash) {
-			if sr.IsConsistent() {
-				sd.InsertRow(sr)
-			}
-		}
-	}
-}
-
-func (sd *searchDBPrivate) GetAllMetadata() map[[32]byte]ResultMeta {
-	return sd.QueryMetaTable("select * from SEARCHES_META", -1)
-}
-
-func (sd *searchDBPrivate) GetResultsMetadataForSync(ts uint64, sizeLimit int) map[[32]byte]ResultMeta {
-	return sd.QueryMetaTable(fmt.Sprintf("select * from SEARCHES_META where TIMESTAMP > %d", ts), sizeLimit)
-}
-
-func (sd *searchDBPrivate) QueryMetaTable(query string, sizeLimit int) map[[32]byte]ResultMeta {
-	rows, err := sd.dbObject.Query(query)
-
-	metas := make(map[[32]byte]ResultMeta, 0)
-
-	if err != nil {
-		return metas
-	}
-
-	count := 0
-
-	var b64Hash string
-	var timestamp uint64
-	var score int
-	var invalidated Invalidation
-
-	for rows.Next() {
-
-		if sizeLimit > 0 && count >= sizeLimit {
-			break
-		}
-
-		err := rows.Scan(&b64Hash, &timestamp, &score, &invalidated)
-
-		if err != nil {
-			logging.LogTrace(err.Error())
-			continue
-		}
-
-		bHash := util.B64UrlsafeStringToHash(b64Hash)
-		metas[bHash] = ResultMeta{
-			ResultHash:  bHash,
-			Timestamp:   timestamp,
-			Score:       score,
-			Invalidated: invalidated,
-		}
-		count++
-
-	}
-	return metas
-}
-
-func (sd *searchDBPrivate) SyncResultsMetadataFrom(metas []ResultMeta) {
-	for _, mt := range metas {
-		hash := util.HashToB64UrlsafeString(mt.ResultHash)
-		// average score when sync - auto adjust: more data means more close to real value
-		_, err := sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set SCORE = (SCORE + %d / 2) where TIMESTAMP < %d and HASH = '%s'",
-			mt.Score, mt.Timestamp, hash))
-		if err != nil {
-			logging.LogTrace(err.Error())
-		}
-		_, err = sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set INVALIDATED = %d where HASH = '%s'",
-			mt.Invalidated, hash))
-		if err != nil {
-			logging.LogTrace(err.Error())
-		}
-	}
-}
-
-func (sd *searchDBPrivate) InsertRow(sr SearchResult) {
-	hashStr := util.HashToB64UrlsafeString(sr.ResultHash)
-	_, err := sd.dbObject.Exec(fmt.Sprintf(
-		"insert or ignore into SEARCHES values('%s', %d, '%s', '%s', '%s')",
-		hashStr, sr.Timestamp, sr.Title, sr.Url, sr.Description))
-	if err != nil {
-		logging.LogTrace(err)
-	}
-	_, err = sd.dbObject.Exec(fmt.Sprintf(
-		"insert or ignore into SEARCHES_META values('%s', %d, %d, %d)",
-		hashStr, 0, 0, NONE))
-	if err != nil {
-		logging.LogTrace(err)
-	}
-}
-
-func (sd *searchDBPrivate) DeleteInvalidated() {
-	_, err := sd.dbObject.Exec(fmt.Sprintf(
-		"delete from SEARCHES as s1 where s1.HASH in (select s2.HASH from SEARCHES_META as s2 where INVALIDATED = %d)", INVALIDATED))
-	if err != nil {
-		logging.LogTrace(err)
-	}
-	_, err = sd.dbObject.Exec(fmt.Sprintf(
-		"delete from SEARCHES_META where INVALIDATED = %d", INVALIDATED))
-	if err != nil {
-		logging.LogTrace(err)
-	}
-}
-
-func (sd *searchDBPrivate) UpdateResultScore(hash [32]byte, increment int) {
-	_, err := sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set TIMESTAMP = %d, SCORE = SCORE + %d where HASH = '%s'",
-		time.Now().Unix(), increment, util.HashToB64UrlsafeString(hash)))
-	if err != nil {
-		logging.LogTrace(err.Error())
-	}
-}
-
-func (sd *searchDBPrivate) SetInvalidationLevel(hash [32]byte, level Invalidation) {
-	_, err := sd.dbObject.Exec(fmt.Sprintf("update SEARCHES_META set INVALIDATED = %d where HASH = '%s'",
-		level, util.HashToB64UrlsafeString(hash)))
-	if err != nil {
-		logging.LogTrace(err.Error())
-	}
-}
-
-func (sd *searchDBPrivate) DoQuery(queryString string, sizeLimit int) map[[32]byte]SearchResult {
-	rows, err := sd.dbObject.Query(queryString)
-
-	results := make(map[[32]byte]SearchResult, 0)
-
-	if err != nil {
-		logging.LogError("SearchDB", "Query:", queryString, err.Error())
-		return results
-	}
-
-	count := 0
-
-	var b64Hash string
-	var timestamp uint64
-	var title string
-	var url string
-	var description string
-
-	for rows.Next() {
-
-		if sizeLimit != -1 && count >= sizeLimit {
-			break
-		}
-
-		err := rows.Scan(&b64Hash, &timestamp, &title, &url, &description)
-		if err != nil {
-			logging.LogTrace(err.Error())
-			continue
-		}
-
-		bHash := util.B64UrlsafeStringToHash(b64Hash)
-		results[bHash] = SearchResult{
-			ResultHash:  bHash,
-			Timestamp:   timestamp,
-			Url:         url,
-			Title:       title,
-			Description: description,
-		}
-		count++
-	}
-	return results
-}
-
-func (sd *searchDBPrivate) ClearTables() {
-	for _, tn := range []string{"SEARCHES", "SEARCHES_META"} {
-		_, err := sd.dbObject.Exec(fmt.Sprintf("delete from %s", tn))
-		if err != nil {
-			logging.LogError(err.Error())
-		}
-	}
-}
-
-func (sd *searchDBPrivate) GetEntriesCount() int {
-	res, err := sd.dbObject.Query("select count(*) from SEARCHES")
-	if err != nil {
-		return 0
-	}
-	var nEntries int
-	for res.Next() {
-		res.Scan(&nEntries)
-	}
-	return nEntries
-}
-
-func (sd *searchDBPrivate) GetDBSizeInBytes() int {
-	res, err := sd.dbObject.Query("PRAGMA PAGE_SIZE;")
-	if err != nil {
-		return -1
-	}
-	var pageSize int
-	for res.Next() {
-		res.Scan(&pageSize)
-	}
-	res, err = sd.dbObject.Query("PRAGMA PAGE_COUNT;")
-	if err != nil {
-		return -1
-	}
-	var pageCount int
-	for res.Next() {
-		res.Scan(&pageCount)
-	}
-
-	return pageSize * pageCount
+	return db
 }
 
 /**
@@ -457,8 +126,10 @@ func (sd *searchDBPrivate) GetDBSizeInBytes() int {
 
 type SearchDB struct {
 	maximumCacheSize  int
-	db                *searchDBPrivate
-	cache             *searchDBPrivate
+	searchesDB        *leveldb.DB
+	metasDB           *leveldb.DB
+	searchesCache     map[[32]byte]SearchResult
+	metasCache        map[[32]byte]ResultMeta
 	LastTimestamp     uint64
 	LastMetaTimestamp uint64
 	flushed           bool
@@ -467,11 +138,10 @@ type SearchDB struct {
 func (sdb *SearchDB) Open(workDir string, maxCacheSize int) {
 	sdb.maximumCacheSize = maxCacheSize
 	logging.LogTrace("DEBUG: SearchDB started with", maxCacheSize, "Bytes of cache")
-	sdb.db = new(searchDBPrivate)
-	sdb.cache = new(searchDBPrivate)
-	sdb.flushed = false
-	sdb.db.Open(filepath.Join(workDir, SEARCHES_DB_FILE_NAME))
-	sdb.cache.Open("file::memory:?cache=shared") //in ram database cache
+
+	sdb.searchesDB = openDB(filepath.Join(workDir, SEARCHES_DB_FILE_NAME))
+	sdb.metasDB = openDB(filepath.Join(workDir, SEARCHES_DB_FILE_NAME))
+
 	// last timestamp is initially set to the last timestamp of the on-disk db
 	sdb.LastTimestamp = sdb.db.GetLastTimestamp()
 	sdb.LastMetaTimestamp = sdb.db.GetLastMetaTimestamp()
