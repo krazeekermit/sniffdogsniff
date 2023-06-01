@@ -17,7 +17,7 @@ const NORMAL_SYNC_DELAY = 30000 // milliseconds
 const FIRST_SYNC_DELAY = 1      // milliseconds
 
 /* Maximum lenght of searches that a peer can send per time */
-const MAX_SYNC_SIZE = 104857600 / ENTRY_MAX_SIZE // 100 MBytes / 512 bytes
+const MAX_SYNC_SIZE = 104857600 / SEARCH_RESULT_BYTE_SIZE // 100 MBytes / 512 bytes
 
 type LocalNode struct {
 	proxySettings         ProxySettings
@@ -256,4 +256,5 @@ func (ln *LocalNode) StartSyncTask() {
 
 func (ln *LocalNode) Shutdown() {
 	ln.searchDB.Flush()
+	ln.searchDB.Close()
 }

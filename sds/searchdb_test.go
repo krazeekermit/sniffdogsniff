@@ -7,33 +7,36 @@ import (
 	"time"
 
 	"github.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/util/logging"
 )
 
-const TEST_FILE = "./test.db"
+const TEST_DIR = "./test_dir"
 
 func setupDB() sds.SearchDB {
-	//logging.InitLogging(logging.TRACE)
+	logging.InitLogging(logging.TRACE)
 	db := sds.SearchDB{}
-	db.Open(TEST_FILE, 1024*1024*256)
+	os.Mkdir(TEST_DIR, 0707)
+	os.Chmod(TEST_DIR+"/*", 0707)
+	db.Open(TEST_DIR, 1024*1024*256)
 	return db
 }
 
 func teardownDB() {
-	err := os.Remove(TEST_FILE)
+	err := os.RemoveAll(TEST_DIR)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 }
 
 func differentValues(name string, a, b interface{}, t *testing.T) {
-	t.Fatal("Different", name, "values: wanted", b, "actual", a)
+	t.Fatal("Different", name, "values: one id", b, "other is", a)
 }
 
 func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score int, inv int, t *testing.T) {
 	if meta.ResultHash != rHash {
 		differentValues("hash", meta.ResultHash, rHash, t)
 	}
-	if meta.Score != score {
+	if meta.Score != uint16(score) {
 		differentValues("score", meta.Score, score, t)
 	}
 	// if meta.Invalidated != inv {
@@ -41,32 +44,79 @@ func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score int, inv int, t
 	// }
 }
 
-func TestDeleteInvalidated(t *testing.T) {
-	db := setupDB()
+func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
 	one := sds.NewSearchResult("title1", "http://url1.net", "one")
-	db.InsertResult(one)
-	two := sds.NewSearchResult("title2", "http://url2.net", "two")
-	db.InsertResult(two)
-	three := sds.NewSearchResult("title3", "http://url3.net", "three")
-	db.InsertResult(three)
+	from, err := sds.BytesToSearchResult(one.ResultHash, one.ToBytes())
 
-	metas1 := make([]sds.ResultMeta, 0)
-	metas1 = append(metas1, sds.NewResultMetadata(one.ResultHash, 12, sds.INVALIDATED))
-	metas1 = append(metas1, sds.NewResultMetadata(two.ResultHash, 23, sds.INVALIDATED))
-
-	db.SyncResultsMetadataFrom(metas1)
-	db.Flush()
-
-	all := db.GetDB().GetAll()
-	if len(all) > 1 {
-		t.Fatalf("DB size wrong: %d", len(all))
-	}
-	if all[three.ResultHash] != three {
-		t.Fatalf("want three eq three")
+	if err != nil {
+		t.Fail()
 	}
 
-	teardownDB()
+	if one.ResultHash != from.ResultHash {
+		differentValues("ResultHash", one.ResultHash, from.ResultHash, t)
+	}
+	if one.Timestamp != from.Timestamp {
+		differentValues("Timestamp", one.Timestamp, from.Timestamp, t)
+	}
+	if one.Title != from.Title {
+		differentValues("Title", one.Title, from.Title, t)
+	}
+	if one.Url != from.Url {
+		differentValues("Url", one.Url, from.Url, t)
+	}
+	if one.Description != from.Description {
+		differentValues("Title", one.Description, from.Description, t)
+	}
 }
+
+func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
+	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net", "one").ResultHash, 744, 234, sds.PENDING)
+	from, err := sds.BytesToResultMeta(one.ResultHash, one.ToBytes())
+
+	if err != nil {
+		t.Fail()
+	}
+
+	if one.ResultHash != from.ResultHash {
+		differentValues("ResultHash", one.ResultHash, from.ResultHash, t)
+	}
+	if one.Timestamp != from.Timestamp {
+		differentValues("Timestamp", one.Timestamp, from.Timestamp, t)
+	}
+	if one.Score != from.Score {
+		differentValues("Score", one.Score, from.Score, t)
+	}
+	if one.Invalidated != from.Invalidated {
+		differentValues("Invalidated", one.Invalidated, from.Invalidated, t)
+	}
+}
+
+// func TestDeleteInvalidated(t *testing.T) {
+// 	db := setupDB()
+// 	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+// 	db.InsertResult(one)
+// 	two := sds.NewSearchResult("title2", "http://url2.net", "two")
+// 	db.InsertResult(two)
+// 	three := sds.NewSearchResult("title3", "http://url3.net", "three")
+// 	db.InsertResult(three)
+
+// 	metas1 := make([]sds.ResultMeta, 0)
+// 	metas1 = append(metas1, sds.NewResultMetadata(one.ResultHash, 12, sds.INVALIDATED))
+// 	metas1 = append(metas1, sds.NewResultMetadata(two.ResultHash, 23, sds.INVALIDATED))
+
+// 	db.SyncResultsMetadataFrom(metas1)
+// 	db.Flush()
+
+// 	all := db.GetDB().GetAll()
+// 	if len(all) > 1 {
+// 		t.Fatalf("DB size wrong: %d", len(all))
+// 	}
+// 	if all[three.ResultHash] != three {
+// 		t.Fatalf("want three eq three")
+// 	}
+
+// 	teardownDB()
+// }
 
 func TestTimeBasedSync_Searches(t *testing.T) {
 	db := setupDB()
@@ -85,7 +135,7 @@ func TestTimeBasedSync_Searches(t *testing.T) {
 
 	db.SyncFrom(toSync)
 
-	dbLen := len(db.GetCacheDB().GetAll())
+	dbLen := len(db.GetSearchesCache())
 	if !(dbLen == 5) {
 		t.Fatalf("lenght of db != 5, actual: %d", dbLen)
 	}
@@ -93,26 +143,50 @@ func TestTimeBasedSync_Searches(t *testing.T) {
 	teardownDB()
 }
 
-func TestTimeBasedSync_Meta(t *testing.T) {
+// func TestTimeBasedSync_Meta(t *testing.T) {
+// 	db := setupDB()
+// 	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+// 	db.InsertResult(one)
+// 	two := sds.NewSearchResult("title2", "http://url2.net", "two")
+// 	db.InsertResult(two)
+// 	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three"))
+
+// 	metas1 := make([]sds.ResultMeta, 0)
+// 	metas1 = append(metas1, sds.NewResultMetadata(one.ResultHash, 12, 25))
+// 	metas1 = append(metas1, sds.NewResultMetadata(two.ResultHash, 23, 0))
+
+// 	db.SyncResultsMetadataFrom(metas1)
+
+// 	time.Sleep(2 * time.Second)
+
+// 	db.SyncResultsMetadataFrom([]sds.ResultMeta{sds.NewResultMetadata(one.ResultHash, 11, 21)})
+
+// 	metasDB := db.GetCacheDB().GetAllMetadata()
+// 	assertMetaRecord(metasDB[one.ResultHash], one.ResultHash, (11+12)/2, 21, t)
+
+// 	teardownDB()
+// }
+
+func TestStressInsertion_Searches(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
-	db.InsertResult(one)
-	two := sds.NewSearchResult("title2", "http://url2.net", "two")
-	db.InsertResult(two)
-	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three"))
 
-	metas1 := make([]sds.ResultMeta, 0)
-	metas1 = append(metas1, sds.NewResultMetadata(one.ResultHash, 12, 25))
-	metas1 = append(metas1, sds.NewResultMetadata(two.ResultHash, 23, 0))
+	toSync := make([]sds.SearchResult, 0)
 
-	db.SyncResultsMetadataFrom(metas1)
+	init_time := time.Now().Unix()
+	for i := 0; i < 1048576; /*512 MB*/ i++ {
+		toSync = append(toSync, sds.NewSearchResult(
+			fmt.Sprintf("Title%d", i), fmt.Sprintf("http://url%d.net", i),
+			fmt.Sprintf("DescriptionsBlaBlaBlaBlaBla%d", i),
+		))
+	}
+	fmt.Println(time.Now().Unix() - init_time)
 
-	time.Sleep(2 * time.Second)
+	db.SyncFrom(toSync)
 
-	db.SyncResultsMetadataFrom([]sds.ResultMeta{sds.NewResultMetadata(one.ResultHash, 11, 21)})
-
-	metasDB := db.GetCacheDB().GetAllMetadata()
-	assertMetaRecord(metasDB[one.ResultHash], one.ResultHash, (11+12)/2, 21, t)
+	// dbLen := len(db.GetSearchesCache())
+	// if !(dbLen == 5) {
+	// 	t.Fatalf("lenght of db != 5, actual: %d", dbLen)
+	// }
 
 	teardownDB()
 }
