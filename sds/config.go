@@ -21,7 +21,8 @@ const (
 	NAME                               = "name"
 	USER_AGENT                         = "user_agent"
 	SEARCH_QUERY_URL                   = "search_query_url"
-	RESULT_CONTAINER_ELEMENT           = "results_container_element"
+	RESULTS_CONTAINER_ELEMENT          = "results_container_element"
+	RESULT_CONTAINER_ELEMENT           = "result_container_element"
 	RESULT_URL_ELEMENT                 = "result_url_element"
 	RESULT_URL_PROPERTY                = "result_url_property"
 	RESULT_TITLE_ELEMENT               = "result_title_element"
@@ -165,7 +166,7 @@ func NewSdsConfig(path string) SdsConfig {
 				name:                    engine.Key(NAME).String(),
 				userAgent:               engine.Key(USER_AGENT).String(),
 				searchQueryUrl:          engine.Key(SEARCH_QUERY_URL).String(),
-				resultsContainerElement: engine.Key(RESULT_CONTAINER_ELEMENT).String(),
+				resultsContainerElement: engine.Key(RESULTS_CONTAINER_ELEMENT).String(),
 				resultContainerElement:  engine.Key(RESULT_CONTAINER_ELEMENT).String(),
 				resultUrlElement:        engine.Key(RESULT_URL_ELEMENT).String(),
 				resultUrlProperty:       engine.Key(RESULT_URL_PROPERTY).String(),
