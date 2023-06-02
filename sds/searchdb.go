@@ -32,12 +32,28 @@ type SearchResult struct {
 
 /*
 SearchResult Structure
-[[HASH (32)][TIMESTAMP (64)][TITLE][URL][DESCRIPTION]] = 512 bytes
+[[HASH (32)][TIMESTAMP (8)][TITLE][URL][DESCRIPTION]] = 512 bytes
 */
 func NewSearchResult(title, url, description string) SearchResult {
-	if 32+64+1+len(title)+1+len(url)+1+len(description) > SEARCH_RESULT_BYTE_SIZE {
-		description = string(description[:(SEARCH_RESULT_BYTE_SIZE - 32 - 64 - len(title) - len(url) - 4)])
+	const FIXED_LENGHT = 32 + 8 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1
+	// SHRINK TITLE AND DESCRIPTION TO FIT 512 byte max size
+	if FIXED_LENGHT+len(title)+len(url)+len(description) > SEARCH_RESULT_BYTE_SIZE {
+		newDescriptionLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(title) - len(url)
+		if newDescriptionLen < 0 {
+			description = ""
+		} else if newDescriptionLen <= len(description) {
+			description = description[:newDescriptionLen]
+		}
 	}
+	if FIXED_LENGHT+len(title)+len(url)+len(description) > SEARCH_RESULT_BYTE_SIZE {
+		newTitleLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(url) - len(description)
+		if newTitleLen < 0 {
+			title = ""
+		} else if newTitleLen <= len(title) {
+			title = title[:newTitleLen]
+		}
+	}
+
 	rs := SearchResult{
 		Timestamp:   uint64(time.Now().Unix()),
 		Title:       title,
@@ -308,8 +324,10 @@ func (sdb *SearchDB) IsEmpty() bool {
 }
 
 func matchesSearch(text string, sr SearchResult) bool {
-	logging.LogTrace("Dosearch::DB::", sr)
-	if strings.Contains(sr.Title, text) || strings.Contains(sr.Description, text) {
+	text = strings.ToLower(text)
+	title := strings.ToLower(sr.Title)
+	desc := strings.ToLower(sr.Description)
+	if strings.Contains(title, text) || strings.Contains(desc, text) {
 		return true
 	}
 	if strings.Contains(text, ".") && !strings.Contains(text, " ") && strings.Contains(sr.Url, text) {
@@ -319,7 +337,7 @@ func matchesSearch(text string, sr SearchResult) bool {
 	count := 0
 	for _, s := range toks {
 		snorm := strings.TrimSpace(s)
-		if strings.Contains(sr.Title, snorm) || strings.Contains(sr.Description, snorm) {
+		if strings.Contains(title, snorm) || strings.Contains(desc, snorm) {
 			count++
 		}
 	}
