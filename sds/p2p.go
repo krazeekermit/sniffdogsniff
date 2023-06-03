@@ -191,26 +191,46 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 
 		logging.LogTrace("Function request", funcCode, len(req_bytes))
 
-		var args interface{}
-		err = msgpack.Unmarshal(req_bytes[1:], &args)
-		if err != nil {
-			errCode = ERRCODE_MARSHAL
-		}
+		argsBytes := req_bytes[1:]
 
 		var returned interface{}
 		switch funcCode {
 		case FCODE_HANDSHAKE:
-			returned = srv.node.Handshake(args.(Peer))
+			var arg Peer
+			err := msgpack.Unmarshal(argsBytes, &arg)
+			if err != nil {
+				errCode = ERRCODE_MARSHAL
+			} else {
+				returned = srv.node.Handshake(arg)
+			}
 		case FCODE_GETSTATUS:
 			returned = util.TwoUint64ToArr(srv.node.GetStatus())
 		case FCODE_GET_RESULTS_FOR_SYNC:
-			returned = srv.node.GetResultsForSync(args.(uint64))
+			var arg uint64
+			err := msgpack.Unmarshal(argsBytes, &arg)
+			if err != nil {
+				errCode = ERRCODE_MARSHAL
+			} else {
+				returned = srv.node.GetResultsForSync(arg)
+			}
 		case FCODE_GET_PEERS_FOR_SYNC:
 			returned = srv.node.getPeersForSync()
 		case FCODE_GET_METADATA_FOR_SYNC:
-			returned = srv.node.GetMetadataForSync(args.(uint64))
+			var arg uint64
+			err := msgpack.Unmarshal(argsBytes, &arg)
+			if err != nil {
+				errCode = ERRCODE_MARSHAL
+			} else {
+				returned = srv.node.GetMetadataForSync(arg)
+			}
 		case FCODE_GET_METADATA_OF:
-			returned = srv.node.GetMetadataOf(args.([][32]byte))
+			var arg [][32]byte
+			err := msgpack.Unmarshal(argsBytes, &arg)
+			if err != nil {
+				errCode = ERRCODE_MARSHAL
+			} else {
+				returned = srv.node.GetMetadataOf(arg)
+			}
 		default:
 			returned = nil
 			errCode = ERRCODE_NOFUNCT
@@ -251,72 +271,76 @@ func NewPeer(address string) Peer {
 }
 
 func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
-	remoteErr, err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer)
+	var remoteErr interface{}
+	err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer, &remoteErr)
 	if err != nil {
 		logging.LogError(err.Error())
-	} else {
-		err = remoteErr.(error)
 	}
 	return err
 }
 
 func (rn *Peer) GetStatus(proxySettings ProxySettings) (uint64, uint64) {
-	timestamps, err := rn.callRemoteFunction(proxySettings, FCODE_GETSTATUS, nil)
+	var timestamps [2]uint64
+	err := rn.callRemoteFunction(proxySettings, FCODE_GETSTATUS, nil, &timestamps)
 	if err != nil {
 		logging.LogError(err.Error())
 	}
-	return util.ArrToTwoUint64(timestamps.([2]uint64))
+	return util.ArrToTwoUint64(timestamps)
 }
 
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
 func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, timestamp uint64) []SearchResult {
-	searches, err := rn.callRemoteFunction(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, timestamp)
+	var searches []SearchResult
+	err := rn.callRemoteFunction(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, timestamp, &searches)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
 	}
-	return searches.([]SearchResult)
+	return searches
 }
 
 func (rn *Peer) GetMetadataForSync(proxySettings ProxySettings, timestamp uint64) []ResultMeta {
-	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, timestamp)
+	var metadata []ResultMeta
+	err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, timestamp, &metadata)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
 	}
-	return metadata.([]ResultMeta)
+	return metadata
 }
 
 func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
-	peers, err := rn.callRemoteFunction(proxySettings, FCODE_GET_PEERS_FOR_SYNC, nil)
+	var peers []Peer
+	err := rn.callRemoteFunction(proxySettings, FCODE_GET_PEERS_FOR_SYNC, nil, &peers)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
 	}
-	return peers.([]Peer)
+	return peers
 }
 
 func (rn *Peer) GetMetadataOf(proxySettings ProxySettings, hashes [][32]byte) []ResultMeta {
-	metadata, err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_OF, hashes)
+	var metadata []ResultMeta
+	err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_OF, hashes, &metadata)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
 	}
-	return metadata.([]ResultMeta)
+	return metadata
 }
 
-func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, args interface{}) (interface{}, error) {
+func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, args interface{}, returned interface{}) error {
 	argsBytes, err := msgpack.Marshal(args)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	conn, err := rn.connect(proxySettings)
 	if err != nil {
 		logging.LogTrace("connection error")
 		rn.Rank -= 500
-		return nil, err
+		return err
 	}
 
 	reqBytes := make([]byte, 0)
@@ -325,14 +349,14 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 
 	err = compressAndSend(reqBytes, conn)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	respBytes, speed, err := receiveAndDecompress(conn)
 	if err != nil {
 		conn.Close()
 		rn.Rank -= 100
-		return nil, err
+		return err
 	}
 	conn.Close()
 
@@ -342,16 +366,15 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 	rn.Rank += speed
 
 	if errCode != ERRCODE_NULL {
-		return nil, errCodeToError(funCode, errCode)
+		return errCodeToError(funCode, errCode)
 	}
 
-	var returned interface{}
-	err = msgpack.Unmarshal(respBytes, &returned)
+	err = msgpack.Unmarshal(respBytes[2:], returned)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return returned, nil
+	return nil
 }
 
 func (rn Peer) connect(settings ProxySettings) (net.Conn, error) {
@@ -400,7 +423,7 @@ func (pdb PeerDB) GetAll() []Peer {
  */
 func (pdb PeerDB) GetRandomPeer() Peer {
 	peers := pdb.GetAll()
-	return peers[rand.Intn(len(peers)-1)]
+	return peers[rand.Intn(len(peers))]
 }
 
 func (pdb PeerDB) SyncFrom(peers []Peer) {

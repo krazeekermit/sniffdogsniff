@@ -1,6 +1,7 @@
 package sds_test
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/sniffdogsniff/sds"
 	"github.com/sniffdogsniff/util/logging"
+	"github.com/vmihailenco/msgpack"
 )
 
 const TEST_DIR = "./test_dir"
@@ -189,4 +191,21 @@ func TestStressInsertion_Searches(t *testing.T) {
 	// }
 
 	teardownDB()
+}
+
+func TestMarshal_Unmarshal_msgpack(t *testing.T) {
+
+	peer1 := sds.NewPeer("www.idontknow.com")
+
+	var buffer bytes.Buffer
+	enc := msgpack.NewEncoder(&buffer)
+	enc.Encode(&peer1)
+
+	rcvBuf := bytes.NewBuffer(buffer.Bytes())
+	dec := msgpack.NewDecoder(rcvBuf)
+
+	v, _ := dec.DecodeInterface()
+
+	fmt.Println(v)
+
 }

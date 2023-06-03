@@ -167,6 +167,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	searchesTimestamp, metasTimestamp := ln.GetStatus()
 	remoteSearchesTimestamp, remoteMetasTimestamp := p.GetStatus(ln.proxySettings)
+	logging.LogTrace("Remote Time", remoteSearchesTimestamp)
 
 	if firstSyncFileExists {
 		if searchesTimestamp >= remoteSearchesTimestamp && metasTimestamp >= remoteMetasTimestamp {

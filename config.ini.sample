@@ -4,7 +4,7 @@ p2p_rpc_port = 4222
 min_search_results_threshold = 50
 
 known_peers = peer1, peer2
-external_search_engines = startpage, yandex, onesearch, brave
+external_search_engines = bing, startpage, brave
 
 [web_ui]
 bind_address = 0.0.0.0:8081
@@ -32,6 +32,17 @@ proxy_type = tor # or i2p
 
 # search engines
 
+[brave]
+name = Brave Search
+user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
+search_query_url = https://search.brave.com/search?q=%s&source=desktop
+results_container_element = "#b_resuts"
+result_container_element = div.snippet
+result_url_element = a.result-header
+result_url_property = href
+result_title_element = span.snippet-header
+result_title_property = text
+
 [startpage]
 name = StartPage
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
@@ -43,35 +54,13 @@ result_url_property = href
 result_title_element = h3
 result_title_property = text
 
-[yandex]
-name = Yandex
+[bing]
+name = Bing
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://yandex.com/search/?text=%s&lr=10448
-results_container_element = ul.serp-list
-result_container_element = li.serp-item
-result_url_element = a.link
+search_query_url = https://www.bing.com/search?q=%s
+results_container_element = ol
+result_container_element = li.b_algo
+result_url_element = "h2 > a"
 result_url_property = href
-result_title_element = h2
-result_title_property = text
-
-[onesearch]
-name = Onesearch
-user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://www.onesearch.com/yhs/search?q=%s
-results_container_element = ol.searchCenterMiddle
-result_container_element = div.relsrch
-result_url_element = a.ac-algo
-result_url_property = href
-result_title_element = a.ac-algo
-result_title_property = text
-
-[brave]
-name = Brave
-user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://search.brave.com/search?q=%s&source=desktop
-results_container_element = div.section
-result_container_element = div.snippet
-result_url_element = a.result-header
-result_url_property = href
-result_title_element = span.snippet-header
+result_title_element = a
 result_title_property = text
