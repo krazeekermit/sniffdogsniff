@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -265,58 +266,64 @@ func (sdb *SearchDB) Open(workDir string, maxCacheSize int) {
 	sdb.metasCache = make(map[[32]byte]ResultMeta, 0)
 
 	// last timestamp is initially set to the last timestamp of the on-disk db
-	sdb.LastTimestamp = sdb.lastSearchesTimestamp()
-	sdb.LastMetaTimestamp = sdb.lastMetasTimestamp()
+	sdb.LastTimestamp = sdb.GetLastDBSearchesTimestamp()
+	sdb.LastMetaTimestamp = sdb.GetLastDBMetasTimestamp()
 }
 
-func (sdb *SearchDB) lastSearchesTimestamp() uint64 {
+func (sdb *SearchDB) GetLastDBSearchesTimestamp() uint64 {
 	var lastts uint64
 	lastts = 0
-	if len(sdb.searchesCache) > 0 {
-		for _, sr := range sdb.searchesCache {
-			if sr.Timestamp > lastts {
-				lastts = sr.Timestamp
-			}
+	iter := sdb.searchesDB.NewIterator(nil, nil)
+	for iter.Next() {
+		sr, err := BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
+		if err != nil {
+			continue
 		}
-	} else {
-		iter := sdb.searchesDB.NewIterator(nil, nil)
-		for iter.Next() {
-			sr, err := BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
-			if err != nil {
-				continue
-			}
-			if sr.Timestamp > lastts {
-				lastts = sr.Timestamp
-			}
+		if sr.Timestamp > lastts {
+			lastts = sr.Timestamp
 		}
-		iter.Release()
 	}
+	iter.Release()
 	return lastts
 }
 
-func (sdb *SearchDB) lastMetasTimestamp() uint64 {
+func (sdb *SearchDB) GetLastDBMetasTimestamp() uint64 {
 	var lastts uint64
 	lastts = 0
-	if len(sdb.searchesCache) > 0 {
-		for _, rm := range sdb.metasCache {
-			if rm.Timestamp > lastts {
-				lastts = rm.Timestamp
-			}
+	iter := sdb.searchesDB.NewIterator(nil, nil)
+	for iter.Next() {
+		rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
+		if err != nil {
+			continue
 		}
-	} else {
-		iter := sdb.searchesDB.NewIterator(nil, nil)
-		for iter.Next() {
-			rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
-			if err != nil {
-				continue
-			}
-			if rm.Timestamp > lastts {
-				lastts = rm.Timestamp
-			}
+		if rm.Timestamp > lastts {
+			lastts = rm.Timestamp
 		}
-		iter.Release()
 	}
+	iter.Release()
 	return lastts
+}
+
+func (sdb *SearchDB) GetLastCachedSearchResultTimestamp() uint64 {
+	var last uint64
+	last = 0
+	for _, sr := range sdb.searchesCache {
+		if sr.Timestamp > last {
+			last = sr.Timestamp
+		}
+	}
+	return last
+}
+
+func (sdb *SearchDB) GetLastCachedResultMetaTimestamp() uint64 {
+	var last uint64
+	last = 0
+	for _, rm := range sdb.metasCache {
+		if rm.Timestamp > last {
+			last = rm.Timestamp
+		}
+	}
+	return last
 }
 
 func (sdb *SearchDB) IsEmpty() bool {
@@ -347,10 +354,14 @@ func matchesSearch(text string, sr SearchResult) bool {
 func (sdb *SearchDB) DoSearch(text string) []SearchResult {
 	results := make([]SearchResult, 0)
 
+	type scoredResult struct {
+		score uint16
+		sr    SearchResult
+	}
+
 	for _, sr := range sdb.searchesCache {
 		if matchesSearch(text, sr) {
 			results = append(results, sr)
-			// if matches retrieve also meta // for sorting
 		}
 	}
 
@@ -362,11 +373,40 @@ func (sdb *SearchDB) DoSearch(text string) []SearchResult {
 		}
 		if matchesSearch(text, sr) {
 			results = append(results, sr)
-			// if matches retrieve also meta // for sorting
 		}
 	}
 	iter.Release()
-	//sort before
+
+	// Retrieve Metadata score for sorting
+	toSort := make([]scoredResult, 0)
+	for _, sr := range results {
+		var score uint16
+		score = 0
+		rm, present := sdb.metasCache[sr.ResultHash]
+		if present {
+			score = rm.Score
+		} else {
+			value, err := sdb.metasDB.Get(util.Array32ToSlice(sr.ResultHash), nil)
+			if err != nil {
+				rm, err = BytesToResultMeta(sr.ResultHash, value)
+				if err != nil {
+					score = rm.Score
+				}
+			}
+		}
+		toSort = append(toSort, scoredResult{
+			sr:    sr,
+			score: score,
+		})
+	}
+	sort.Slice(toSort, func(i, j int) bool {
+		return toSort[i].score < toSort[j].score
+	})
+
+	results = make([]SearchResult, 0)
+	for _, ssr := range toSort {
+		results = append(results, ssr.sr)
+	}
 	return results
 }
 
@@ -418,7 +458,9 @@ func (sdb *SearchDB) SyncFrom(results []SearchResult) {
 			count = 0
 			sdb.Flush()
 		}
-		sdb.searchesCache[sr.ResultHash] = sr
+		if sr.IsConsistent() {
+			sdb.searchesCache[sr.ResultHash] = sr
+		}
 		count++
 	}
 	sdb.setUpdated()
@@ -484,6 +526,11 @@ func (sdb *SearchDB) SyncResultsMetadataFrom(metas []ResultMeta) {
 			count = 0
 			sdb.Flush()
 		}
+		prev, present := sdb.metasCache[rm.ResultHash]
+		if present && prev.Score > 0 {
+			//prevents spam
+			rm.Score = (prev.Score + rm.Score) / 2
+		}
 		sdb.metasCache[rm.ResultHash] = rm
 		count++
 	}
@@ -510,49 +557,42 @@ func (sdb *SearchDB) CalculateCacheSize() int {
 	return len(sdb.searchesCache)*SEARCH_RESULT_BYTE_SIZE + len(sdb.metasCache)*RESULT_META_BYTE_SIZE
 }
 
-func (sdb *SearchDB) GetLastCachedSearchResultTimestamp() uint64 {
-	var last uint64
-	last = 0
-	for _, sr := range sdb.searchesCache {
-		if sr.Timestamp > last {
-			last = sr.Timestamp
-		}
-	}
-	return last
-}
-
-func (sdb *SearchDB) GetLastCachedResultMetaTimestamp() uint64 {
-	var last uint64
-	last = 0
-	for _, rm := range sdb.metasCache {
-		if rm.Timestamp > last {
-			last = rm.Timestamp
-		}
-	}
-	return last
-}
-
 func (sdb *SearchDB) setUpdated() {
 	sdb.flushed = false
 	searchesLastTime := sdb.GetLastCachedSearchResultTimestamp()
-	if searchesLastTime > 0 && searchesLastTime > sdb.LastTimestamp {
+	if searchesLastTime > 0 && searchesLastTime >= sdb.LastTimestamp {
 		sdb.LastTimestamp = searchesLastTime
 	}
 	metasLastTime := sdb.GetLastCachedResultMetaTimestamp()
 	if metasLastTime > 0 && metasLastTime > sdb.LastMetaTimestamp {
 		sdb.LastMetaTimestamp = metasLastTime
 	}
-	if sdb.CalculateCacheSize() >= int(sdb.maximumCacheSize) {
+	if sdb.CalculateCacheSize() > int(sdb.maximumCacheSize) {
 		sdb.Flush()
 	}
 }
 
 func (sdb *SearchDB) InvalidateResult(rHash [32]byte) {
-	// sdb.cache.SetInvalidationLevel(rHash, INVALIDATED)
+	rm := sdb.metasCache[rHash]
+	rm.Invalidated = INVALIDATED
+	sdb.metasCache[rHash] = rm
 }
 
 func (sdb *SearchDB) deleteInvalidated() {
-	// sdb.cache.SetInvalidationLevel(rHash, INVALIDATED)
+	iter := sdb.metasDB.NewIterator(nil, nil)
+	for iter.Next() {
+		rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
+		if err != nil {
+			continue
+		}
+		if rm.Invalidated == INVALIDATED {
+			sdb.searchesDB.Delete(iter.Key(), nil)
+			if err != nil {
+				logging.LogTrace("Error deleting invalidated:", err.Error())
+			}
+		}
+	}
+	iter.Release()
 }
 
 func (sdb *SearchDB) Flush() {
@@ -560,20 +600,29 @@ func (sdb *SearchDB) Flush() {
 		return
 	}
 
-	// Sync SearchResults
+	// sdb.LastTimestamp = sdb.GetLastCachedSearchResultTimestamp()
+	// sdb.LastMetaTimestamp = sdb.GetLastCachedResultMetaTimestamp()
+
+	// Flush SearchResults
 	for h, sr := range sdb.searchesCache {
 		sdb.searchesDB.Put(util.Array32ToSlice(h), sr.ToBytes(), nil)
 	}
 
-	// Sync ResultMetas
+	// Flush ResultMetas
 	for h, rm := range sdb.metasCache {
-		sdb.metasDB.Put(util.Array32ToSlice(h), rm.ToBytes(), nil)
+		key := util.Array32ToSlice(h)
+		value, err := sdb.metasDB.Get(key, nil)
+		if err != nil {
+			prev, err := BytesToResultMeta(h, value)
+			if err != nil && prev.Score > 0 {
+				//prevents spam
+				rm.Score = (rm.Score + prev.Score) / 2
+			}
+		}
+		sdb.metasDB.Put(key, rm.ToBytes(), nil)
 	}
 
 	sdb.deleteInvalidated()
-
-	sdb.LastTimestamp = sdb.GetLastCachedSearchResultTimestamp()
-	sdb.LastMetaTimestamp = sdb.GetLastCachedResultMetaTimestamp()
 
 	// Clear cache
 	sdb.searchesCache = make(map[[32]byte]SearchResult, 0)
@@ -590,6 +639,10 @@ func (sdb *SearchDB) Close() {
 // For tests
 func (sdb *SearchDB) GetSearchesCache() map[[32]byte]SearchResult {
 	return sdb.searchesCache
+}
+
+func (sdb *SearchDB) GetMetasCache() map[[32]byte]ResultMeta {
+	return sdb.metasCache
 }
 
 func (sdb *SearchDB) GetSearchesDB() *leveldb.DB {
