@@ -14,6 +14,7 @@ const MAX_RAM_DB_SIZE = 268435456 // 256 MB
 const (
 	SERVICE_RPC_PORT                   = "service_rpc_port"
 	WORK_DIR_PATH                      = "work_dir_path"
+	ALLOW_RESULTS_INVALIDATION         = "allow_results_invalidation"
 	SEARCH_DATABASE_MAX_RAM_CACHE_SIZE = "search_database_max_ram_cache_size"
 	KNOWN_PEERS                        = "known_peers"
 	ADDRESS                            = "address"
@@ -117,13 +118,14 @@ type NodeServiceSettings struct {
 }
 
 type SdsConfig struct {
-	workDirPath           string
-	searchDBMaxCacheSize  int
-	WebServiceBindAddress string
-	KnownPeers            []Peer
-	proxySettings         ProxySettings
-	ServiceSettings       NodeServiceSettings
-	searchEngines         map[string]SearchEngine
+	workDirPath              string
+	searchDBMaxCacheSize     int
+	AllowResultsInvalidation bool
+	WebServiceBindAddress    string
+	KnownPeers               []Peer
+	proxySettings            ProxySettings
+	ServiceSettings          NodeServiceSettings
+	searchEngines            map[string]SearchEngine
 }
 
 func NewSdsConfig(path string) SdsConfig {
@@ -145,6 +147,16 @@ func NewSdsConfig(path string) SdsConfig {
 			defaultSection.Key(SEARCH_DATABASE_MAX_RAM_CACHE_SIZE).String())
 	} else {
 		cfg.searchDBMaxCacheSize = MAX_RAM_DB_SIZE
+	}
+	if defaultSection.HasKey(ALLOW_RESULTS_INVALIDATION) {
+		allowInvalidation, err := defaultSection.Key(ALLOW_RESULTS_INVALIDATION).Bool()
+		if err != nil {
+			cfg.AllowResultsInvalidation = allowInvalidation
+		} else {
+			cfg.AllowResultsInvalidation = false
+		}
+	} else {
+		cfg.AllowResultsInvalidation = false
 	}
 	if defaultSection.HasKey(KNOWN_PEERS) {
 		peerNames := iniData.Section(ini.DefaultSection).Key(KNOWN_PEERS).Strings(",")

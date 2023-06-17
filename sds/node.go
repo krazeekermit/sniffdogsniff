@@ -21,6 +21,7 @@ const MAX_SYNC_SIZE = 104857600 / SEARCH_RESULT_BYTE_SIZE // 100 MBytes / 512 by
 
 type LocalNode struct {
 	proxySettings         ProxySettings
+	canInvalidate         bool
 	tsLock                sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB              SearchDB
 	searchEngines         map[string]SearchEngine
@@ -36,6 +37,7 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 	ln.searchDB.Open(configs.workDirPath, configs.searchDBMaxCacheSize)
 	ln.peerDB.Open(configs.workDirPath, configs.KnownPeers)
 	ln.proxySettings = configs.proxySettings
+	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
@@ -197,7 +199,7 @@ func (ln *LocalNode) SyncWithPeer() {
 		newMetadata := rn.GetMetadataForSync(metasTimestamp)
 		logging.LogTrace("Received", len(newMetadata), "results metadata")
 
-		if len(newMetadata) > 0 {
+		if ln.canInvalidate && len(newMetadata) > 0 {
 			invalidationTable := make(map[[32]byte]int, 0)
 			invalidationTableKeyList := util.MapKeys(invalidationTable)
 			newMetadataPtrMap := make(map[[32]byte]*ResultMeta)

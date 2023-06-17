@@ -84,7 +84,34 @@ func (pdb *PeerDB) Open(workDir string, knownPeers []Peer) {
 	pdb.peers = make(map[string]Peer)
 
 	pdb.dbPath = filepath.Join(workDir, PEER_DB_DIR_NAME)
-	if !util.DirExists(pdb.dbPath) {
+
+	if util.DirExists(pdb.dbPath) {
+		peersFiles, err := os.ReadDir(pdb.dbPath)
+		if err != nil {
+			logging.LogError("No DB found [peers]")
+			panic(err)
+		}
+		for _, peerFile := range peersFiles {
+			path := filepath.Join(pdb.dbPath, peerFile.Name())
+			fp, err := os.Open(path)
+
+			psize, err := fp.Seek(0, os.SEEK_END)
+			fp.Seek(0, os.SEEK_SET)
+			if err != nil {
+				logging.LogError("Peer file Corrupted:", path, err)
+			}
+			prbytes := make([]byte, psize)
+			fp.Read(prbytes)
+			p, err := BytesToPeer(prbytes)
+			if err != nil {
+				logging.LogError("Peer file Corrupted:", path, err)
+				fp.Close()
+			}
+			fp.Close()
+
+			pdb.peers[p.Address] = p
+		}
+	} else {
 		pdb.SyncFrom(knownPeers)
 		logging.LogWarn("Peer database files does not exists...")
 	}
@@ -98,30 +125,7 @@ func (pdb *PeerDB) GetAll() []Peer {
  * Gets a random peer from PeerDB (for node sync)
  */
 func (pdb *PeerDB) GetRandomPeer() Peer {
-	peersFiles, err := os.ReadDir(pdb.dbPath)
-	if err != nil {
-		logging.LogError("No DB found [peers]")
-		panic(err)
-	}
-	path := filepath.Join(pdb.dbPath, peersFiles[rand.Intn(len(peersFiles))].Name())
-	fp, err := os.Open(path)
-
-	psize, err := fp.Seek(0, os.SEEK_END)
-	fp.Seek(0, os.SEEK_SET)
-	if err != nil {
-		logging.LogError("Peer file Corrupted:", path, err)
-		return pdb.GetRandomPeer()
-	}
-	prbytes := make([]byte, psize)
-	fp.Read(prbytes)
-	p, err := BytesToPeer(prbytes)
-	if err != nil {
-		logging.LogError("Peer file Corrupted:", path, err)
-		fp.Close()
-		return pdb.GetRandomPeer()
-	}
-	fp.Close()
-	return p
+	return pdb.GetAll()[rand.Intn(len(pdb.peers))]
 }
 
 func (pdb *PeerDB) SyncFrom(peers []Peer) {

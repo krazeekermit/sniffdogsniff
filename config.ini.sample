@@ -2,6 +2,7 @@ work_dir_path = ./
 search_database_max_ram_cache_size = 512M
 p2p_rpc_port = 4222
 min_search_results_threshold = 50
+allow_results_invalidation = no
 
 known_peers = peer1, peer2
 external_search_engines = bing, startpage, brave
