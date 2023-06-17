@@ -139,10 +139,11 @@ func (ln *LocalNode) SyncWithPeer() {
 	ln.tsLock.Lock()
 	allPeers := ln.peerDB.GetAll()
 	p := ln.peerDB.GetRandomPeer()
+	rn := NewNodeClient(p, ln.proxySettings)
 	ln.tsLock.Unlock()
 	logging.LogInfo("Sync with ", p.Address)
 
-	err := p.Handshake(ln.proxySettings, ln.SelfPeer)
+	err := rn.Handshake(ln.SelfPeer)
 	/* if the first peer does not respond and the db is
 	empty first sync flag is set back to false to avoid
 	infinite loop cycle blocking the all node.*/
@@ -156,7 +157,7 @@ func (ln *LocalNode) SyncWithPeer() {
 	}
 
 	/* Sync of peers */
-	newPeers := p.GetPeersForSync(ln.proxySettings)
+	newPeers := rn.GetPeersForSync()
 	logging.LogTrace("Received", len(newPeers), "peers")
 
 	if len(newPeers) > 0 {
@@ -166,7 +167,7 @@ func (ln *LocalNode) SyncWithPeer() {
 	}
 
 	searchesTimestamp, metasTimestamp := ln.GetStatus()
-	remoteSearchesTimestamp, remoteMetasTimestamp := p.GetStatus(ln.proxySettings)
+	remoteSearchesTimestamp, remoteMetasTimestamp := rn.GetStatus()
 	logging.LogTrace("Remote Time", remoteSearchesTimestamp)
 
 	if firstSyncFileExists {
@@ -177,7 +178,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	/* Sync of searches */
 	if searchesTimestamp < remoteSearchesTimestamp {
-		newSearches := p.GetResultsForSync(ln.proxySettings, searchesTimestamp)
+		newSearches := rn.GetResultsForSync(searchesTimestamp)
 		logging.LogTrace("Received", len(newSearches), "searches")
 
 		if len(newSearches) > 0 {
@@ -193,7 +194,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	/* Sync of metadatada of searches */
 	if metasTimestamp < remoteMetasTimestamp {
-		newMetadata := p.GetMetadataForSync(ln.proxySettings, metasTimestamp)
+		newMetadata := rn.GetMetadataForSync(metasTimestamp)
 		logging.LogTrace("Received", len(newMetadata), "results metadata")
 
 		if len(newMetadata) > 0 {
@@ -208,7 +209,8 @@ func (ln *LocalNode) SyncWithPeer() {
 				}
 			}
 			for _, po := range allPeers {
-				for _, mo := range po.GetMetadataOf(ln.proxySettings, invalidationTableKeyList) {
+				rni := NewNodeClient(po, ln.proxySettings)
+				for _, mo := range rni.GetMetadataOf(invalidationTableKeyList) {
 					if mo.Invalidated == INVALIDATED {
 						invalidationTable[mo.ResultHash] += 1
 					}
@@ -248,6 +250,7 @@ func (ln *LocalNode) StartSyncTask() {
 			if syncCycles >= 5 { // every 5 cycles the data is flushed to disk (number choice is totally hempiric)
 				ln.tsLock.Lock()
 				ln.searchDB.Flush()
+				ln.peerDB.Flush()
 				ln.tsLock.Unlock()
 				syncCycles = 0
 			}
@@ -257,5 +260,6 @@ func (ln *LocalNode) StartSyncTask() {
 
 func (ln *LocalNode) Shutdown() {
 	ln.searchDB.Flush()
+	ln.peerDB.Flush()
 	ln.searchDB.Close()
 }

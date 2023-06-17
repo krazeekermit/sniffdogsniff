@@ -1,12 +1,9 @@
 package sds
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -28,8 +25,6 @@ const (
 	TOR_SOCKS_5_PROXY_TYPE int = 0
 	I2P_SOCKS_5_PROXY_TYPE int = 1
 )
-
-const PEER_DB_FILE_NAME = "peers.db"
 
 const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
@@ -255,33 +250,32 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 	}
 }
 
-/***************************** Peers ******************************/
-
-type Peer struct {
-	Address   string
-	ProxyType int
-	Rank      int64
+type NodeClient struct {
+	peer          Peer
+	proxySettings ProxySettings
 }
 
-func NewPeer(address string) Peer {
-	return Peer{
-		Address:   address,
-		ProxyType: -1,
+func NewNodeClient(peer Peer, proxySettings ProxySettings) NodeClient {
+	return NodeClient{
+		peer:          peer,
+		proxySettings: proxySettings,
 	}
 }
 
-func (rn *Peer) Handshake(proxySettings ProxySettings, peer Peer) error {
+/***************************** Remote Node (Client) ******************************/
+
+func (rn *NodeClient) Handshake(peer Peer) error {
 	var remoteErr interface{}
-	err := rn.callRemoteFunction(proxySettings, FCODE_HANDSHAKE, peer, &remoteErr)
+	err := rn.callRemoteFunction(FCODE_HANDSHAKE, peer, &remoteErr)
 	if err != nil {
 		logging.LogError(err.Error())
 	}
 	return err
 }
 
-func (rn *Peer) GetStatus(proxySettings ProxySettings) (uint64, uint64) {
+func (rn *NodeClient) GetStatus() (uint64, uint64) {
 	var timestamps [2]uint64
-	err := rn.callRemoteFunction(proxySettings, FCODE_GETSTATUS, nil, &timestamps)
+	err := rn.callRemoteFunction(FCODE_GETSTATUS, nil, &timestamps)
 	if err != nil {
 		logging.LogError(err.Error())
 	}
@@ -290,9 +284,9 @@ func (rn *Peer) GetStatus(proxySettings ProxySettings) (uint64, uint64) {
 
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
-func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, timestamp uint64) []SearchResult {
+func (rn *NodeClient) GetResultsForSync(timestamp uint64) []SearchResult {
 	var searches []SearchResult
-	err := rn.callRemoteFunction(proxySettings, FCODE_GET_RESULTS_FOR_SYNC, timestamp, &searches)
+	err := rn.callRemoteFunction(FCODE_GET_RESULTS_FOR_SYNC, timestamp, &searches)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
@@ -300,9 +294,9 @@ func (rn *Peer) GetResultsForSync(proxySettings ProxySettings, timestamp uint64)
 	return searches
 }
 
-func (rn *Peer) GetMetadataForSync(proxySettings ProxySettings, timestamp uint64) []ResultMeta {
+func (rn *NodeClient) GetMetadataForSync(timestamp uint64) []ResultMeta {
 	var metadata []ResultMeta
-	err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_FOR_SYNC, timestamp, &metadata)
+	err := rn.callRemoteFunction(FCODE_GET_METADATA_FOR_SYNC, timestamp, &metadata)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
@@ -310,9 +304,9 @@ func (rn *Peer) GetMetadataForSync(proxySettings ProxySettings, timestamp uint64
 	return metadata
 }
 
-func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
+func (rn *NodeClient) GetPeersForSync() []Peer {
 	var peers []Peer
-	err := rn.callRemoteFunction(proxySettings, FCODE_GET_PEERS_FOR_SYNC, nil, &peers)
+	err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, nil, &peers)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
@@ -320,9 +314,9 @@ func (rn *Peer) GetPeersForSync(proxySettings ProxySettings) []Peer {
 	return peers
 }
 
-func (rn *Peer) GetMetadataOf(proxySettings ProxySettings, hashes [][32]byte) []ResultMeta {
+func (rn *NodeClient) GetMetadataOf(hashes [][32]byte) []ResultMeta {
 	var metadata []ResultMeta
-	err := rn.callRemoteFunction(proxySettings, FCODE_GET_METADATA_OF, hashes, &metadata)
+	err := rn.callRemoteFunction(FCODE_GET_METADATA_OF, hashes, &metadata)
 	if err != nil {
 		logging.LogError(err.Error())
 		return nil
@@ -330,16 +324,16 @@ func (rn *Peer) GetMetadataOf(proxySettings ProxySettings, hashes [][32]byte) []
 	return metadata
 }
 
-func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, args interface{}, returned interface{}) error {
+func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, returned interface{}) error {
 	argsBytes, err := msgpack.Marshal(args)
 	if err != nil {
 		return err
 	}
 
-	conn, err := rn.connect(proxySettings)
+	conn, err := rn.connect()
 	if err != nil {
 		logging.LogTrace("connection error")
-		rn.Rank -= 500
+		rn.peer.Rank -= 500
 		return err
 	}
 
@@ -355,7 +349,7 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 	respBytes, speed, err := receiveAndDecompress(conn)
 	if err != nil {
 		conn.Close()
-		rn.Rank -= 100
+		rn.peer.Rank -= 100
 		return err
 	}
 	conn.Close()
@@ -363,7 +357,7 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 	funCode = respBytes[0]
 	errCode := respBytes[1]
 	speed -= int64(errCode) * 10
-	rn.Rank += speed
+	rn.peer.Rank += speed
 
 	if errCode != ERRCODE_NULL {
 		return errCodeToError(funCode, errCode)
@@ -377,11 +371,11 @@ func (rn *Peer) callRemoteFunction(proxySettings ProxySettings, funCode byte, ar
 	return nil
 }
 
-func (rn Peer) connect(settings ProxySettings) (net.Conn, error) {
-	if rn.ProxyType == NONE_PROXY_TYPE {
-		return net.Dial("tcp", rn.Address)
+func (rn *NodeClient) connect() (net.Conn, error) {
+	if rn.peer.ProxyType == NONE_PROXY_TYPE {
+		return net.Dial("tcp", rn.peer.Address)
 	} else {
-		dialer, err := proxy.SOCKS5("tcp", settings.AddrByType(rn.ProxyType), nil, &net.Dialer{
+		dialer, err := proxy.SOCKS5("tcp", rn.proxySettings.AddrByType(rn.peer.ProxyType), nil, &net.Dialer{
 			Timeout:   60 * time.Second,
 			KeepAlive: 30 * time.Second,
 		})
@@ -389,84 +383,6 @@ func (rn Peer) connect(settings ProxySettings) (net.Conn, error) {
 			logging.LogError(err.Error())
 			return nil, err
 		}
-		return dialer.Dial("tcp", rn.Address)
+		return dialer.Dial("tcp", rn.peer.Address)
 	}
-}
-
-type PeerDB struct {
-	dbObject *sql.DB
-}
-
-func (sd *PeerDB) Open(workDir string, knownPeers []Peer) {
-	sql, err := sql.Open("sqlite3", filepath.Join(workDir, PEER_DB_FILE_NAME))
-	if err != nil {
-		logging.LogError(err.Error())
-		return
-	} else {
-		sd.dbObject = sql
-	}
-	_, err = sql.Exec("create table PEERS(ADDRESS text, PROXY_TYPE int, RANK int)")
-	if err != nil {
-		logging.LogWarn(err.Error())
-	}
-
-	sd.SyncFrom(knownPeers)
-
-}
-
-func (pdb PeerDB) GetAll() []Peer {
-	return pdb.DoQuery("select * from PEERS")
-}
-
-/**
- * Gets a random peer from PeerDB (for node sync)
- */
-func (pdb PeerDB) GetRandomPeer() Peer {
-	peers := pdb.GetAll()
-	return peers[rand.Intn(len(peers))]
-}
-
-func (pdb PeerDB) SyncFrom(peers []Peer) {
-	for _, p := range peers {
-		pL := pdb.DoQuery(fmt.Sprintf(
-			"select * from PEERS where ADDRESS='%s' and PROXY_TYPE=%d",
-			p.Address, p.ProxyType))
-		if len(pL) == 0 {
-			pdb.insertRow(p)
-		}
-	}
-}
-
-func (sd PeerDB) DoQuery(queryString string) []Peer {
-	rows, err := sd.dbObject.Query(queryString)
-	if err != nil {
-		logging.LogError(err.Error())
-		return make([]Peer, 0)
-	}
-
-	results := make([]Peer, 0)
-
-	var address string
-	var proxyType int
-	var rank int64
-
-	for rows.Next() {
-		err := rows.Scan(&address, &proxyType, &rank)
-
-		if err != nil {
-			continue
-		}
-		results = append(results, Peer{
-			Address:   address,
-			ProxyType: proxyType,
-			Rank:      rank,
-		})
-	}
-	return results
-}
-
-func (pdb PeerDB) insertRow(p Peer) {
-	pdb.dbObject.Exec(fmt.Sprintf(
-		"insert into PEERS values('%s', %d, %d)",
-		p.Address, p.ProxyType, p.Rank))
 }
