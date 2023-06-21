@@ -5,44 +5,66 @@
     <title>SniffDigSniff - Search</title>
     <link rel="stylesheet" href="style.css"/>
 </head>
-<body>
-    <nav class="navbar navbar-dark bg-dark">
+<body class="pt-5 mt-5">
+    <div class="fixed-top ">
+    <nav class="navbar navbar-light bg-light">
     <a class="navbar-brand" href="/">
         <img src="sds_logo.png" width="40" height="40" alt=""> SniffDogSniff
     </a>
-        <form class="form-inline" action="/search" method="get">
-            <input type="search" class="form-control rounded" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q"/>
-            <input type="submit" class="btn btn-outline-primary" value="Search"/>
+    <form class="form-inline form-left form-group-lg" action="/search" method="get" style="width:80%">
+        <input type="search" class="form-control" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q" style="width:75%"/>
+        <input type="submit" class="btn btn-outline-primary" value="Search"/>
         <!--<input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
         <input type="submit" name="q" class="btn btn-outline-success my-2 my-sm-0"/>-->
     </form>
     </nav>
-    <div>
-        <ul id="navigation" class="list-group">
-        {{range $result := .}}
-        <li class="list-group-item list-group-item-action">
-            <div>
-                <small class="disabled">{{$result.Url}}</small>
-                <small class="float-right">
-                    <a class="btn btn btn-outline-secondary btn-sm" role="button" href="/invalidate?hash={{$result.HashAsB64UrlSafeStr}}" data-toggle="tooltip" data-placement="top" 
-                    title="Mark link for removal: if in your opinion this link contains offensive content (see offensive.md) you can mark it for removal">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-octagon" viewBox="0 0 16 16">
-                            <path d="M4.54.146A.5.5 0 0 1 4.893 0h6.214a.5.5 0 0 1 .353.146l4.394 4.394a.5.5 0 0 1 .146.353v6.214a.5.5 0 0 1-.146.353l-4.394 4.394a.5.5 0 0 1-.353.146H4.893a.5.5 0 0 1-.353-.146L.146 11.46A.5.5 0 0 1 0 11.107V4.893a.5.5 0 0 1 .146-.353L4.54.146zM5.1 1 1 5.1v5.8L5.1 15h5.8l4.1-4.1V5.1L10.9 1H5.1z"></path>
-                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"></path>
-                        </svg>
-                        Mark for removal
-                    </a>
-                </small>
-                <br/>
-                <img src="" width="16" height="16">
-                <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
-                <p class="mb-1">
-                    {{$result.Description}}
-                </p>
-            </div>
+
+    <!-- <nav class="bg-light">
+    <ul class="nav justify-content-center">
+        <li class="nav-item">
+          <a class="nav-link active" href="#">Active</a>
         </li>
-        {{end}}
-        </ul>
+        <li class="nav-item">
+          <a class="nav-link" href="#">Link</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#">Link</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link disabled" href="#">Disabled</a>
+        </li>
+      </ul>
+    </nav> -->
     </div>
+      
+    <main class="container">
+        <div class="col-14 mx-auto">
+            <ul class="list-group list-group-flush">
+            {{range $result := .}}
+            <li class="list-group-item">
+                <div>
+                    <small class="disabled">{{$result.Url}}</small>
+                    <small class="float-right">
+                        <a class="btn btn btn-outline-secondary btn-sm" role="button" href="/invalidate?hash={{$result.HashAsB64UrlSafeStr}}" data-toggle="tooltip" data-placement="top" 
+                        title="Mark link for removal: if in your opinion this link contains offensive content (see offensive.md) you can mark it for removal">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-octagon" viewBox="0 0 16 16">
+                                <path d="M4.54.146A.5.5 0 0 1 4.893 0h6.214a.5.5 0 0 1 .353.146l4.394 4.394a.5.5 0 0 1 .146.353v6.214a.5.5 0 0 1-.146.353l-4.394 4.394a.5.5 0 0 1-.353.146H4.893a.5.5 0 0 1-.353-.146L.146 11.46A.5.5 0 0 1 0 11.107V4.893a.5.5 0 0 1 .146-.353L4.54.146zM5.1 1 1 5.1v5.8L5.1 15h5.8l4.1-4.1V5.1L10.9 1H5.1z"></path>
+                                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"></path>
+                            </svg>
+                            Mark for removal
+                        </a>
+                    </small>
+                    <br/>
+                    <img src="" width="16" height="16">
+                    <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
+                    <p class="mb-1">
+                        {{$result.Description}}
+                    </p>
+                </div>
+            </li>
+            {{end}}
+            </ul>
+        </div>
+    </main>
 </body>
 </html>
