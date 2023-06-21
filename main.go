@@ -48,7 +48,9 @@ func shutdownHook(configs sds.SdsConfig, node *sds.LocalNode) {
 			s := <-sigchnl
 			if s == syscall.SIGINT {
 				if configs.ServiceSettings.CreateHiddenService {
-					sds.RemoveHiddenService(configs.ServiceSettings, node.SelfPeer)
+					if configs.ServiceSettings.OnionService {
+						configs.OnionServiceSettings.RemoveHiddenService()
+					}
 				}
 				node.Shutdown()
 				logging.LogInfo("Shutting down...")
@@ -64,16 +66,16 @@ func main() {
 
 	confs := sds.NewSdsConfig(cfgFilePath)
 
-	nodeServerBindAddress := confs.ServiceSettings.PeerInfo.Address
-
 	if confs.ServiceSettings.CreateHiddenService {
-		confs.ServiceSettings.PeerInfo = sds.CreateHiddenService(confs.ServiceSettings)
+		if confs.ServiceSettings.OnionService {
+			confs.OnionServiceSettings.CreateHiddenService(confs.ServiceSettings.BindAddress)
+		}
 	}
 
 	node := sds.GetNodeInstance(confs)
 
 	p2pServer := sds.InitNodeServer(node)
-	go p2pServer.Serve(nodeServerBindAddress)
+	go p2pServer.Serve(confs.ServiceSettings.BindAddress)
 
 	node.StartSyncTask()
 

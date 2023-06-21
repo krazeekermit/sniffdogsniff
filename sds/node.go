@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
 )
@@ -20,7 +21,7 @@ const FIRST_SYNC_DELAY = 1      // milliseconds
 const MAX_SYNC_SIZE = 104857600 / SEARCH_RESULT_BYTE_SIZE // 100 MBytes / 512 bytes
 
 type LocalNode struct {
-	proxySettings         ProxySettings
+	proxySettings         proxies.ProxySettings
 	canInvalidate         bool
 	tsLock                sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB              SearchDB
@@ -49,7 +50,14 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 		ln.FirstSync = true
 		logging.LogWarn("Your Node is not already synced with the rest of the network, you are in FIRSTSYNC mode!")
 	}
-	ln.SelfPeer = configs.ServiceSettings.PeerInfo
+
+	if configs.ServiceSettings.CreateHiddenService {
+		if configs.ServiceSettings.OnionService {
+			ln.SelfPeer = NewPeer(configs.OnionServiceSettings.OnionAddress)
+		}
+	} else {
+		ln.SelfPeer = NewPeer(configs.ServiceSettings.BindAddress)
+	}
 	return &ln
 }
 
@@ -90,7 +98,7 @@ func (ln *LocalNode) Handshake(peer Peer) error {
 		return errors.New("First sync, handshake refused")
 	}
 	ln.tsLock.Lock()
-	ln.peerDB.SyncFrom([]Peer{peer})
+	ln.peerDB.SyncFrom([]Peer{peer}, ln.SelfPeer)
 	ln.tsLock.Unlock()
 	return nil
 }
@@ -164,7 +172,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	if len(newPeers) > 0 {
 		ln.tsLock.Lock()
-		ln.peerDB.SyncFrom(newPeers)
+		ln.peerDB.SyncFrom(newPeers, ln.SelfPeer)
 		ln.tsLock.Unlock()
 	}
 

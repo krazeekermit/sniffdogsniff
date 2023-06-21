@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util/logging"
 	"gopkg.in/ini.v1"
 )
@@ -31,6 +33,7 @@ const (
 	WEB_UI                             = "web_ui"
 	BIND_ADDRESS                       = "bind_address"
 	PROXY_SETTINGS                     = "proxy_settings"
+	FORCE_TOR_PROXY                    = "force_tor_proxy"
 	I2P_SOCKS5_PROXY                   = "i2p_socks5_proxy"
 	TOR_SOCKS5_PROXY                   = "tor_socks5_proxy"
 	NODE_SERVICE                       = "node_service"
@@ -51,44 +54,14 @@ func panicNoSection(key string) {
 	panic(fmt.Sprint("Config file parse error: required section: ", key))
 }
 
-type ProxySettings struct {
-	i2pSocks5Addr string
-	torSocks5Addr string
-}
-
-func (ps ProxySettings) AddrByType(proxyType int) string {
-	switch proxyType {
-	case I2P_SOCKS_5_PROXY_TYPE:
-		return ps.i2pSocks5Addr
-	case TOR_SOCKS_5_PROXY_TYPE:
-		return ps.torSocks5Addr
-	}
-	return ""
-}
-
 func parsePeer(sec *ini.Section, addressKey string) Peer {
 	if sec.HasKey(addressKey) {
-		proxyType := stringToProxyTypeInt(sec.Key("proxy_type").String())
 		return Peer{
-			Address:   sec.Key(addressKey).String(),
-			ProxyType: proxyType,
+			Address: sec.Key(addressKey).String(),
 		}
 	} else {
 		panicNoKey(addressKey)
 		return Peer{}
-	}
-}
-
-func stringToProxyTypeInt(proxyType string) int {
-	switch strings.ToUpper(proxyType) {
-	case "TOR":
-		return TOR_SOCKS_5_PROXY_TYPE
-	case "I2P":
-		return I2P_SOCKS_5_PROXY_TYPE
-	case "NONE":
-		return NONE_PROXY_TYPE
-	default:
-		return NONE_PROXY_TYPE
 	}
 }
 
@@ -111,10 +84,10 @@ func stringToByteSize(text string) int {
 }
 
 type NodeServiceSettings struct {
-	Enabled               bool
-	CreateHiddenService   bool
-	HiddenServiceSettings HiddenService_settings
-	PeerInfo              Peer
+	Enabled             bool
+	CreateHiddenService bool
+	OnionService        bool
+	BindAddress         string
 }
 
 type SdsConfig struct {
@@ -123,8 +96,9 @@ type SdsConfig struct {
 	AllowResultsInvalidation bool
 	WebServiceBindAddress    string
 	KnownPeers               []Peer
-	proxySettings            ProxySettings
+	proxySettings            proxies.ProxySettings
 	ServiceSettings          NodeServiceSettings
+	OnionServiceSettings     hiddenservice.OnionService
 	searchEngines            map[string]SearchEngine
 }
 
@@ -201,15 +175,23 @@ func NewSdsConfig(path string) SdsConfig {
 
 	if iniData.HasSection(PROXY_SETTINGS) {
 		proxySettingsSection := iniData.Section(PROXY_SETTINGS)
-		if proxySettingsSection.HasKey(TOR_SOCKS5_PROXY) {
-			cfg.proxySettings.torSocks5Addr = proxySettingsSection.Key(TOR_SOCKS5_PROXY).String()
+		if proxySettingsSection.HasKey(FORCE_TOR_PROXY) {
+			cfg.proxySettings.ForceTor, err = proxySettingsSection.Key(FORCE_TOR_PROXY).Bool()
+			if err != nil {
+				cfg.proxySettings.ForceTor = false
+			}
 		} else {
-			cfg.proxySettings.torSocks5Addr = "127.0.0.1:9050"
+			cfg.proxySettings.ForceTor = false
+		}
+		if proxySettingsSection.HasKey(TOR_SOCKS5_PROXY) {
+			cfg.proxySettings.TorSocks5Addr = proxySettingsSection.Key(TOR_SOCKS5_PROXY).String()
+		} else {
+			cfg.proxySettings.TorSocks5Addr = "127.0.0.1:9050"
 		}
 		if proxySettingsSection.HasKey(I2P_SOCKS5_PROXY) {
-			cfg.proxySettings.i2pSocks5Addr = proxySettingsSection.Key(I2P_SOCKS5_PROXY).String()
+			cfg.proxySettings.I2pSocks5Addr = proxySettingsSection.Key(I2P_SOCKS5_PROXY).String()
 		} else {
-			cfg.proxySettings.i2pSocks5Addr = "127.0.0.1:4447"
+			cfg.proxySettings.I2pSocks5Addr = "127.0.0.1:4447"
 		}
 	} else {
 		panicNoSection(PROXY_SETTINGS)
@@ -234,34 +216,39 @@ func NewSdsConfig(path string) SdsConfig {
 			}
 			if cfg.ServiceSettings.CreateHiddenService {
 				if nodeServiceSection.HasKey(TOR_CONTROL_PORT) {
-					cfg.ServiceSettings.HiddenServiceSettings.IsTor = true
-					cfg.ServiceSettings.HiddenServiceSettings.TorControlPort, err = nodeServiceSection.Key(TOR_CONTROL_PORT).Int()
+					cfg.ServiceSettings.OnionService = true
+					cfg.OnionServiceSettings.TorControlPort, err = nodeServiceSection.Key(TOR_CONTROL_PORT).Int()
 					if err != nil {
-						cfg.ServiceSettings.HiddenServiceSettings.TorControlPort = 9051
+						cfg.OnionServiceSettings.TorControlPort = 9051
 					}
 					if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
-						cfg.ServiceSettings.HiddenServiceSettings.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+						cfg.OnionServiceSettings.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
 					}
 				} else if nodeServiceSection.HasKey(I2P_SAM_PORT) {
-					cfg.ServiceSettings.HiddenServiceSettings.IsTor = false
-					cfg.ServiceSettings.HiddenServiceSettings.SamPort, err = nodeServiceSection.Key(I2P_SAM_PORT).Int()
-					if err != nil {
-						cfg.ServiceSettings.HiddenServiceSettings.SamPort = 7656
-					}
-					if nodeServiceSection.HasKey(I2P_SAM_USER) {
-						cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = true
-						cfg.ServiceSettings.HiddenServiceSettings.SamUser = nodeServiceSection.Key(I2P_SAM_USER).String()
-						if nodeServiceSection.HasKey(I2P_SAM_PASSWORD) {
-							cfg.ServiceSettings.HiddenServiceSettings.SamPassword = nodeServiceSection.Key(I2P_SAM_PASSWORD).String()
-						} else {
-							panicNoKey(I2P_SAM_PASSWORD)
-						}
-					} else {
-						cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = false
-					}
+					/* I2P hidden service not supported for now */
+					// cfg.ServiceSettings.HiddenServiceSettings.IsTor = false
+					// cfg.ServiceSettings.HiddenServiceSettings.SamPort, err = nodeServiceSection.Key(I2P_SAM_PORT).Int()
+					// if err != nil {
+					// 	cfg.ServiceSettings.HiddenServiceSettings.SamPort = 7656
+					// }
+					// if nodeServiceSection.HasKey(I2P_SAM_USER) {
+					// 	cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = true
+					// 	cfg.ServiceSettings.HiddenServiceSettings.SamUser = nodeServiceSection.Key(I2P_SAM_USER).String()
+					// 	if nodeServiceSection.HasKey(I2P_SAM_PASSWORD) {
+					// 		cfg.ServiceSettings.HiddenServiceSettings.SamPassword = nodeServiceSection.Key(I2P_SAM_PASSWORD).String()
+					// 	} else {
+					// 		panicNoKey(I2P_SAM_PASSWORD)
+					// 	}
+					// } else {
+					// 	cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = false
+					// }
 				}
 			}
-			cfg.ServiceSettings.PeerInfo = parsePeer(nodeServiceSection, BIND_ADDRESS)
+			if nodeServiceSection.HasKey(BIND_ADDRESS) {
+				cfg.ServiceSettings.BindAddress = nodeServiceSection.Key(BIND_ADDRESS).String()
+			} else {
+				cfg.ServiceSettings.BindAddress = "127.0.0.1:4222"
+			}
 		}
 	} else {
 		panicNoSection(NODE_SERVICE)

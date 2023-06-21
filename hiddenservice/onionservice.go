@@ -1,4 +1,4 @@
-package sds
+package hiddenservice
 
 import (
 	"fmt"
@@ -8,14 +8,14 @@ import (
 	"github.com/sniffdogsniff/util/logging"
 )
 
-type HiddenService_settings struct {
-	IsTor              bool
+type OnionService struct {
 	NeedAuth           bool
 	TorControlPort     int
 	TorControlPassword string
-	SamPort            int
-	SamUser            string
-	SamPassword        string
+	OnionAddress       string
+	// SamPort            int
+	// SamUser            string
+	// SamPassword        string
 }
 
 const TXT_BUFFER_SIZE = 2048
@@ -62,40 +62,32 @@ func connectToControlPort(port int, auth string) net.Conn {
 	return conn
 }
 
-func CreateHiddenService(serviceSettings NodeServiceSettings) Peer {
-	conn := connectToControlPort(serviceSettings.HiddenServiceSettings.TorControlPort,
-		serviceSettings.HiddenServiceSettings.TorControlPassword)
+func (ons *OnionService) CreateHiddenService(bindAddress string) {
+	conn := connectToControlPort(ons.TorControlPort,
+		ons.TorControlPassword)
 
-	addr, err := net.ResolveTCPAddr("tcp", serviceSettings.PeerInfo.Address)
+	addr, err := net.ResolveTCPAddr("tcp", bindAddress)
 	if err != nil {
-		panic(fmt.Sprintf("Malformed url: %s", serviceSettings.PeerInfo.Address))
+		panic(fmt.Sprintf("Malformed url: %s", bindAddress))
 	}
 
-	onionAddr := ""
-	writeToDaemon(conn, fmt.Sprintf("ADD_ONION NEW:BEST Port=%d,%s", addr.Port, serviceSettings.PeerInfo.Address))
+	writeToDaemon(conn, fmt.Sprintf("ADD_ONION NEW:BEST Port=%d,%s", addr.Port, bindAddress))
 	response := readDaemonAnswer(conn)
 	if len(response) > 0 {
 		tokens := strings.Split(response[0], "=")
 		if strings.Contains(tokens[0], "ServiceID") {
-			onionAddr = fmt.Sprint(tokens[1], ".onion:", addr.Port)
+			ons.OnionAddress = fmt.Sprint(tokens[1], ".onion:", addr.Port)
+			logging.LogInfo("Hidden Service started on", ons.OnionAddress)
 		}
 	}
 
-	logging.LogInfo("Hidden Service started on", onionAddr)
-
 	conn.Close()
-
-	return Peer{
-		Address:   onionAddr,
-		ProxyType: TOR_SOCKS_5_PROXY_TYPE,
-	}
 }
 
-func RemoveHiddenService(serviceSettings NodeServiceSettings, p Peer) {
-	conn := connectToControlPort(serviceSettings.HiddenServiceSettings.TorControlPort,
-		serviceSettings.HiddenServiceSettings.TorControlPassword)
-	logging.LogInfo("Removing Hidden Service", p.Address)
-	writeToDaemon(conn, fmt.Sprintf("DEL_ONION %s", strings.Split(p.Address, ".")[0]))
+func (ons *OnionService) RemoveHiddenService() {
+	conn := connectToControlPort(ons.TorControlPort, ons.TorControlPassword)
+	logging.LogInfo("Removing Hidden Service", ons.OnionAddress)
+	writeToDaemon(conn, fmt.Sprintf("DEL_ONION %s", strings.Split(ons.OnionAddress, ".")[0]))
 	readDaemonAnswer(conn)
 	conn.Close()
 }

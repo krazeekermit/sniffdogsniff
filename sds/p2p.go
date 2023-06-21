@@ -8,9 +8,9 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
-	"golang.org/x/net/proxy"
 
 	"github.com/vmihailenco/msgpack"
 )
@@ -19,12 +19,6 @@ import (
  * SniffDogSniff uses Epidemic Gossip protocol SI model
  * pull method for syncing SearchResults and Peers
  */
-
-const (
-	NONE_PROXY_TYPE        int = -1
-	TOR_SOCKS_5_PROXY_TYPE int = 0
-	I2P_SOCKS_5_PROXY_TYPE int = 1
-)
 
 const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
@@ -252,10 +246,10 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 
 type NodeClient struct {
 	peer          Peer
-	proxySettings ProxySettings
+	proxySettings proxies.ProxySettings
 }
 
-func NewNodeClient(peer Peer, proxySettings ProxySettings) NodeClient {
+func NewNodeClient(peer Peer, proxySettings proxies.ProxySettings) NodeClient {
 	return NodeClient{
 		peer:          peer,
 		proxySettings: proxySettings,
@@ -330,7 +324,7 @@ func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, returne
 		return err
 	}
 
-	conn, err := rn.connect()
+	conn, err := rn.proxySettings.NewConnection(rn.peer.Address)
 	if err != nil {
 		logging.LogTrace("connection error")
 		rn.peer.Rank -= 500
@@ -369,20 +363,4 @@ func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, returne
 	}
 
 	return nil
-}
-
-func (rn *NodeClient) connect() (net.Conn, error) {
-	if rn.peer.ProxyType == NONE_PROXY_TYPE {
-		return net.Dial("tcp", rn.peer.Address)
-	} else {
-		dialer, err := proxy.SOCKS5("tcp", rn.proxySettings.AddrByType(rn.peer.ProxyType), nil, &net.Dialer{
-			Timeout:   60 * time.Second,
-			KeepAlive: 30 * time.Second,
-		})
-		if err != nil {
-			logging.LogError(err.Error())
-			return nil, err
-		}
-		return dialer.Dial("tcp", rn.peer.Address)
-	}
 }

@@ -23,16 +23,14 @@ func hash(bytez []byte) uint32 {
 }
 
 type Peer struct {
-	Address   string
-	ProxyType int
-	Rank      int64
+	Address string
+	Rank    int64
 }
 
 func NewPeer(address string) Peer {
 	return Peer{
-		Address:   address,
-		ProxyType: -1,
-		Rank:      -1,
+		Address: address,
+		Rank:    -1,
 	}
 }
 
@@ -47,10 +45,6 @@ func BytesToPeer(bytez []byte) (Peer, error) {
 	if err != nil || n != int(addrLen) {
 		return Peer{}, err
 	}
-	proxyType, err := buf.ReadByte()
-	if err != nil {
-		return Peer{}, err
-	}
 	brank := make([]byte, 8) // RANK
 	n, err = buf.Read(brank)
 	if err != nil || n != 8 {
@@ -58,9 +52,8 @@ func BytesToPeer(bytez []byte) (Peer, error) {
 	}
 
 	return Peer{
-		Address:   string(baddr),
-		ProxyType: int(int8(proxyType)),
-		Rank:      int64(binary.LittleEndian.Uint64(brank)),
+		Address: string(baddr),
+		Rank:    int64(binary.LittleEndian.Uint64(brank)),
 	}, nil
 }
 
@@ -68,7 +61,6 @@ func (p *Peer) ToBytes() []byte {
 	buf := bytes.NewBuffer(nil)
 	buf.WriteByte(byte(len(p.Address)))
 	buf.Write([]byte(p.Address))
-	buf.WriteByte(byte(p.ProxyType))
 	rankBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(rankBytes, uint64(p.Rank))
 	buf.Write(rankBytes)
@@ -94,6 +86,9 @@ func (pdb *PeerDB) Open(workDir string, knownPeers []Peer) {
 		for _, peerFile := range peersFiles {
 			path := filepath.Join(pdb.dbPath, peerFile.Name())
 			fp, err := os.Open(path)
+			if err != nil {
+				logging.LogError("Cannot open file:", path, err)
+			}
 
 			psize, err := fp.Seek(0, os.SEEK_END)
 			fp.Seek(0, os.SEEK_SET)
@@ -112,7 +107,7 @@ func (pdb *PeerDB) Open(workDir string, knownPeers []Peer) {
 			pdb.peers[p.Address] = p
 		}
 	} else {
-		pdb.SyncFrom(knownPeers)
+		pdb.SyncFrom(knownPeers, Peer{})
 		logging.LogWarn("Peer database files does not exists...")
 	}
 }
@@ -128,8 +123,11 @@ func (pdb *PeerDB) GetRandomPeer() Peer {
 	return pdb.GetAll()[rand.Intn(len(pdb.peers))]
 }
 
-func (pdb *PeerDB) SyncFrom(peers []Peer) {
+func (pdb *PeerDB) SyncFrom(peers []Peer, skip Peer) {
 	for _, p := range peers {
+		if p == skip {
+			continue
+		}
 		pdb.peers[p.Address] = p
 	}
 }

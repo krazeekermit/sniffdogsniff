@@ -11,6 +11,7 @@ external_search_engines = bing, startpage, brave
 bind_address = 0.0.0.0:8081
 
 [proxy_settings]
+force_tor_proxy = yes
 # i2p_socks5_proxy = addr:port
 tor_socks5_proxy = 127.0.0.1:9050
 
