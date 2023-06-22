@@ -19,15 +19,24 @@ const (
 const MAX_RESULTS_PER_PAGE int = 10
 
 func getResultsForPage(results []sds.SearchResult, page int) []sds.SearchResult {
-	firstIdx := MAX_RESULTS_PER_PAGE * page
-	lastIdx := firstIdx + MAX_RESULTS_PER_PAGE
-	if lastIdx > (len(results) - 1) {
-		lastIdx = (len(results) - 1)
+	if len(results) <= MAX_RESULTS_PER_PAGE {
+		return results
+	} else {
+		firstIdx := MAX_RESULTS_PER_PAGE * page
+		lastIdx := firstIdx + MAX_RESULTS_PER_PAGE
+		if lastIdx > (len(results) - 1) {
+			lastIdx = (len(results) - 1)
+		}
+		return results[firstIdx:lastIdx]
 	}
-	return results[firstIdx:lastIdx]
 }
 
-func matchesUrlType(url *url.URL, urlType string) bool {
+func matchesUrlType(urlStr, urlType string) bool {
+	url, err := url.Parse(urlStr)
+	if err != nil {
+		logging.LogTrace("URL filter -", err.Error())
+		return true
+	}
 	comps := strings.Split(url.Hostname(), ".")
 	domain := comps[len(comps)-1]
 	// logging.LogTrace("domain:", domain)
@@ -45,21 +54,14 @@ func matchesUrlType(url *url.URL, urlType string) bool {
 	}
 }
 
-func filterSearchResults(results []sds.SearchResult, urlType string) []sds.SearchResult {
-	if urlType == RULE_ALL {
-		return results
-	} else {
-		filtered := make([]sds.SearchResult, 0)
-		for _, sr := range results {
-			url, err := url.Parse(sr.Url)
-			if err != nil {
-				logging.LogTrace("URL filter -", err.Error())
-				continue
-			}
-			if matchesUrlType(url, urlType) {
-				filtered = append(filtered, sr)
-			}
+func filterSearchResults(results []sds.SearchResult, urlType, dataTypeStr string) []sds.SearchResult {
+	filtered := make([]sds.SearchResult, 0)
+	for _, sr := range results {
+		logging.LogTrace(sr.Title, sr.DataType)
+		if matchesUrlType(sr.Url, urlType) && sr.DataType == sds.StrToDataType(dataTypeStr) {
+			filtered = append(filtered, sr)
 		}
-		return filtered
 	}
+	logging.LogTrace("FILTERED ", len(filtered), "results!!!!!!!!!!!!!!1")
+	return filtered
 }

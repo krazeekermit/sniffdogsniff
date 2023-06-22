@@ -69,6 +69,7 @@ func NewSearchResult(title, url, description string, dataType ResultDataType) Se
 		Timestamp:   uint64(time.Now().Unix()),
 		Title:       title,
 		Url:         url,
+		DataType:    dataType,
 		Description: description,
 	}
 	rs.ReHash()

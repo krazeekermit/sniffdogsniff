@@ -8,41 +8,36 @@
 <body class="pt-5 mt-5">
     <div class="fixed-top ">
     <nav class="navbar navbar-light bg-light">
-    <a class="navbar-brand" href="/">
-        <img src="sds_logo.png" width="40" height="40" alt=""> SniffDogSniff
-    </a>
-    <form class="form-inline form-left form-group-lg" action="/search" method="get" style="width:80%">
-        <input type="search" class="form-control" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q" value="{{ .q }}" style="width:75%"/>
-        <input type="submit" class="btn btn-outline-primary" value="Search"/>
+    <form action="/search" method="get" style="width: 100%">
+        <div class="form-row">
+            <a class="navbar-brand" href="/">
+                <img src="sds_logo.png" width="40" height="40" alt=""> SniffDogSniff
+            </a>
+            <div class="input-group col-14 ml-4 mr-4 mb-3" style="width: 80%">
+                <input type="search" class="form-control" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q" value="{{ .q }}" style="width:75%"/>
+                <div class="input-group-append">
+                  <button class="btn btn-primary" type="submit">Search</button>
+                </div>
+              </div>
+        </div>
         <!--<input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
         <input type="submit" name="q" class="btn btn-outline-success my-2 my-sm-0"/>-->
+        <div class="form-row justify-content-center">
+              <div class="btn-group" role="group" aria-label="Basic example">
+                <button type="submit" name="data_type" value="links" class="btn btn-default btn-outline-secondary btn-sm" style="width: 150px !important;">Links</button>
+                <button type="submit" name="data_type" value="images" class="btn btn-default btn-secondary btn-sm" style="width: 150px !important;">Images</button>
+                <button type="submit" name="data_type" value="videos" class="btn btn-default btn-outline-secondary btn-sm" style="width: 150px !important;">Videos</button>
+              </div>
+        </div>
     </form>
     </nav>
-
-    <!-- <nav class="bg-light">
-    <ul class="nav justify-content-center">
-        <li class="nav-item">
-          <a class="nav-link active" href="#">Active</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Link</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#">Link</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link disabled" href="#">Disabled</a>
-        </li>
-      </ul>
-    </nav> -->
+    
     </div>
       
     <main class="container">
-        <div class="col-14 mx-auto">
-            <ul class="list-group list-group-flush">
+        <div class="col-14 mx-auto row">
             {{range $result := .results}}
-            <li class="list-group-item">
-                <div>
+                <!-- <div>
                     <small class="disabled">{{$result.Url}}</small>
                     <small class="float-right">
                         <a class="btn btn btn-outline-secondary btn-sm" role="button" href="/invalidate?hash={{$result.HashAsB64UrlSafeStr}}" data-toggle="tooltip" data-placement="top" 
@@ -60,10 +55,14 @@
                     <p class="mb-1">
                         {{$result.Description}}
                     </p>
-                </div>
-            </li>
+                </div> -->
+                <div class="card col-sm-auto mr-2 ml-2 mt-2 mb-2" style="width: 18rem;">
+                    <img class="card-img-top" src="{{$result.Url}}" alt="{{$result.Url}}">
+                    <div class="card-body">
+                      <p class="card-text">{{$result.Title}}</p>
+                    </div>
+                  </div>
             {{end}}
-            </ul>
         </div>
       </main>
       <nav aria-label="Page navigation example">

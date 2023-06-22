@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -10,8 +11,9 @@ import (
 )
 
 type searchActionStatus struct {
-	results []sds.SearchResult
-	query   string
+	results  []sds.SearchResult
+	query    string
+	dataType string
 }
 
 type SdsWebServer struct {
@@ -28,9 +30,14 @@ func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
 
 func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
-	urlFilter := r.URL.Query().Get("link_filter")
+	urlFilter := RULE_ALL
+	if r.URL.Query().Has("link_filter") {
+		urlFilter = r.URL.Query().Get("link_filter")
+	}
 
-	logging.LogTrace("---------_>>>>>>>>>>>>> WEBUI SEARCH", query, server.searchStatus.query)
+	dataType := r.URL.Query().Get("data_type")
+
+	logging.LogTrace("---------_>>>>>>>>>>>>> WEBUI SEARCH", query, server.searchStatus.query, dataType)
 
 	pageNum, err := strconv.Atoi(r.URL.Query().Get("page"))
 	if err != nil {
@@ -38,14 +45,15 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 	}
 
 	//Avoid extra search actions
-	if query != server.searchStatus.query {
-		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter)
+	if query != server.searchStatus.query || dataType != server.searchStatus.dataType {
+		logging.LogTrace("status changed")
+		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter, dataType)
 		server.searchStatus.query = query
 		pageNum = 0
 	}
 
 	npages := len(server.searchStatus.results) / MAX_RESULTS_PER_PAGE
-	renderTemplate2(w, "results.html", argsMap{
+	renderTemplate2(w, fmt.Sprintf("results_%s.html", dataType), argsMap{
 		"results":       getResultsForPage(server.searchStatus.results, pageNum),
 		"n_pages":       npages,
 		"q":             server.searchStatus.query,
@@ -74,7 +82,9 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 		title := r.FormValue("link_title")
 		url := r.FormValue("link_url")
 		description := r.FormValue("link_description")
-		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description, sds.LINK_DATA_TYPE))
+		dataType := sds.StrToDataType(r.FormValue("data_type"))
+		logging.LogTrace("inserti link", dataType)
+		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description, dataType))
 	}
 	renderTemplate(w, "insert_link.html", nil)
 }

@@ -84,7 +84,7 @@ func stringToByteSize(text string) int {
 	}
 }
 
-func strToDataType(token string) ResultDataType {
+func StrToDataType(token string) ResultDataType {
 	switch token {
 	case "images":
 		return IMAGE_DATA_TYPE
@@ -172,7 +172,7 @@ func NewSdsConfig(path string) SdsConfig {
 				resultUrlProperty:       engine.Key(RESULT_URL_PROPERTY).String(),
 				resultTitleElement:      engine.Key(RESULT_TITLE_ELEMENT).String(),
 				resultTitleProperty:     engine.Key(RESULT_TITLE_PROPERTY).String(),
-				providedDataType:        strToDataType(engine.Key(PROVIDED_DATA_TYPE).String()),
+				providedDataType:        StrToDataType(engine.Key(PROVIDED_DATA_TYPE).String()),
 			}
 		}
 	}
