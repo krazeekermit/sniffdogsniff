@@ -16,6 +16,17 @@ const (
 	RULE_CLEARNET string = "clearnet"
 )
 
+const MAX_RESULTS_PER_PAGE int = 10
+
+func getResultsForPage(results []sds.SearchResult, page int) []sds.SearchResult {
+	firstIdx := MAX_RESULTS_PER_PAGE * page
+	lastIdx := firstIdx + MAX_RESULTS_PER_PAGE
+	if lastIdx > (len(results) - 1) {
+		lastIdx = (len(results) - 1)
+	}
+	return results[firstIdx:lastIdx]
+}
+
 func matchesUrlType(url *url.URL, urlType string) bool {
 	comps := strings.Split(url.Hostname(), ".")
 	domain := comps[len(comps)-1]

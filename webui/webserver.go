@@ -2,27 +2,57 @@ package webui
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/sniffdogsniff/sds"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
 )
 
+type searchActionStatus struct {
+	results []sds.SearchResult
+	query   string
+}
+
 type SdsWebServer struct {
-	node *sds.LocalNode
+	node         *sds.LocalNode
+	searchStatus *searchActionStatus
 }
 
 func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
 	return SdsWebServer{
-		node: node,
+		node:         node,
+		searchStatus: new(searchActionStatus),
 	}
 }
 
 func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	urlFilter := r.URL.Query().Get("link_filter")
-	results := filterSearchResults(server.node.DoSearch(query), urlFilter)
-	renderTemplate(w, "results.html", results)
+
+	//Avoid extra search actions
+	if query != server.searchStatus.query {
+		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter)
+		server.searchStatus.query = query
+	}
+
+	pageNum, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil {
+		pageNum = 0
+	}
+
+	npages := len(server.searchStatus.results) / MAX_RESULTS_PER_PAGE
+	renderTemplate2(w, "results.html", argsMap{
+		"results":       getResultsForPage(server.searchStatus.results, pageNum),
+		"n_pages":       npages,
+		"q":             server.searchStatus.query,
+		"link_filter":   urlFilter,
+		"page_num":      pageNum,
+		"has_next_page": pageNum+1 < npages,
+		"next_page":     pageNum + 1,
+		"has_prev_page": pageNum > 0,
+		"prev_page":     pageNum - 1,
+	})
 }
 
 func (server *SdsWebServer) redirectHandleFunc(w http.ResponseWriter, r *http.Request) {
