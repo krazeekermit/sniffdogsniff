@@ -30,6 +30,7 @@ const (
 	RESULT_URL_PROPERTY                = "result_url_property"
 	RESULT_TITLE_ELEMENT               = "result_title_element"
 	RESULT_TITLE_PROPERTY              = "result_title_property"
+	PROVIDED_DATA_TYPE                 = "provided_data_type"
 	WEB_UI                             = "web_ui"
 	BIND_ADDRESS                       = "bind_address"
 	PROXY_SETTINGS                     = "proxy_settings"
@@ -80,6 +81,19 @@ func stringToByteSize(text string) int {
 		return size * 1024
 	} else { // Bytes
 		return size
+	}
+}
+
+func strToDataType(token string) ResultDataType {
+	switch token {
+	case "images":
+		return IMAGE_DATA_TYPE
+	case "videos":
+		return VIDEO_DATA_TYPE
+	case "links":
+		return LINK_DATA_TYPE
+	default:
+		return LINK_DATA_TYPE
 	}
 }
 
@@ -158,6 +172,7 @@ func NewSdsConfig(path string) SdsConfig {
 				resultUrlProperty:       engine.Key(RESULT_URL_PROPERTY).String(),
 				resultTitleElement:      engine.Key(RESULT_TITLE_ELEMENT).String(),
 				resultTitleProperty:     engine.Key(RESULT_TITLE_PROPERTY).String(),
+				providedDataType:        strToDataType(engine.Key(PROVIDED_DATA_TYPE).String()),
 			}
 		}
 	}

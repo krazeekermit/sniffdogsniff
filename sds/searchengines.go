@@ -57,6 +57,7 @@ type SearchEngine struct {
 	resultUrlProperty       string
 	resultTitleElement      string
 	resultTitleProperty     string
+	providedDataType        ResultDataType
 }
 
 func (se SearchEngine) extractDescription(url string) string {
@@ -114,7 +115,7 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 			}
 			if validUrl(url) {
 				desc := se.extractDescription(url)
-				result := NewSearchResult(title, url, desc)
+				result := NewSearchResult(title, url, desc, se.providedDataType)
 				result.ReHash()
 				searchResults = append(searchResults, result)
 			}

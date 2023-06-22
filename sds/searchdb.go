@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -23,20 +24,29 @@ const METASS_DB_FILE_NAME = "searches_meta.db"
 const SEARCH_RESULT_BYTE_SIZE = 512 // bytes
 const RESULT_META_BYTE_SIZE = 43    // bytes
 
+type ResultDataType uint8
+
+const (
+	LINK_DATA_TYPE  ResultDataType = 0
+	IMAGE_DATA_TYPE ResultDataType = 1
+	VIDEO_DATA_TYPE ResultDataType = 2
+)
+
 type SearchResult struct {
 	ResultHash  [32]byte
 	Timestamp   uint64
 	Title       string
 	Url         string
 	Description string
+	DataType    ResultDataType
 }
 
 /*
 SearchResult Structure
 [[HASH (32)][TIMESTAMP (8)][TITLE][URL][DESCRIPTION]] = 512 bytes
 */
-func NewSearchResult(title, url, description string) SearchResult {
-	const FIXED_LENGHT = 32 + 8 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1
+func NewSearchResult(title, url, description string, dataType ResultDataType) SearchResult {
+	const FIXED_LENGHT = 32 + 8 + 1 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1, datatype=1
 	// SHRINK TITLE AND DESCRIPTION TO FIT 512 byte max size
 	if FIXED_LENGHT+len(title)+len(url)+len(description) > SEARCH_RESULT_BYTE_SIZE {
 		newDescriptionLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(title) - len(url)
@@ -104,12 +114,18 @@ func BytesToSearchResult(hash [32]byte, bytez []byte) (SearchResult, error) {
 		return SearchResult{}, err
 	}
 
+	dataType, err := buf.ReadByte() // DATA_TYPe
+	if err != nil {
+		return SearchResult{}, err
+	}
+
 	return SearchResult{
 		ResultHash:  hash,
 		Timestamp:   binary.LittleEndian.Uint64(bts),
 		Title:       string(btitle),
 		Url:         string(burl),
 		Description: string(bdesc),
+		DataType:    ResultDataType(dataType),
 	}, nil
 }
 
@@ -124,13 +140,14 @@ func (sr *SearchResult) ToBytes() []byte {
 	buf.Write([]byte(sr.Url))
 	buf.WriteByte(byte(len(sr.Description)))
 	buf.Write([]byte(sr.Description))
+	buf.WriteByte(byte(sr.DataType))
 	return buf.Bytes()
 }
 
 func (sr *SearchResult) calculateHash() [32]byte {
 	m3_bytes := make([]byte, 0)
 
-	for _, s := range []string{sr.Url, sr.Title, sr.Description} {
+	for _, s := range []string{sr.Url, sr.Title, sr.Description, fmt.Sprintf("%c", sr.DataType)} {
 		m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(s)))...)
 	}
 	return sha256.Sum256(m3_bytes)

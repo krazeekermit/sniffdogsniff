@@ -30,14 +30,17 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 	query := r.URL.Query().Get("q")
 	urlFilter := r.URL.Query().Get("link_filter")
 
+	logging.LogTrace("---------_>>>>>>>>>>>>> WEBUI SEARCH", query, server.searchStatus.query)
+
+	pageNum, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil {
+		pageNum = 0
+	}
+
 	//Avoid extra search actions
 	if query != server.searchStatus.query {
 		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter)
 		server.searchStatus.query = query
-	}
-
-	pageNum, err := strconv.Atoi(r.URL.Query().Get("page"))
-	if err != nil {
 		pageNum = 0
 	}
 
@@ -71,7 +74,7 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 		title := r.FormValue("link_title")
 		url := r.FormValue("link_url")
 		description := r.FormValue("link_description")
-		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description))
+		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description, sds.LINK_DATA_TYPE))
 	}
 	renderTemplate(w, "insert_link.html", nil)
 }

@@ -71,7 +71,7 @@ func getAllDBSearchesAsMap(db *leveldb.DB) map[[32]byte]sds.SearchResult {
 }
 
 func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.IMAGE_DATA_TYPE)
 	from, err := sds.BytesToSearchResult(one.ResultHash, one.ToBytes())
 
 	if err != nil {
@@ -93,10 +93,13 @@ func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
 	if one.Description != from.Description {
 		differentValues("Title", one.Description, from.Description, t)
 	}
+	if one.DataType != from.DataType {
+		differentValues("DataType", one.DataType, from.DataType, t)
+	}
 }
 
 func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
-	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net", "one").ResultHash, 744, 234, sds.PENDING)
+	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net", "one", sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
 	from, err := sds.BytesToResultMeta(one.ResultHash, one.ToBytes())
 
 	if err != nil {
@@ -115,15 +118,18 @@ func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
 	if one.Invalidated != from.Invalidated {
 		differentValues("Invalidated", one.Invalidated, from.Invalidated, t)
 	}
+	if one.Invalidated != from.Invalidated {
+		differentValues("Invalidated", one.Invalidated, from.Invalidated, t)
+	}
 }
 
 func TestDeleteInvalidated(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	two := sds.NewSearchResult("title2", "http://url2.net", "two")
+	two := sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE)
 	db.InsertResult(two)
-	three := sds.NewSearchResult("title3", "http://url3.net", "three")
+	three := sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE)
 	db.InsertResult(three)
 
 	metas1 := make([]sds.ResultMeta, 0)
@@ -148,18 +154,18 @@ func TestDeleteInvalidated(t *testing.T) {
 
 func TestTimeBasedSync_Searches(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two"))
-	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three"))
+	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE))
 
 	time.Sleep(2 * time.Second)
 
 	toSync := make([]sds.SearchResult, 0)
 	// a duplicated entry with different timestamp
-	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one"))
-	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four"))
-	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five"))
+	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five", sds.LINK_DATA_TYPE))
 
 	db.SyncFrom(toSync)
 
@@ -173,18 +179,18 @@ func TestTimeBasedSync_Searches(t *testing.T) {
 
 func TestFlush_TimestampNeverZero(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two"))
-	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three"))
+	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE))
 
 	time.Sleep(2 * time.Second)
 
 	toSync := make([]sds.SearchResult, 0)
 	// a duplicated entry with different timestamp
-	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one"))
-	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four"))
-	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five"))
+	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five", sds.LINK_DATA_TYPE))
 
 	db.SyncFrom(toSync)
 	lastTs := db.GetLastCachedSearchResultTimestamp()
@@ -202,7 +208,7 @@ func TestFlush_TimestampNeverZero(t *testing.T) {
 
 func TestTimeBasedSync_Meta(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one")
+	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
 
 	metas1 := make([]sds.ResultMeta, 0)
@@ -222,7 +228,7 @@ func TestDoSearch(t *testing.T) {
 	db := setupDB()
 
 	for i := 1; i < 10; i++ {
-		sr := sds.NewSearchResult(fmt.Sprintf("test%d", i), "", fmt.Sprintf("description_test%d", i))
+		sr := sds.NewSearchResult(fmt.Sprintf("test%d", i), "", fmt.Sprintf("description_test%d", i), sds.LINK_DATA_TYPE)
 		db.InsertResult(sr)
 		db.UpdateResultScore(sr.ResultHash, 20-i)
 	}
