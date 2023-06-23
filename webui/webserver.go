@@ -10,6 +10,14 @@ import (
 	"github.com/sniffdogsniff/util/logging"
 )
 
+func getVarOrDefault_GET(r *http.Request, varName, def string) string {
+	if r.URL.Query().Has(varName) {
+		return r.URL.Query().Get(varName)
+	} else {
+		return def
+	}
+}
+
 type searchActionStatus struct {
 	results  []sds.SearchResult
 	query    string
@@ -30,16 +38,11 @@ func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
 
 func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
-	urlFilter := RULE_ALL
-	if r.URL.Query().Has("link_filter") {
-		urlFilter = r.URL.Query().Get("link_filter")
-	}
+	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
 
-	dataType := r.URL.Query().Get("data_type")
+	dataType := getVarOrDefault_GET(r, "data_type", "links")
 
-	logging.LogTrace("---------_>>>>>>>>>>>>> WEBUI SEARCH", query, server.searchStatus.query, dataType)
-
-	pageNum, err := strconv.Atoi(r.URL.Query().Get("page"))
+	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
 	if err != nil {
 		pageNum = 0
 	}
