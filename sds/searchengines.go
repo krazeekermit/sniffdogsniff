@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/gocolly/colly"
 	"github.com/sniffdogsniff/util/logging"
@@ -111,7 +112,7 @@ func (se SearchEngine) extractDescription(url string) string {
 	return normalizeString(description)
 }
 
-func (se SearchEngine) DoSearch(query string) []SearchResult {
+func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, query string) {
 	searchResults := make([]SearchResult, 0)
 
 	c := colly.NewCollector()
@@ -157,5 +158,27 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 
 	c.Visit(searchUrlString)
 	c.Wait()
-	return searchResults
+
+	ch <- searchResults
+}
+
+func DoParallelSearchOnExtEngines(engines map[string]SearchEngine, query string) []SearchResult {
+	ch := make(chan []SearchResult)
+
+	var wg sync.WaitGroup
+
+	for _, se := range engines {
+		go se.DoSearch(ch, &wg, query)
+	}
+
+	results := make([]SearchResult, 0)
+
+	for i := 0; i < len(engines); i++ {
+		select {
+		case srs := <-ch:
+			results = append(results, srs...)
+		}
+	}
+
+	return results
 }

@@ -136,9 +136,8 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 		return results
 	}
 
-	for _, engine := range ln.searchEngines {
-		results = append(results, engine.DoSearch(query)...)
-	}
+	results = append(results, DoParallelSearchOnExtEngines(ln.searchEngines, query)...)
+
 	ln.searchDB.SyncFrom(results)
 	return results
 }
