@@ -16,7 +16,7 @@ const (
 	RULE_CLEARNET string = "clearnet"
 )
 
-const MAX_RESULTS_PER_PAGE int = 10
+const MAX_RESULTS_PER_PAGE int = 12
 
 func getResultsForPage(results []sds.SearchResult, page int) []sds.SearchResult {
 	if len(results) <= MAX_RESULTS_PER_PAGE {
@@ -57,11 +57,9 @@ func matchesUrlType(urlStr, urlType string) bool {
 func filterSearchResults(results []sds.SearchResult, urlType, dataTypeStr string) []sds.SearchResult {
 	filtered := make([]sds.SearchResult, 0)
 	for _, sr := range results {
-		logging.LogTrace(sr.Title, sr.DataType)
 		if matchesUrlType(sr.Url, urlType) && sr.DataType == sds.StrToDataType(dataTypeStr) {
 			filtered = append(filtered, sr)
 		}
 	}
-	logging.LogTrace("FILTERED ", len(filtered), "results!!!!!!!!!!!!!!1")
 	return filtered
 }

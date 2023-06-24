@@ -1,6 +1,7 @@
 package sds
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -47,6 +48,24 @@ func normalizeString(text string) string {
 	return text
 }
 
+func extractUrlJson(jsonStr, property string) string {
+	url := ""
+
+	var m interface{}
+	if json.Unmarshal([]byte(jsonStr), &m) == nil {
+		switch v := m.(type) {
+		case []interface{}:
+			jsonMap, ok := v[0].(map[string]interface{})
+			if ok {
+				url = jsonMap[property].(string)
+			}
+		case map[string]interface{}:
+			url = v[property].(string)
+		}
+	}
+	return url
+}
+
 type SearchEngine struct {
 	name                    string
 	userAgent               string
@@ -55,6 +74,8 @@ type SearchEngine struct {
 	resultContainerElement  string
 	resultUrlElement        string
 	resultUrlProperty       string
+	resultUrlIsJson         bool
+	resultUrlJsonProperty   string
 	resultTitleElement      string
 	resultTitleProperty     string
 	providedDataType        ResultDataType
@@ -106,13 +127,22 @@ func (se SearchEngine) DoSearch(query string) []SearchResult {
 
 	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
 		e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
-			url := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+			urlData := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+
+			url := ""
+			if se.resultUrlIsJson {
+				url = extractUrlJson(urlData, se.resultUrlJsonProperty)
+			} else {
+				url = urlData
+			}
+
 			title := ""
 			if se.resultTitleProperty == "text" {
-				title = elContainer.ChildText(se.resultUrlElement)
+				title = elContainer.ChildText(se.resultTitleElement)
 			} else {
-				title = elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+				title = elContainer.ChildAttr(se.resultTitleElement, se.resultTitleProperty)
 			}
+
 			if validUrl(url) {
 				desc := se.extractDescription(url)
 				result := NewSearchResult(title, url, desc, se.providedDataType)

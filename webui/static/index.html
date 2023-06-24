@@ -16,8 +16,10 @@
         </div>
         <form action="/search" method="get">
             <div class="input-group">
-            <input type="search" class="form-control rounded" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q"/>
-            <input type="submit" class="btn btn-outline-primary" value="Search"/>
+              <input type="search" class="form-control" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q" value="Search something..." style="width:50%"/>
+              <div class="input-group-append">
+                <button class="btn btn-primary" type="submit">Search</button>
+              </div>
             </div>
             <!-- content type radios -->
             <div>
@@ -41,6 +43,7 @@
                 <label class="form-check-label" for="inlineRadio4">I2P links</label>
               </div>
             </div>
+            <input type="hidden" name="data_type" value="links"/>
         </form>
 </body>
 </html>

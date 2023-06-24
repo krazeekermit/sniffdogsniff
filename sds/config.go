@@ -28,6 +28,8 @@ const (
 	RESULT_CONTAINER_ELEMENT           = "result_container_element"
 	RESULT_URL_ELEMENT                 = "result_url_element"
 	RESULT_URL_PROPERTY                = "result_url_property"
+	RESULT_URL_IS_JSON                 = "result_url_is_json"
+	RESULT_URL_JSON_PROPERTY           = "result_url_json_property"
 	RESULT_TITLE_ELEMENT               = "result_title_element"
 	RESULT_TITLE_PROPERTY              = "result_title_property"
 	PROVIDED_DATA_TYPE                 = "provided_data_type"
@@ -170,6 +172,8 @@ func NewSdsConfig(path string) SdsConfig {
 				resultContainerElement:  engine.Key(RESULT_CONTAINER_ELEMENT).String(),
 				resultUrlElement:        engine.Key(RESULT_URL_ELEMENT).String(),
 				resultUrlProperty:       engine.Key(RESULT_URL_PROPERTY).String(),
+				resultUrlIsJson:         engine.Key(RESULT_URL_IS_JSON).MustBool(false),
+				resultUrlJsonProperty:   engine.Key(RESULT_URL_JSON_PROPERTY).String(),
 				resultTitleElement:      engine.Key(RESULT_TITLE_ELEMENT).String(),
 				resultTitleProperty:     engine.Key(RESULT_TITLE_PROPERTY).String(),
 				providedDataType:        StrToDataType(engine.Key(PROVIDED_DATA_TYPE).String()),

@@ -24,9 +24,9 @@
         <input type="submit" name="q" class="btn btn-outline-success my-2 my-sm-0"/>-->
         <div class="form-row justify-content-center">
               <div class="btn-group" role="group" aria-label="Basic example">
-                <button type="submit" name="data_type" value="links" class="btn btn-default btn-secondary btn-sm" style="width: 150px !important;">Links</button>
+                <button type="submit" name="data_type" value="links" class="btn btn-default btn-outline-secondary btn-sm" style="width: 150px !important;">Links</button>
                 <button type="submit" name="data_type" value="images" class="btn btn-default btn-outline-secondary btn-sm" style="width: 150px !important;">Images</button>
-                <button type="submit" name="data_type" value="videos" class="btn btn-default btn-outline-secondary btn-sm" style="width: 150px !important;">Videos</button>
+                <button type="submit" name="data_type" value="videos" class="btn btn-default btn-secondary btn-sm" style="width: 150px !important;">Videos</button>
               </div>
         </div>
     </form>
@@ -35,13 +35,19 @@
     </div>
       
     <main class="container">
-        <div class="col-14 mx-auto">
-            <ul class="list-group list-group-flush">
+        <!-- <div class="col-14 mx-auto row">
             {{range $result := .results}}
-            <li class="list-group-item">
-                <div>
-                    <small class="disabled">{{$result.Url}}</small>
-                    <small class="float-right">
+                  <div class="card col-sm-auto mr-2 ml-2 mt-2 mb-2" style="width: 18rem;">
+                  <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">
+                    <img class="card-img-top" src="{{$result.Url}}" alt="{{$result.Url}}" style="max-height:175px; max-width: 17rem; width: auto;">
+                    <div class="card-body">
+                      <h5 class="card-title">{{$result.Title}}</h5>
+                      <p class="card-text">{{$result.Description}}</p>
+                    </div>
+                  </a>
+                    <div class="card-body">
+                      <a href="#" class="card-link">Card link</a>
+                      <small class="float-right">
                         <a class="btn btn btn-outline-secondary btn-sm" role="button" href="/invalidate?hash={{$result.HashAsB64UrlSafeStr}}" data-toggle="tooltip" data-placement="top" 
                         title="Mark link for removal: if in your opinion this link contains offensive content (see offensive.md) you can mark it for removal">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-octagon" viewBox="0 0 16 16">
@@ -51,17 +57,11 @@
                             Mark for removal
                         </a>
                     </small>
-                    <br/>
-                    <img src="" width="16" height="16">
-                    <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
-                    <p class="mb-1">
-                        {{$result.Description}}
-                    </p>
-                </div>
-            </li>
+                    </div>
+                  </div>
             {{end}}
-            </ul>
-        </div>
+        </div> -->
+        <h1>Not working for now</h1>
       </main>
       <nav aria-label="Page navigation example">
         <form action="/search" method="get">

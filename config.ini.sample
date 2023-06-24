@@ -5,7 +5,7 @@ min_search_results_threshold = 50
 allow_results_invalidation = no
 
 known_peers = peer1, peer2
-external_search_engines = bing, startpage, brave
+external_search_engines = bing_images, bing, startpage, brave, 
 
 [web_ui]
 bind_address = 0.0.0.0:8081
@@ -66,3 +66,17 @@ result_url_element = "h2 > a"
 result_url_property = href
 result_title_element = a
 result_title_property = text
+
+[bing_images]
+name = Bing
+user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
+search_query_url = https://www.bing.com/images/async?q=%s&first=155&count=35
+results_container_element = ul.dgControl_list
+result_container_element = li
+result_url_element = a.iusc
+result_url_property = m
+result_url_is_json = yes
+result_url_json_property = murl
+result_title_element = "li > a"
+result_title_property = text
+provided_data_type = images

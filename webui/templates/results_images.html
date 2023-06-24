@@ -37,9 +37,17 @@
     <main class="container">
         <div class="col-14 mx-auto row">
             {{range $result := .results}}
-                <!-- <div>
-                    <small class="disabled">{{$result.Url}}</small>
-                    <small class="float-right">
+                  <div class="card col-sm-auto mr-2 ml-2 mt-2 mb-2" style="width: 18rem;">
+                  <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">
+                    <img class="card-img-top" src="{{$result.Url}}" alt="{{$result.Url}}" style="max-height:175px; max-width: 17rem; width: auto;">
+                    <div class="card-body">
+                      <h5 class="card-title">{{$result.Title}}</h5>
+                      <p class="card-text">{{$result.Description}}</p>
+                    </div>
+                  </a>
+                    <div class="card-body">
+                      <!-- <a href="#" class="card-link">Card link</a> -->
+                      <small class="float-right">
                         <a class="btn btn btn-outline-secondary btn-sm" role="button" href="/invalidate?hash={{$result.HashAsB64UrlSafeStr}}" data-toggle="tooltip" data-placement="top" 
                         title="Mark link for removal: if in your opinion this link contains offensive content (see offensive.md) you can mark it for removal">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-octagon" viewBox="0 0 16 16">
@@ -49,17 +57,6 @@
                             Mark for removal
                         </a>
                     </small>
-                    <br/>
-                    <img src="" width="16" height="16">
-                    <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
-                    <p class="mb-1">
-                        {{$result.Description}}
-                    </p>
-                </div> -->
-                <div class="card col-sm-auto mr-2 ml-2 mt-2 mb-2" style="width: 18rem;">
-                    <img class="card-img-top" src="{{$result.Url}}" alt="{{$result.Url}}">
-                    <div class="card-body">
-                      <p class="card-text">{{$result.Title}}</p>
                     </div>
                   </div>
             {{end}}
@@ -69,6 +66,7 @@
         <form action="/search" method="get">
         <input type="hidden" name="q" value="{{ .q }}"/>
         <input type="hidden" name="link_filter" value="{{ .link_filter }}"/>
+        <input type="hidden" name="data_type" value="{{ .data_type }}"/>
           <ul class="pagination justify-content-center">
 
             <li class="page-item{{ if .has_prev_page }}{{else}} disabled{{end}}"><button type="submit" name="page" value="{{ .prev_page }}" class="page-link"><<</button></li>

@@ -40,7 +40,7 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 	query := r.URL.Query().Get("q")
 	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
 
-	dataType := getVarOrDefault_GET(r, "data_type", "links")
+	dataType := getVarOrDefault_GET(r, "data_type", server.searchStatus.dataType)
 
 	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
 	if err != nil {
@@ -52,6 +52,7 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 		logging.LogTrace("status changed")
 		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter, dataType)
 		server.searchStatus.query = query
+		server.searchStatus.dataType = dataType
 		pageNum = 0
 	}
 
@@ -61,6 +62,7 @@ func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Requ
 		"n_pages":       npages,
 		"q":             server.searchStatus.query,
 		"link_filter":   urlFilter,
+		"data_type":     dataType,
 		"page_num":      pageNum,
 		"has_next_page": pageNum+1 < npages,
 		"next_page":     pageNum + 1,
