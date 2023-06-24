@@ -59,7 +59,7 @@ result_title_property = text
 [bing]
 name = Bing
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://www.bing.com/search?q=%s
+search_query_url = https://www.bing.com/search?q=%s&count=35
 results_container_element = ol
 result_container_element = li.b_algo
 result_url_element = "h2 > a"

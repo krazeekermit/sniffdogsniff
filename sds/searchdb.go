@@ -32,6 +32,12 @@ const (
 	VIDEO_DATA_TYPE ResultDataType = 2
 )
 
+const (
+	RESULT_PROPERTY_THUMB_LINK  string = "rptl"
+	RESULT_PROPERTY_SOURCE_LINK string = "rpsl"
+	RESULT_PROPERTY_DESCRIPTION string = "rpde"
+)
+
 type SearchResult struct {
 	ResultHash  [32]byte
 	Timestamp   uint64
