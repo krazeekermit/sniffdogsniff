@@ -9,6 +9,7 @@ import (
 	"github.com/sniffdogsniff/sds"
 	"github.com/sniffdogsniff/util"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/vmihailenco/msgpack"
 )
 
 const TEST_DIR = "./test_dir"
@@ -33,11 +34,11 @@ func differentValues(name string, a, b interface{}, t *testing.T) {
 	t.Fatal("Different", name, "values: one id", b, "other is", a)
 }
 
-func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score int, inv sds.Invalidation, t *testing.T) {
+func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score uint16, inv sds.Invalidation, t *testing.T) {
 	if meta.ResultHash != rHash {
 		differentValues("hash", meta.ResultHash, rHash, t)
 	}
-	if meta.Score != uint16(score) {
+	if meta.Score != score {
 		differentValues("score", meta.Score, score, t)
 	}
 	if meta.Invalidated != inv {
@@ -45,15 +46,21 @@ func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score int, inv sds.In
 	}
 }
 
-func assertSearchResult(sr sds.SearchResult, title, url, desc string, t *testing.T) {
+func assertSearchResult(sr sds.SearchResult, rHash [32]byte, title, url string, properties sds.ResultPropertiesMap, t *testing.T) {
+	if sr.ResultHash != rHash {
+		differentValues("hash", sr.ResultHash, rHash, t)
+	}
 	if sr.Title != title {
 		differentValues("title", sr.Title, title, t)
 	}
 	if sr.Url != url {
 		differentValues("url", sr.Url, url, t)
 	}
-	if sr.Description != desc {
-		differentValues("timestamp", sr.Description, desc, t)
+	for k, p := range properties {
+		p1 := sr.SafeGetProperty(k)
+		if p1 != p {
+			differentValues(fmt.Sprintf("property[%d]", k), p, p1, t)
+		}
 	}
 }
 
@@ -71,65 +78,80 @@ func getAllDBSearchesAsMap(db *leveldb.DB) map[[32]byte]sds.SearchResult {
 }
 
 func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
-	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.IMAGE_DATA_TYPE)
+	one := sds.NewSearchResult("title1", "http://url1.net", sds.ResultPropertiesMap{
+		sds.RP_DESCRIPTION: "descriptionnnnnnn",
+		sds.RP_THUMB_LINK:  "http://blabla",
+	}, sds.IMAGE_DATA_TYPE)
+
 	from, err := sds.BytesToSearchResult(one.ResultHash, one.ToBytes())
 
 	if err != nil {
 		t.Fail()
 	}
 
-	if one.ResultHash != from.ResultHash {
-		differentValues("ResultHash", one.ResultHash, from.ResultHash, t)
+	assertSearchResult(one, from.ResultHash, from.Title, from.Url, from.Properties, t)
+}
+
+func TestSearchResult_SERIALIZE_MSGPACK(t *testing.T) {
+	one := sds.NewSearchResult("title1", "http://url1.net", sds.ResultPropertiesMap{
+		sds.RP_DESCRIPTION: "descriptionnnnnnn",
+		sds.RP_THUMB_LINK:  "http://blabla",
+	}, sds.IMAGE_DATA_TYPE)
+
+	b_one, err := msgpack.Marshal(one)
+	if err != nil {
+		t.Fail()
 	}
-	if one.Timestamp != from.Timestamp {
-		differentValues("Timestamp", one.Timestamp, from.Timestamp, t)
+
+	var from sds.SearchResult
+	err = msgpack.Unmarshal(b_one, &from)
+	if err != nil {
+		t.Fail()
 	}
-	if one.Title != from.Title {
-		differentValues("Title", one.Title, from.Title, t)
-	}
-	if one.Url != from.Url {
-		differentValues("Url", one.Url, from.Url, t)
-	}
-	if one.Description != from.Description {
-		differentValues("Title", one.Description, from.Description, t)
-	}
-	if one.DataType != from.DataType {
-		differentValues("DataType", one.DataType, from.DataType, t)
-	}
+
+	assertSearchResult(one, from.ResultHash, from.Title, from.Url, from.Properties, t)
 }
 
 func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
-	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net", "one", sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
+	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
 	from, err := sds.BytesToResultMeta(one.ResultHash, one.ToBytes())
 
 	if err != nil {
 		t.Fail()
 	}
 
-	if one.ResultHash != from.ResultHash {
-		differentValues("ResultHash", one.ResultHash, from.ResultHash, t)
+	assertMetaRecord(one, from.ResultHash, from.Score, from.Invalidated, t)
+}
+
+func TestResultMeta_SERIALIZE_MSGPACK(t *testing.T) {
+	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
+
+	b_one, err := msgpack.Marshal(one)
+	if err != nil {
+		t.Fail()
 	}
-	if one.Timestamp != from.Timestamp {
-		differentValues("Timestamp", one.Timestamp, from.Timestamp, t)
+
+	var from sds.ResultMeta
+	err = msgpack.Unmarshal(b_one, &from)
+	if err != nil {
+		t.Fail()
 	}
-	if one.Score != from.Score {
-		differentValues("Score", one.Score, from.Score, t)
-	}
-	if one.Invalidated != from.Invalidated {
-		differentValues("Invalidated", one.Invalidated, from.Invalidated, t)
-	}
-	if one.Invalidated != from.Invalidated {
-		differentValues("Invalidated", one.Invalidated, from.Invalidated, t)
-	}
+
+	assertMetaRecord(one, from.ResultHash, from.Score, from.Invalidated, t)
 }
 
 func TestDeleteInvalidated(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
+	one := sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	two := sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE)
+	two := sds.NewSearchResult("title2", "http://url2.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "two"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(two)
-	three := sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE)
+	three := sds.NewSearchResult("title3", "http://url3.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "three"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(three)
 
 	metas1 := make([]sds.ResultMeta, 0)
@@ -145,27 +167,32 @@ func TestDeleteInvalidated(t *testing.T) {
 	if len(all) != 1 {
 		t.Fatalf("DB size wrong: %d", len(all))
 	}
-	if all[three.ResultHash] != three {
-		t.Fatalf("want three eq three")
-	}
+
+	assertSearchResult(all[three.ResultHash], three.ResultHash, three.Title, three.Url, three.Properties, t)
 
 	teardownDB()
 }
 
 func TestTimeBasedSync_Searches(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
+	one := sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE))
-	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "two"}, sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "three"}, sds.LINK_DATA_TYPE))
 
 	time.Sleep(2 * time.Second)
 
 	toSync := make([]sds.SearchResult, 0)
 	// a duplicated entry with different timestamp
-	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE))
-	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four", sds.LINK_DATA_TYPE))
-	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "four"}, sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "five"}, sds.LINK_DATA_TYPE))
 
 	db.SyncFrom(toSync)
 
@@ -179,18 +206,24 @@ func TestTimeBasedSync_Searches(t *testing.T) {
 
 func TestFlush_TimestampNeverZero(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
+	one := sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
-	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net", "two", sds.LINK_DATA_TYPE))
-	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net", "three", sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title2", "http://url2.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "two"}, sds.LINK_DATA_TYPE))
+	db.InsertResult(sds.NewSearchResult("title3", "http://url3.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "three"}, sds.LINK_DATA_TYPE))
 
 	time.Sleep(2 * time.Second)
 
 	toSync := make([]sds.SearchResult, 0)
 	// a duplicated entry with different timestamp
-	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE))
-	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net", "four", sds.LINK_DATA_TYPE))
-	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net", "five", sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title4", "http://url4.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "four"}, sds.LINK_DATA_TYPE))
+	toSync = append(toSync, sds.NewSearchResult("title5", "http://url5.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "five"}, sds.LINK_DATA_TYPE))
 
 	db.SyncFrom(toSync)
 	lastTs := db.GetLastCachedSearchResultTimestamp()
@@ -208,7 +241,8 @@ func TestFlush_TimestampNeverZero(t *testing.T) {
 
 func TestTimeBasedSync_Meta(t *testing.T) {
 	db := setupDB()
-	one := sds.NewSearchResult("title1", "http://url1.net", "one", sds.LINK_DATA_TYPE)
+	one := sds.NewSearchResult("title1", "http://url1.net",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "one"}, sds.LINK_DATA_TYPE)
 	db.InsertResult(one)
 
 	metas1 := make([]sds.ResultMeta, 0)
@@ -228,21 +262,32 @@ func TestDoSearch(t *testing.T) {
 	db := setupDB()
 
 	for i := 1; i < 10; i++ {
-		sr := sds.NewSearchResult(fmt.Sprintf("test%d", i), "", fmt.Sprintf("description_test%d", i), sds.LINK_DATA_TYPE)
+		sr := sds.NewSearchResult(fmt.Sprintf("test%d", i), "",
+			sds.ResultPropertiesMap{sds.RP_DESCRIPTION: fmt.Sprintf("description_test%d", i)},
+			sds.LINK_DATA_TYPE)
 		db.InsertResult(sr)
 		db.UpdateResultScore(sr.ResultHash, 20-i)
 	}
 
 	results := db.DoSearch("test")
-	assertSearchResult(results[0], "test9", "", "description_test9", t)
-	assertSearchResult(results[1], "test8", "", "description_test8", t)
-	assertSearchResult(results[2], "test7", "", "description_test7", t)
-	assertSearchResult(results[3], "test6", "", "description_test6", t)
-	assertSearchResult(results[4], "test5", "", "description_test5", t)
-	assertSearchResult(results[5], "test4", "", "description_test4", t)
-	assertSearchResult(results[6], "test3", "", "description_test3", t)
-	assertSearchResult(results[7], "test2", "", "description_test2", t)
-	assertSearchResult(results[8], "test1", "", "description_test1", t)
+	assertSearchResult(results[0], results[0].ResultHash, "test9", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test9"}, t)
+	assertSearchResult(results[1], results[1].ResultHash, "test8", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test8"}, t)
+	assertSearchResult(results[2], results[2].ResultHash, "test7", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test7"}, t)
+	assertSearchResult(results[3], results[3].ResultHash, "test6", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test6"}, t)
+	assertSearchResult(results[4], results[4].ResultHash, "test5", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test5"}, t)
+	assertSearchResult(results[5], results[5].ResultHash, "test4", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test4"}, t)
+	assertSearchResult(results[6], results[6].ResultHash, "test3", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test3"}, t)
+	assertSearchResult(results[7], results[7].ResultHash, "test2", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test2"}, t)
+	assertSearchResult(results[8], results[8].ResultHash, "test1", "",
+		sds.ResultPropertiesMap{sds.RP_DESCRIPTION: "description_test1"}, t)
 
 	teardownDB()
 }

@@ -42,7 +42,7 @@
                     <img class="card-img-top" src="{{$result.Url}}" alt="{{$result.Url}}" style="max-height:175px; max-width: 17rem; width: auto;">
                     <div class="card-body">
                       <h5 class="card-title">{{$result.Title}}</h5>
-                      <p class="card-text">{{$result.Description}}</p>
+                      <p class="card-text">{{$result.SafeGetProperty 2}}</p>
                     </div>
                   </a>
                     <div class="card-body">

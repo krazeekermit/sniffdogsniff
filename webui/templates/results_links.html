@@ -55,7 +55,7 @@
                     <img src="" width="16" height="16">
                     <a href="/redirect?url={{$result.Url}}&hash={{$result.HashAsB64UrlSafeStr}}">{{$result.Title}}</a>
                     <p class="mb-1">
-                        {{$result.Description}}
+                        {{$result.SafeGetProperty 2}}
                     </p>
                 </div>
             </li>

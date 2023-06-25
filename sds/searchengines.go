@@ -146,7 +146,8 @@ func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, quer
 
 			if validUrl(url) {
 				desc := se.extractDescription(url)
-				result := NewSearchResult(title, url, desc, se.providedDataType)
+				result := NewSearchResult(title, url,
+					ResultPropertiesMap{RP_DESCRIPTION: desc}, se.providedDataType)
 				result.ReHash()
 				searchResults = append(searchResults, result)
 			}

@@ -89,7 +89,8 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 		description := r.FormValue("link_description")
 		dataType := sds.StrToDataType(r.FormValue("data_type"))
 		logging.LogTrace("inserti link", dataType)
-		server.node.InsertSearchResult(sds.NewSearchResult(title, url, description, dataType))
+		server.node.InsertSearchResult(sds.NewSearchResult(title, url,
+			sds.ResultPropertiesMap{sds.RP_DESCRIPTION: description}, dataType))
 	}
 	renderTemplate(w, "insert_link.html", nil)
 }

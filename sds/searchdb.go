@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,38 +31,55 @@ const (
 	VIDEO_DATA_TYPE ResultDataType = 2
 )
 
+type ResultPropertiesMap map[uint8]string
+
 const (
-	RESULT_PROPERTY_THUMB_LINK  string = "rptl"
-	RESULT_PROPERTY_SOURCE_LINK string = "rpsl"
-	RESULT_PROPERTY_DESCRIPTION string = "rpde"
+	RP_THUMB_LINK  uint8 = 0
+	RP_SOURCE_LINK uint8 = 1
+	RP_DESCRIPTION uint8 = 2
 )
 
 type SearchResult struct {
-	ResultHash  [32]byte
-	Timestamp   uint64
-	Title       string
-	Url         string
-	Description string
-	DataType    ResultDataType
+	ResultHash [32]byte
+	Timestamp  uint64
+	Title      string
+	Url        string
+	Properties ResultPropertiesMap
+	DataType   ResultDataType
 }
 
 /*
 SearchResult Structure
-[[HASH (32)][TIMESTAMP (8)][TITLE][URL][DESCRIPTION]] = 512 bytes
+[[HASH (32)][TIMESTAMP (8)][TITLE][URL][PROPERTIES]] = 512 bytes
 */
-func NewSearchResult(title, url, description string, dataType ResultDataType) SearchResult {
+func NewSearchResult(title, url string, properties ResultPropertiesMap, dataType ResultDataType) SearchResult {
 	const FIXED_LENGHT = 32 + 8 + 1 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1, datatype=1
-	// SHRINK TITLE AND DESCRIPTION TO FIT 512 byte max size
-	if FIXED_LENGHT+len(title)+len(url)+len(description) > SEARCH_RESULT_BYTE_SIZE {
-		newDescriptionLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(title) - len(url)
-		if newDescriptionLen < 0 {
-			description = ""
-		} else if newDescriptionLen <= len(description) {
-			description = description[:newDescriptionLen]
-		}
+	// SHRINK TITLE AND PROPERTIES TO FIT 512 byte max size
+
+	propertiesLen := 0
+	for _, p := range properties {
+		propertiesLen += 1 + len(p)
 	}
-	if FIXED_LENGHT+len(title)+len(url)+len(description) > SEARCH_RESULT_BYTE_SIZE {
-		newTitleLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(url) - len(description)
+
+	if FIXED_LENGHT+len(title)+len(url)+propertiesLen > SEARCH_RESULT_BYTE_SIZE {
+		newPropertiesLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(title) - len(url)
+
+		if newPropertiesLen < 0 {
+			properties = make(ResultPropertiesMap, 0)
+		} else {
+			filledLen := 0
+			for k, _ := range properties {
+				plen := filledLen + len(properties[k]) + 2 //property lenght + 1 (key lenght) + strlen
+				if plen <= newPropertiesLen {
+					properties[k] = properties[k][:newPropertiesLen-2]
+					filledLen += len(properties[k]) + 2
+				}
+			}
+		}
+		propertiesLen = newPropertiesLen
+	}
+	if FIXED_LENGHT+len(title)+len(url)+propertiesLen > SEARCH_RESULT_BYTE_SIZE {
+		newTitleLen := SEARCH_RESULT_BYTE_SIZE - FIXED_LENGHT - len(url) - propertiesLen
 		if newTitleLen < 0 {
 			title = ""
 		} else if newTitleLen <= len(title) {
@@ -72,11 +88,11 @@ func NewSearchResult(title, url, description string, dataType ResultDataType) Se
 	}
 
 	rs := SearchResult{
-		Timestamp:   uint64(time.Now().Unix()),
-		Title:       title,
-		Url:         url,
-		DataType:    dataType,
-		Description: description,
+		Timestamp:  uint64(time.Now().Unix()),
+		Title:      title,
+		Url:        url,
+		DataType:   dataType,
+		Properties: properties,
 	}
 	rs.ReHash()
 	return rs
@@ -111,14 +127,27 @@ func BytesToSearchResult(hash [32]byte, bytez []byte) (SearchResult, error) {
 		return SearchResult{}, err
 	}
 
-	descLen, err := buf.ReadByte() // DESCRIPTION
+	propsLen, err := buf.ReadByte() // PROPERTIES
 	if err != nil {
 		return SearchResult{}, err
 	}
-	bdesc := make([]byte, descLen)
-	n, err = buf.Read(bdesc)
-	if err != nil || n != int(descLen) {
-		return SearchResult{}, err
+
+	properties := make(ResultPropertiesMap)
+	for i := 0; i < int(propsLen); i++ {
+		propKey, err := buf.ReadByte()
+		if err != nil {
+			continue
+		}
+		propLen, err := buf.ReadByte()
+		if err != nil {
+			continue
+		}
+		bprop := make([]byte, propLen)
+		n, err = buf.Read(bprop)
+		if err != nil || n != int(propLen) {
+			continue
+		}
+		properties[uint8(propKey)] = string(bprop)
 	}
 
 	dataType, err := buf.ReadByte() // DATA_TYPe
@@ -127,12 +156,12 @@ func BytesToSearchResult(hash [32]byte, bytez []byte) (SearchResult, error) {
 	}
 
 	return SearchResult{
-		ResultHash:  hash,
-		Timestamp:   binary.LittleEndian.Uint64(bts),
-		Title:       string(btitle),
-		Url:         string(burl),
-		Description: string(bdesc),
-		DataType:    ResultDataType(dataType),
+		ResultHash: hash,
+		Timestamp:  binary.LittleEndian.Uint64(bts),
+		Title:      string(btitle),
+		Url:        string(burl),
+		Properties: properties,
+		DataType:   ResultDataType(dataType),
 	}, nil
 }
 
@@ -145,18 +174,32 @@ func (sr *SearchResult) ToBytes() []byte {
 	buf.Write([]byte(sr.Title))
 	buf.WriteByte(byte(len(sr.Url)))
 	buf.Write([]byte(sr.Url))
-	buf.WriteByte(byte(len(sr.Description)))
-	buf.Write([]byte(sr.Description))
+	buf.WriteByte(byte(len(sr.Properties)))
+	for k, p := range sr.Properties {
+		buf.WriteByte(byte(k))
+		buf.WriteByte(byte(len(p)))
+		buf.Write([]byte(p))
+	}
 	buf.WriteByte(byte(sr.DataType))
 	return buf.Bytes()
 }
 
 func (sr *SearchResult) calculateHash() [32]byte {
 	m3_bytes := make([]byte, 0)
-
-	for _, s := range []string{sr.Url, sr.Title, sr.Description, fmt.Sprintf("%c", sr.DataType)} {
+	for _, s := range []string{sr.Url, sr.Title} {
 		m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(s)))...)
 	}
+	for k, p := range sr.Properties {
+		pb := make([]byte, 0)
+		pb = append(pb, k)
+		pb = append(pb, []byte(p)...)
+		m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(pb)))...)
+	}
+
+	dtb := make([]byte, 1)
+	dtb[0] = byte(sr.DataType)
+	m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(dtb)))...)
+
 	return sha256.Sum256(m3_bytes)
 }
 
@@ -170,6 +213,14 @@ func (sr *SearchResult) ReHash() {
 
 func (sr *SearchResult) HashAsB64UrlSafeStr() string {
 	return util.HashToB64UrlsafeString(sr.ResultHash)
+}
+
+func (sr *SearchResult) SafeGetProperty(propKey uint8) string {
+	property, ok := sr.Properties[propKey]
+	if ok {
+		return property
+	}
+	return ""
 }
 
 type Invalidation uint8
@@ -357,7 +408,7 @@ func (sdb *SearchDB) IsEmpty() bool {
 func matchesSearch(text string, sr SearchResult) bool {
 	text = strings.ToLower(text)
 	title := strings.ToLower(sr.Title)
-	desc := strings.ToLower(sr.Description)
+	desc := strings.ToLower(sr.SafeGetProperty(RP_DESCRIPTION))
 	if strings.Contains(title, text) || strings.Contains(desc, text) {
 		return true
 	}
