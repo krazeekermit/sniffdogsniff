@@ -6,6 +6,7 @@ package sds
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"path/filepath"
 	"sort"
@@ -16,6 +17,36 @@ import (
 	"github.com/sniffdogsniff/util/logging"
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+type Hash256 [32]byte
+
+func SliceToHas256(data []byte) Hash256 {
+	var bytes Hash256
+	for i, b := range data {
+		if i > 31 {
+			break
+		}
+		bytes[i] = b
+	}
+	return bytes
+}
+
+func Hash256ToSlice(data Hash256) []byte {
+	slice := make([]byte, 0)
+	for _, b := range data {
+		slice = append(slice, b)
+	}
+	return slice
+}
+
+func HashToB64UrlsafeString(hash Hash256) string {
+	return base64.URLEncoding.EncodeToString(hash[:])
+}
+
+func B64UrlsafeStringToHash(b64 string) Hash256 {
+	bytes, _ := base64.URLEncoding.DecodeString(b64)
+	return SliceToHas256(bytes)
+}
 
 const SEARCHES_DB_FILE_NAME = "searches.db"
 const METASS_DB_FILE_NAME = "searches_meta.db"
@@ -40,7 +71,7 @@ const (
 )
 
 type SearchResult struct {
-	ResultHash [32]byte
+	ResultHash Hash256
 	Timestamp  uint64
 	Title      string
 	Url        string
@@ -98,7 +129,7 @@ func NewSearchResult(title, url string, properties ResultPropertiesMap, dataType
 	return rs
 }
 
-func BytesToSearchResult(hash [32]byte, bytez []byte) (SearchResult, error) {
+func BytesToSearchResult(hash Hash256, bytez []byte) (SearchResult, error) {
 	buf := bytes.NewBuffer(bytez)
 
 	bts := make([]byte, 8) // TIMESTAMP
@@ -184,26 +215,20 @@ func (sr *SearchResult) ToBytes() []byte {
 	return buf.Bytes()
 }
 
-func (sr *SearchResult) calculateHash() [32]byte {
-	m3_bytes := make([]byte, 0)
-	for _, s := range []string{sr.Url, sr.Title} {
-		m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(s)))...)
-	}
+func (sr *SearchResult) calculateHash() Hash256 {
+	thBytes := make([]byte, 0)
+	thBytes = append(thBytes, []byte(sr.Title)...)
+	thBytes = append(thBytes, []byte(sr.Url)...)
 	for k, p := range sr.Properties {
-		pb := make([]byte, 0)
-		pb = append(pb, k)
-		pb = append(pb, []byte(p)...)
-		m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(pb)))...)
+		thBytes = append(thBytes, k)
+		thBytes = append(thBytes, []byte(p)...)
 	}
+	thBytes = append(thBytes, byte(sr.DataType))
 
-	dtb := make([]byte, 1)
-	dtb[0] = byte(sr.DataType)
-	m3_bytes = append(m3_bytes, util.Array32ToSlice(sha256.Sum256([]byte(dtb)))...)
-
-	return sha256.Sum256(m3_bytes)
+	return sha256.Sum256(thBytes)
 }
 
-func (sr *SearchResult) IsConsistent() bool {
+func (sr *SearchResult) CheckIntegrity() bool {
 	return sr.ResultHash == sr.calculateHash()
 }
 
@@ -212,7 +237,7 @@ func (sr *SearchResult) ReHash() {
 }
 
 func (sr *SearchResult) HashAsB64UrlSafeStr() string {
-	return util.HashToB64UrlsafeString(sr.ResultHash)
+	return HashToB64UrlsafeString(sr.ResultHash)
 }
 
 func (sr *SearchResult) SafeGetProperty(propKey uint8) string {
@@ -232,13 +257,13 @@ const (
 )
 
 type ResultMeta struct {
-	ResultHash  [32]byte
+	ResultHash  Hash256
 	Timestamp   uint64
 	Score       uint16
 	Invalidated Invalidation // int8
 }
 
-func NewResultMeta(hash [32]byte, ts uint64, score uint16, inv Invalidation) ResultMeta {
+func NewResultMeta(hash Hash256, ts uint64, score uint16, inv Invalidation) ResultMeta {
 	return ResultMeta{
 		ResultHash:  hash,
 		Timestamp:   ts,
@@ -247,7 +272,7 @@ func NewResultMeta(hash [32]byte, ts uint64, score uint16, inv Invalidation) Res
 	}
 }
 
-func BytesToResultMeta(hash [32]byte, bytez []byte) (ResultMeta, error) {
+func BytesToResultMeta(hash Hash256, bytez []byte) (ResultMeta, error) {
 	buf := bytes.NewBuffer(bytez)
 
 	bts := make([]byte, 8) // TIMESTAMP
@@ -304,8 +329,8 @@ type SearchDB struct {
 	maximumCacheSize  int
 	searchesDB        *leveldb.DB
 	metasDB           *leveldb.DB
-	searchesCache     map[[32]byte]SearchResult
-	metasCache        map[[32]byte]ResultMeta
+	searchesCache     map[Hash256]SearchResult
+	metasCache        map[Hash256]ResultMeta
 	LastTimestamp     uint64
 	LastMetaTimestamp uint64
 	flushed           bool
@@ -337,8 +362,8 @@ func (sdb *SearchDB) Open(workDir string, maxCacheSize int) {
 	sdb.metasDB = openDB(filepath.Join(workDir, METASS_DB_FILE_NAME))
 
 	// Initialize cache
-	sdb.searchesCache = make(map[[32]byte]SearchResult, 0)
-	sdb.metasCache = make(map[[32]byte]ResultMeta, 0)
+	sdb.searchesCache = make(map[Hash256]SearchResult, 0)
+	sdb.metasCache = make(map[Hash256]ResultMeta, 0)
 
 	// last timestamp is initially set to the last timestamp of the on-disk db
 	sdb.LastTimestamp = sdb.GetLastDBSearchesTimestamp()
@@ -350,7 +375,7 @@ func (sdb *SearchDB) GetLastDBSearchesTimestamp() uint64 {
 	lastts = 0
 	iter := sdb.searchesDB.NewIterator(nil, nil)
 	for iter.Next() {
-		sr, err := BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
+		sr, err := BytesToSearchResult(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -367,7 +392,7 @@ func (sdb *SearchDB) GetLastDBMetasTimestamp() uint64 {
 	lastts = 0
 	iter := sdb.searchesDB.NewIterator(nil, nil)
 	for iter.Next() {
-		rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
+		rm, err := BytesToResultMeta(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -442,7 +467,7 @@ func (sdb *SearchDB) DoSearch(text string) []SearchResult {
 
 	iter := sdb.searchesDB.NewIterator(nil, nil)
 	for iter.Next() {
-		sr, err := BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
+		sr, err := BytesToSearchResult(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -461,7 +486,7 @@ func (sdb *SearchDB) DoSearch(text string) []SearchResult {
 		if present {
 			score = rm.Score
 		} else {
-			value, err := sdb.metasDB.Get(util.Array32ToSlice(sr.ResultHash), nil)
+			value, err := sdb.metasDB.Get(Hash256ToSlice(sr.ResultHash), nil)
 			if err != nil {
 				rm, err = BytesToResultMeta(sr.ResultHash, value)
 				if err != nil {
@@ -485,7 +510,7 @@ func (sdb *SearchDB) DoSearch(text string) []SearchResult {
 	return results
 }
 
-func (sdb *SearchDB) GetAllHashes() [][32]byte {
+func (sdb *SearchDB) GetAllHashes() []Hash256 {
 	// hashes := sdb.db.GetAllHashes()
 	// hashes = append(hashes, sdb.cache.GetAllHashes()...)
 	return nil
@@ -512,7 +537,7 @@ func (sdb *SearchDB) GetForSync(timestamp uint64, sizeLimit int) []SearchResult 
 			return results
 		}
 
-		sr, err := BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
+		sr, err := BytesToSearchResult(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -533,7 +558,7 @@ func (sdb *SearchDB) SyncFrom(results []SearchResult) {
 			count = 0
 			sdb.Flush()
 		}
-		if sr.IsConsistent() {
+		if sr.CheckIntegrity() {
 			sdb.searchesCache[sr.ResultHash] = sr
 		}
 		count++
@@ -541,8 +566,8 @@ func (sdb *SearchDB) SyncFrom(results []SearchResult) {
 	sdb.setUpdated()
 }
 
-func (sdb *SearchDB) GetMetadataOf(hashes [][32]byte) []ResultMeta {
-	metas := make(map[[32]byte]ResultMeta, 0)
+func (sdb *SearchDB) GetMetadataOf(hashes []Hash256) []ResultMeta {
+	metas := make(map[Hash256]ResultMeta, 0)
 	for _, h := range hashes {
 		meta, present := sdb.metasCache[h]
 		if present {
@@ -550,7 +575,7 @@ func (sdb *SearchDB) GetMetadataOf(hashes [][32]byte) []ResultMeta {
 		}
 	}
 	for _, h := range hashes {
-		bytez, err := sdb.searchesDB.Get(util.Array32ToSlice(h), nil)
+		bytez, err := sdb.searchesDB.Get(Hash256ToSlice(h), nil)
 		if err == nil {
 			meta, err := BytesToResultMeta(h, bytez)
 			if err == nil {
@@ -580,7 +605,7 @@ func (sdb *SearchDB) GetMetadataForSync(ts uint64, sizeLimit int) []ResultMeta {
 			return metas
 		}
 
-		rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
+		rm, err := BytesToResultMeta(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -613,14 +638,14 @@ func (sdb *SearchDB) SyncResultsMetadataFrom(metas []ResultMeta) {
 }
 
 func (sdb *SearchDB) InsertResult(sr SearchResult) {
-	if sr.IsConsistent() {
+	if sr.CheckIntegrity() {
 		sdb.searchesCache[sr.ResultHash] = sr
 		sdb.metasCache[sr.ResultHash] = NewResultMeta(sr.ResultHash, sr.Timestamp, 0, NONE)
 	}
 	sdb.setUpdated()
 }
 
-func (sdb *SearchDB) UpdateResultScore(hash [32]byte, increment int) {
+func (sdb *SearchDB) UpdateResultScore(hash Hash256, increment int) {
 	rm := sdb.metasCache[hash]
 	rm.Score += uint16(increment)
 	rm.UpdateTime()
@@ -647,7 +672,7 @@ func (sdb *SearchDB) setUpdated() {
 	}
 }
 
-func (sdb *SearchDB) InvalidateResult(rHash [32]byte) {
+func (sdb *SearchDB) InvalidateResult(rHash Hash256) {
 	rm := sdb.metasCache[rHash]
 	rm.Invalidated = INVALIDATED
 	sdb.metasCache[rHash] = rm
@@ -656,7 +681,7 @@ func (sdb *SearchDB) InvalidateResult(rHash [32]byte) {
 func (sdb *SearchDB) deleteInvalidated() {
 	iter := sdb.metasDB.NewIterator(nil, nil)
 	for iter.Next() {
-		rm, err := BytesToResultMeta(util.SliceToArray32(iter.Key()), iter.Value())
+		rm, err := BytesToResultMeta(SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}
@@ -680,12 +705,12 @@ func (sdb *SearchDB) Flush() {
 
 	// Flush SearchResults
 	for h, sr := range sdb.searchesCache {
-		sdb.searchesDB.Put(util.Array32ToSlice(h), sr.ToBytes(), nil)
+		sdb.searchesDB.Put(Hash256ToSlice(h), sr.ToBytes(), nil)
 	}
 
 	// Flush ResultMetas
 	for h, rm := range sdb.metasCache {
-		key := util.Array32ToSlice(h)
+		key := Hash256ToSlice(h)
 		value, err := sdb.metasDB.Get(key, nil)
 		if err != nil {
 			prev, err := BytesToResultMeta(h, value)
@@ -700,8 +725,8 @@ func (sdb *SearchDB) Flush() {
 	sdb.deleteInvalidated()
 
 	// Clear cache
-	sdb.searchesCache = make(map[[32]byte]SearchResult, 0)
-	sdb.metasCache = make(map[[32]byte]ResultMeta, 0)
+	sdb.searchesCache = make(map[Hash256]SearchResult, 0)
+	sdb.metasCache = make(map[Hash256]ResultMeta, 0)
 
 	sdb.flushed = true
 }
@@ -712,11 +737,11 @@ func (sdb *SearchDB) Close() {
 }
 
 // For tests
-func (sdb *SearchDB) GetSearchesCache() map[[32]byte]SearchResult {
+func (sdb *SearchDB) GetSearchesCache() map[Hash256]SearchResult {
 	return sdb.searchesCache
 }
 
-func (sdb *SearchDB) GetMetasCache() map[[32]byte]ResultMeta {
+func (sdb *SearchDB) GetMetasCache() map[Hash256]ResultMeta {
 	return sdb.metasCache
 }
 

@@ -213,7 +213,7 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 				returned = srv.node.GetMetadataForSync(arg)
 			}
 		case FCODE_GET_METADATA_OF:
-			var arg [][32]byte
+			var arg []Hash256
 			err := msgpack.Unmarshal(argsBytes, &arg)
 			if err != nil {
 				errCode = ERRCODE_MARSHAL
@@ -308,7 +308,7 @@ func (rn *NodeClient) GetPeersForSync() []Peer {
 	return peers
 }
 
-func (rn *NodeClient) GetMetadataOf(hashes [][32]byte) []ResultMeta {
+func (rn *NodeClient) GetMetadataOf(hashes []Hash256) []ResultMeta {
 	var metadata []ResultMeta
 	err := rn.callRemoteFunction(FCODE_GET_METADATA_OF, hashes, &metadata)
 	if err != nil {

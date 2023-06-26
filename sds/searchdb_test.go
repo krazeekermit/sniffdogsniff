@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/sniffdogsniff/sds"
-	"github.com/sniffdogsniff/util"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/vmihailenco/msgpack"
 )
@@ -34,7 +33,7 @@ func differentValues(name string, a, b interface{}, t *testing.T) {
 	t.Fatal("Different", name, "values: one id", b, "other is", a)
 }
 
-func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score uint16, inv sds.Invalidation, t *testing.T) {
+func assertMetaRecord(meta sds.ResultMeta, rHash sds.Hash256, score uint16, inv sds.Invalidation, t *testing.T) {
 	if meta.ResultHash != rHash {
 		differentValues("hash", meta.ResultHash, rHash, t)
 	}
@@ -46,7 +45,7 @@ func assertMetaRecord(meta sds.ResultMeta, rHash [32]byte, score uint16, inv sds
 	}
 }
 
-func assertSearchResult(sr sds.SearchResult, rHash [32]byte, title, url string, properties sds.ResultPropertiesMap, t *testing.T) {
+func assertSearchResult(sr sds.SearchResult, rHash sds.Hash256, title, url string, properties sds.ResultPropertiesMap, t *testing.T) {
 	if sr.ResultHash != rHash {
 		differentValues("hash", sr.ResultHash, rHash, t)
 	}
@@ -64,11 +63,11 @@ func assertSearchResult(sr sds.SearchResult, rHash [32]byte, title, url string, 
 	}
 }
 
-func getAllDBSearchesAsMap(db *leveldb.DB) map[[32]byte]sds.SearchResult {
-	searches := make(map[[32]byte]sds.SearchResult, 0)
+func getAllDBSearchesAsMap(db *leveldb.DB) map[sds.Hash256]sds.SearchResult {
+	searches := make(map[sds.Hash256]sds.SearchResult, 0)
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
-		sr, err := sds.BytesToSearchResult(util.SliceToArray32(iter.Key()), iter.Value())
+		sr, err := sds.BytesToSearchResult(sds.SliceToHas256(iter.Key()), iter.Value())
 		if err != nil {
 			continue
 		}

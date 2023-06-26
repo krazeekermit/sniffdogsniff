@@ -3,19 +3,9 @@ package util
 import (
 	"bytes"
 	"compress/zlib"
-	"encoding/base64"
 	"io/ioutil"
 	"os"
 )
-
-func Array32Contains(array [][32]byte, entry [32]byte) bool {
-	for _, elem := range array {
-		if bytes.Equal(elem[:], entry[:]) {
-			return true
-		}
-	}
-	return false
-}
 
 func SliceContains[T comparable](s []T, e T) bool {
 	for _, v := range s {
@@ -24,17 +14,6 @@ func SliceContains[T comparable](s []T, e T) bool {
 		}
 	}
 	return false
-}
-
-func SliceToArray32(data []byte) [32]byte {
-	var bytes [32]byte
-	for i, b := range data {
-		if i > 31 {
-			break
-		}
-		bytes[i] = b
-	}
-	return bytes
 }
 
 func ZlibDecompress(data []byte) ([]byte, error) {
@@ -58,23 +37,6 @@ func ZlibCompress(data []byte) ([]byte, error) {
 	w.Write(data)
 	w.Close()
 	return b.Bytes(), nil
-}
-
-func Array32ToSlice(data [32]byte) []byte {
-	slice := make([]byte, 0)
-	for _, b := range data {
-		slice = append(slice, b)
-	}
-	return slice
-}
-
-func HashToB64UrlsafeString(hash [32]byte) string {
-	return base64.URLEncoding.EncodeToString(hash[:])
-}
-
-func B64UrlsafeStringToHash(b64 string) [32]byte {
-	bytes, _ := base64.URLEncoding.DecodeString(b64)
-	return SliceToArray32(bytes)
 }
 
 func MergeMaps[K comparable, V interface{}](m1, m2 map[K]V) map[K]V {

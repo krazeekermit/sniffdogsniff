@@ -65,7 +65,7 @@ func (ln *LocalNode) firstSyncLockFileExists() bool {
 	return util.FileExists(ln.firstSyncLockFilePath)
 }
 
-func (ln *LocalNode) GetMetadataOf(hashes [][32]byte) []ResultMeta {
+func (ln *LocalNode) GetMetadataOf(hashes []Hash256) []ResultMeta {
 	ln.tsLock.Lock()
 	metadata := ln.searchDB.GetMetadataOf(hashes)
 	ln.tsLock.Unlock()
@@ -113,7 +113,7 @@ func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 	ln.tsLock.Unlock()
 }
 
-func (ln *LocalNode) InvalidateSearchResult(h [32]byte) {
+func (ln *LocalNode) InvalidateSearchResult(h Hash256) {
 	ln.tsLock.Lock()
 	ln.searchDB.InvalidateResult(h)
 	ln.tsLock.Unlock()
@@ -121,7 +121,7 @@ func (ln *LocalNode) InvalidateSearchResult(h [32]byte) {
 
 func (ln *LocalNode) UpdateResultScore(hash string) {
 	ln.tsLock.Lock()
-	ln.searchDB.UpdateResultScore(util.B64UrlsafeStringToHash(hash), 1)
+	ln.searchDB.UpdateResultScore(B64UrlsafeStringToHash(hash), 1)
 	ln.tsLock.Unlock()
 }
 
@@ -207,9 +207,9 @@ func (ln *LocalNode) SyncWithPeer() {
 		logging.LogTrace("Received", len(newMetadata), "results metadata")
 
 		if ln.canInvalidate && len(newMetadata) > 0 {
-			invalidationTable := make(map[[32]byte]int, 0)
+			invalidationTable := make(map[Hash256]int, 0)
 			invalidationTableKeyList := util.MapKeys(invalidationTable)
-			newMetadataPtrMap := make(map[[32]byte]*ResultMeta)
+			newMetadataPtrMap := make(map[Hash256]*ResultMeta)
 
 			for _, m := range newMetadata {
 				newMetadataPtrMap[m.ResultHash] = &m

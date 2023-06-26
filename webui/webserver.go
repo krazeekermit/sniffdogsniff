@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/sniffdogsniff/sds"
-	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
 )
 
@@ -96,7 +95,7 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 }
 
 func (server *SdsWebServer) invalidateLinkHandleFunc(w http.ResponseWriter, r *http.Request) {
-	server.node.InvalidateSearchResult(util.B64UrlsafeStringToHash(r.URL.Query().Get("hash")))
+	server.node.InvalidateSearchResult(sds.B64UrlsafeStringToHash(r.URL.Query().Get("hash")))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
