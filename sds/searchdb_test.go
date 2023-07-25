@@ -33,7 +33,7 @@ func differentValues(name string, a, b interface{}, t *testing.T) {
 	t.Fatal("Different", name, "values: one id", b, "other is", a)
 }
 
-func assertMetaRecord(meta sds.ResultMeta, rHash sds.Hash256, score uint16, inv sds.Invalidation, t *testing.T) {
+func assertMetaRecord(meta sds.ResultMeta, rHash sds.Hash256, score uint16, inv int8, t *testing.T) {
 	if meta.ResultHash != rHash {
 		differentValues("hash", meta.ResultHash, rHash, t)
 	}
@@ -113,7 +113,7 @@ func TestSearchResult_SERIALIZE_MSGPACK(t *testing.T) {
 
 func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
 	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net",
-		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
+		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, 5)
 	from, err := sds.BytesToResultMeta(one.ResultHash, one.ToBytes())
 
 	if err != nil {
@@ -125,7 +125,7 @@ func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
 
 func TestResultMeta_SERIALIZE_MSGPACK(t *testing.T) {
 	one := sds.NewResultMeta(sds.NewSearchResult("title1", "http://url1.net",
-		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, sds.PENDING)
+		sds.ResultPropertiesMap{}, sds.VIDEO_DATA_TYPE).ResultHash, 744, 234, 5)
 
 	b_one, err := msgpack.Marshal(one)
 	if err != nil {
@@ -154,9 +154,9 @@ func TestDeleteInvalidated(t *testing.T) {
 	db.InsertResult(three)
 
 	metas1 := make([]sds.ResultMeta, 0)
-	metas1 = append(metas1, sds.NewResultMeta(one.ResultHash, 0, 12, sds.INVALIDATED))
+	metas1 = append(metas1, sds.NewResultMeta(one.ResultHash, 0, 12, sds.INVALIDATION_LEVEL_INVALIDATED))
 	metas1[0].UpdateTime()
-	metas1 = append(metas1, sds.NewResultMeta(two.ResultHash, 0, 23, sds.INVALIDATED))
+	metas1 = append(metas1, sds.NewResultMeta(two.ResultHash, 0, 23, sds.INVALIDATION_LEVEL_INVALIDATED))
 	metas1[1].UpdateTime()
 
 	db.SyncResultsMetadataFrom(metas1)

@@ -116,11 +116,24 @@ func (pdb *PeerDB) GetAll() []Peer {
 	return util.MapToSlice(pdb.peers)
 }
 
+func (pdb *PeerDB) Count() int {
+	return len(pdb.GetAll())
+}
+
 /**
- * Gets a random peer from PeerDB (for node sync)
+* Gets a random peer from PeerDB (for node sync)
  */
 func (pdb *PeerDB) GetRandomPeer() Peer {
 	return pdb.GetAll()[rand.Intn(len(pdb.peers))]
+}
+
+func (pdb *PeerDB) GetRandomPeerList(n int) []Peer {
+	allPeers := pdb.GetAll()
+	peers := make([]Peer, n)
+	for i := 0; i < n; i++ {
+		peers[i] = allPeers[rand.Intn(len(pdb.peers))]
+	}
+	return peers
 }
 
 func (pdb *PeerDB) SyncFrom(peers []Peer, skip Peer) {

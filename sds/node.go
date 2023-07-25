@@ -2,6 +2,7 @@ package sds
 
 import (
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -65,6 +66,10 @@ func (ln *LocalNode) firstSyncLockFileExists() bool {
 	return util.FileExists(ln.firstSyncLockFilePath)
 }
 
+func (ln *LocalNode) CalculateAgreementThreshold() int {
+	return 2 * int(math.Log10(float64(ln.peerDB.Count())))
+}
+
 func (ln *LocalNode) GetMetadataOf(hashes []Hash256) []ResultMeta {
 	ln.tsLock.Lock()
 	metadata := ln.searchDB.GetMetadataOf(hashes)
@@ -115,7 +120,10 @@ func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
 
 func (ln *LocalNode) InvalidateSearchResult(h Hash256) {
 	ln.tsLock.Lock()
-	ln.searchDB.InvalidateResult(h)
+	rm, err := ln.searchDB.GetMetaByHash(h)
+	if err != nil {
+		ln.searchDB.SetInvalidationLevel(h, rm.Invalidated+1)
+	}
 	ln.tsLock.Unlock()
 }
 
@@ -146,7 +154,6 @@ func (ln *LocalNode) SyncWithPeer() {
 	firstSyncFileExists := ln.firstSyncLockFileExists()
 
 	ln.tsLock.Lock()
-	allPeers := ln.peerDB.GetAll()
 	p := ln.peerDB.GetRandomPeer()
 	rn := NewNodeClient(p, ln.proxySettings)
 	ln.tsLock.Unlock()
@@ -206,32 +213,30 @@ func (ln *LocalNode) SyncWithPeer() {
 		newMetadata := rn.GetMetadataForSync(metasTimestamp)
 		logging.LogTrace("Received", len(newMetadata), "results metadata")
 
-		if ln.canInvalidate && len(newMetadata) > 0 {
-			invalidationTable := make(map[Hash256]int, 0)
-			invalidationTableKeyList := util.MapKeys(invalidationTable)
-			newMetadataPtrMap := make(map[Hash256]*ResultMeta)
+		if (!firstSyncFileExists) && ln.canInvalidate && len(newMetadata) > 0 {
+			hashList := make([]Hash256, 0)
+			invalidations := make(map[Hash256]int8, 0)
+			for _, rm := range newMetadata {
+				if rm.Invalidated > INVALIDATION_LEVEL_NONE {
+					invalidations[rm.ResultHash] = 1
+					hashList = append(hashList, rm.ResultHash)
+				}
+			}
 
-			for _, m := range newMetadata {
-				newMetadataPtrMap[m.ResultHash] = &m
-				if m.Invalidated != NONE {
-					invalidationTable[m.ResultHash] = 0
-				}
-			}
-			for _, po := range allPeers {
-				rni := NewNodeClient(po, ln.proxySettings)
-				for _, mo := range rni.GetMetadataOf(invalidationTableKeyList) {
-					if mo.Invalidated == INVALIDATED {
-						invalidationTable[mo.ResultHash] += 1
+			nConfirmations := ln.CalculateAgreementThreshold()
+			for _, pi := range ln.peerDB.GetRandomPeerList(nConfirmations) {
+				rni := NewNodeClient(pi, ln.proxySettings)
+				for _, rmi := range rni.GetMetadataOf(hashList) {
+					if rmi.Invalidated > INVALIDATION_LEVEL_NONE {
+						invalidations[rmi.ResultHash] += 1
 					}
 				}
 			}
-			for rHash, inv := range invalidationTable {
-				if inv > (len(allPeers) / 2) {
-					if newMetadataPtrMap[rHash].Invalidated < INVALIDATED {
-						newMetadataPtrMap[rHash].Invalidated += 1
-					} else if newMetadataPtrMap[rHash].Invalidated == INVALIDATED {
-						newMetadataPtrMap[rHash].Invalidated = PENDING
-					}
+
+			for _, rm := range newMetadata {
+				rm.Invalidated = invalidations[rm.ResultHash]
+				if rm.Invalidated >= int8(nConfirmations) {
+					rm.Invalidated = INVALIDATION_LEVEL_INVALIDATED
 				}
 			}
 		}

@@ -248,22 +248,19 @@ func (sr *SearchResult) SafeGetProperty(propKey uint8) string {
 	return ""
 }
 
-type Invalidation uint8
-
 const (
-	NONE        Invalidation = 0
-	PENDING     Invalidation = 1
-	INVALIDATED Invalidation = 2
+	INVALIDATION_LEVEL_NONE        int8 = 0
+	INVALIDATION_LEVEL_INVALIDATED int8 = -1
 )
 
 type ResultMeta struct {
 	ResultHash  Hash256
 	Timestamp   uint64
 	Score       uint16
-	Invalidated Invalidation // int8
+	Invalidated int8
 }
 
-func NewResultMeta(hash Hash256, ts uint64, score uint16, inv Invalidation) ResultMeta {
+func NewResultMeta(hash Hash256, ts uint64, score uint16, inv int8) ResultMeta {
 	return ResultMeta{
 		ResultHash:  hash,
 		Timestamp:   ts,
@@ -296,7 +293,7 @@ func BytesToResultMeta(hash Hash256, bytez []byte) (ResultMeta, error) {
 		ResultHash:  hash,
 		Timestamp:   binary.LittleEndian.Uint64(bts),
 		Score:       binary.LittleEndian.Uint16(bscore),
-		Invalidated: Invalidation(inv),
+		Invalidated: int8(inv),
 	}, nil
 }
 
@@ -640,7 +637,7 @@ func (sdb *SearchDB) SyncResultsMetadataFrom(metas []ResultMeta) {
 func (sdb *SearchDB) InsertResult(sr SearchResult) {
 	if sr.CheckIntegrity() {
 		sdb.searchesCache[sr.ResultHash] = sr
-		sdb.metasCache[sr.ResultHash] = NewResultMeta(sr.ResultHash, sr.Timestamp, 0, NONE)
+		sdb.metasCache[sr.ResultHash] = NewResultMeta(sr.ResultHash, sr.Timestamp, 0, INVALIDATION_LEVEL_NONE)
 	}
 	sdb.setUpdated()
 }
@@ -672,10 +669,40 @@ func (sdb *SearchDB) setUpdated() {
 	}
 }
 
-func (sdb *SearchDB) InvalidateResult(rHash Hash256) {
-	rm := sdb.metasCache[rHash]
-	rm.Invalidated = INVALIDATED
-	sdb.metasCache[rHash] = rm
+func (sdb *SearchDB) GetMetaByHash(rHash Hash256) (ResultMeta, error) {
+	rm, ok := sdb.metasCache[rHash]
+	if ok {
+		return rm, nil
+	} else {
+		byteHash := Hash256ToSlice(rHash)
+		bytez, err := sdb.searchesDB.Get(byteHash, nil)
+		if err != nil {
+			return ResultMeta{}, err
+		}
+		meta, err := BytesToResultMeta(rHash, bytez)
+		if err != nil {
+			return meta, nil
+		}
+	}
+	return ResultMeta{}, nil
+}
+
+func (sdb *SearchDB) SetInvalidationLevel(rHash Hash256, level int8) {
+	rm, ok := sdb.metasCache[rHash]
+	if ok {
+		rm.Invalidated = int8(level)
+		sdb.metasCache[rHash] = rm
+	} else {
+		byteHash := Hash256ToSlice(rHash)
+		bytez, err := sdb.searchesDB.Get(byteHash, nil)
+		if err == nil {
+			meta, err := BytesToResultMeta(rHash, bytez)
+			if err == nil {
+				meta.Invalidated = level
+				sdb.searchesDB.Put(byteHash, meta.ToBytes(), nil)
+			}
+		}
+	}
 }
 
 func (sdb *SearchDB) deleteInvalidated() {
@@ -685,7 +712,7 @@ func (sdb *SearchDB) deleteInvalidated() {
 		if err != nil {
 			continue
 		}
-		if rm.Invalidated == INVALIDATED {
+		if rm.Invalidated == INVALIDATION_LEVEL_INVALIDATED {
 			sdb.searchesDB.Delete(iter.Key(), nil)
 			if err != nil {
 				logging.LogTrace("Error deleting invalidated:", err.Error())
