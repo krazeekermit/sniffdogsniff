@@ -1,9 +1,7 @@
 package webui
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/sniffdogsniff/sds"
 	"github.com/sniffdogsniff/util/logging"
@@ -17,57 +15,20 @@ func getVarOrDefault_GET(r *http.Request, varName, def string) string {
 	}
 }
 
-type searchActionStatus struct {
-	results  []sds.SearchResult
-	query    string
-	dataType string
-}
-
 type SdsWebServer struct {
-	node         *sds.LocalNode
-	searchStatus *searchActionStatus
+	node        *sds.LocalNode
+	resultsView *resultsPageView
 }
 
 func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
 	return SdsWebServer{
-		node:         node,
-		searchStatus: new(searchActionStatus),
+		node:        node,
+		resultsView: new(resultsPageView),
 	}
 }
 
 func (server *SdsWebServer) searchHandleFunc(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query().Get("q")
-	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
-
-	dataType := getVarOrDefault_GET(r, "data_type", server.searchStatus.dataType)
-
-	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
-	if err != nil {
-		pageNum = 0
-	}
-
-	//Avoid extra search actions
-	if query != server.searchStatus.query || dataType != server.searchStatus.dataType {
-		logging.LogTrace("status changed")
-		server.searchStatus.results = filterSearchResults(server.node.DoSearch(query), urlFilter, dataType)
-		server.searchStatus.query = query
-		server.searchStatus.dataType = dataType
-		pageNum = 0
-	}
-
-	npages := len(server.searchStatus.results) / MAX_RESULTS_PER_PAGE
-	renderTemplate2(w, fmt.Sprintf("results_%s.html", dataType), argsMap{
-		"results":       getResultsForPage(server.searchStatus.results, pageNum),
-		"n_pages":       npages,
-		"q":             server.searchStatus.query,
-		"link_filter":   urlFilter,
-		"data_type":     dataType,
-		"page_num":      pageNum,
-		"has_next_page": pageNum+1 < npages,
-		"next_page":     pageNum + 1,
-		"has_prev_page": pageNum > 0,
-		"prev_page":     pageNum - 1,
-	})
+	server.resultsView.handle(w, r, server.node)
 }
 
 func (server *SdsWebServer) redirectHandleFunc(w http.ResponseWriter, r *http.Request) {

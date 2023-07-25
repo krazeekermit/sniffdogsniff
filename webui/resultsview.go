@@ -1,22 +1,26 @@
 package webui
 
 import (
+	"fmt"
+	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sniffdogsniff/sds"
 	"github.com/sniffdogsniff/util/logging"
 )
 
-const RULE_ALL string = "all"
-
 const (
+	RULE_ALL      string = "all"
 	RULE_ONION    string = "onion"
 	RULE_I2P      string = "i2p"
 	RULE_CLEARNET string = "clearnet"
 )
 
 const MAX_RESULTS_PER_PAGE int = 12
+
+const RESULTS_TEMPLATE_FILE_NAME = "results_%s.html"
 
 func getResultsForPage(results []sds.SearchResult, page int) []sds.SearchResult {
 	if len(results) <= MAX_RESULTS_PER_PAGE {
@@ -62,4 +66,45 @@ func filterSearchResults(results []sds.SearchResult, urlType, dataTypeStr string
 		}
 	}
 	return filtered
+}
+
+type resultsPageView struct {
+	results  []sds.SearchResult
+	query    string
+	dataType string
+}
+
+func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node *sds.LocalNode) {
+	query := r.URL.Query().Get("q")
+	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
+
+	dataType := getVarOrDefault_GET(r, "data_type", rpv.dataType)
+
+	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
+	if err != nil {
+		pageNum = 0
+	}
+
+	//Avoid extra search actions
+	if query != rpv.query || dataType != rpv.dataType {
+		logging.LogTrace("status changed")
+		rpv.results = filterSearchResults(node.DoSearch(query), urlFilter, dataType)
+		rpv.query = query
+		rpv.dataType = dataType
+		pageNum = 0
+	}
+
+	npages := len(rpv.results) / MAX_RESULTS_PER_PAGE
+	renderTemplate2(w, fmt.Sprintf(RESULTS_TEMPLATE_FILE_NAME, dataType), argsMap{
+		"results":       getResultsForPage(rpv.results, pageNum),
+		"n_pages":       npages,
+		"q":             rpv.query,
+		"link_filter":   urlFilter,
+		"data_type":     dataType,
+		"page_num":      pageNum,
+		"has_next_page": pageNum+1 < npages,
+		"next_page":     pageNum + 1,
+		"has_prev_page": pageNum > 0,
+		"prev_page":     pageNum - 1,
+	})
 }
