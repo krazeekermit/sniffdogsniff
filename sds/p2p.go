@@ -111,15 +111,14 @@ func compressAndSend(stream []byte, conn net.Conn) error {
 type NodeServer struct {
 	node      *LocalNode
 	connQueue Deque
-	cond      sync.Cond
+	cond      *sync.Cond
 }
 
 func InitNodeServer(node *LocalNode) NodeServer {
-	qLock := sync.Mutex{}
 	return NodeServer{
 		node:      node,
 		connQueue: NewDeque(),
-		cond:      *sync.NewCond(&qLock),
+		cond:      sync.NewCond(&sync.Mutex{}),
 	}
 }
 
