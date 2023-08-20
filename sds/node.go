@@ -31,6 +31,7 @@ type LocalNode struct {
 	FirstSync             bool
 	firstSyncLockFilePath string
 	peerDB                PeerDB
+	canStartSync          bool
 	SelfPeer              Peer
 }
 
@@ -51,19 +52,20 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 		ln.FirstSync = true
 		logging.LogWarn("Your Node is not already synced with the rest of the network, you are in FIRSTSYNC mode!")
 	}
-
-	if configs.ServiceSettings.CreateHiddenService {
-		if configs.ServiceSettings.OnionService {
-			ln.SelfPeer = NewPeer(configs.OnionServiceSettings.OnionAddress)
-		}
-	} else {
-		ln.SelfPeer = NewPeer(configs.ServiceSettings.BindAddress)
-	}
+	ln.canStartSync = true
+	ln.SelfPeer = NewPeer("")
 	return &ln
 }
 
 func (ln *LocalNode) firstSyncLockFileExists() bool {
 	return util.FileExists(ln.firstSyncLockFilePath)
+}
+
+func (ln *LocalNode) SetBindAddress(addr string) {
+	ln.tsLock.Lock()
+	ln.SelfPeer = NewPeer(addr)
+	ln.canStartSync = true
+	ln.tsLock.Unlock()
 }
 
 func (ln *LocalNode) CalculateAgreementThreshold() int {
@@ -100,7 +102,7 @@ func (ln *LocalNode) getPeersForSync() []Peer {
 
 func (ln *LocalNode) Handshake(peer Peer) error {
 	if ln.firstSyncLockFileExists() {
-		return errors.New("First sync, handshake refused")
+		return errors.New("first sync, handshake refused")
 	}
 	ln.tsLock.Lock()
 	ln.peerDB.SyncFrom([]Peer{peer}, ln.SelfPeer)
@@ -250,6 +252,12 @@ func (ln *LocalNode) SyncWithPeer() {
 }
 
 func (ln *LocalNode) StartSyncTask() {
+	for {
+		if ln.canStartSync {
+			break
+		}
+	}
+
 	ticker := time.NewTicker(time.Duration(FIRST_SYNC_DELAY) * time.Millisecond)
 	syncCycles := 0
 	go func() {

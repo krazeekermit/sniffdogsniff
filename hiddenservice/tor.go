@@ -71,10 +71,9 @@ func randPort() int {
 }
 
 type TorProto struct {
-	NeedAuth           bool
 	TorControlPort     int
 	TorControlPassword string
-	OnionAddress       string
+	onionAddress       string
 }
 
 func (ons *TorProto) connectAndCreateHiddenService(port int) {
@@ -86,8 +85,8 @@ func (ons *TorProto) connectAndCreateHiddenService(port int) {
 	if len(response) > 0 {
 		tokens := strings.Split(response[0], "=")
 		if strings.Contains(tokens[0], "ServiceID") {
-			ons.OnionAddress = fmt.Sprint(tokens[1], ".onion:", port)
-			logging.LogInfo("Hidden Service started on", ons.OnionAddress)
+			ons.onionAddress = fmt.Sprint(tokens[1], ".onion:", port)
+			logging.LogInfo("Hidden Service started on", ons.onionAddress)
 		}
 	}
 
@@ -96,13 +95,17 @@ func (ons *TorProto) connectAndCreateHiddenService(port int) {
 
 func (ons *TorProto) Close() {
 	conn := connectToControlPort(ons.TorControlPort, ons.TorControlPassword)
-	logging.LogInfo("Removing Hidden Service", ons.OnionAddress)
-	writeToDaemon(conn, fmt.Sprintf("DEL_ONION %s", strings.Split(ons.OnionAddress, ".")[0]))
+	logging.LogInfo("Removing Hidden Service", ons.onionAddress)
+	writeToDaemon(conn, fmt.Sprintf("DEL_ONION %s", strings.Split(ons.onionAddress, ".")[0]))
 	readDaemonAnswer(conn)
 	conn.Close()
 }
 
-func (i2p *TorProto) Listen() (net.Listener, error) {
+func (ons *TorProto) Listen() (net.Listener, error) {
 	port := randPort()
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", DEFAULT_BIND_ADDRESS, port))
+}
+
+func (ons *TorProto) GetAddressString() string {
+	return ons.onionAddress
 }

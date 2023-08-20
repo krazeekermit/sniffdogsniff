@@ -12,13 +12,16 @@ import (
 )
 
 type I2PProto struct {
-	SamAPIPort  string
+	NeedAuth    bool
+	SamAPIPort  int
 	SamUser     string
 	SamPassword string
+
+	client *goSam.Client
 }
 
 func (i2p *I2PProto) Listen() (net.Listener, error) {
-	sam, err := goSam.NewClient(fmt.Sprintf(":%s", i2p.SamAPIPort))
+	sam, err := goSam.NewClient(fmt.Sprintf(":%d", i2p.SamAPIPort))
 	if err != nil {
 		return nil, err
 	}
@@ -26,4 +29,8 @@ func (i2p *I2PProto) Listen() (net.Listener, error) {
 	return sam.Listen()
 }
 
-func Close() {}
+func (i2p *I2PProto) GetAddressString() string {
+	return i2p.client.Base32()
+}
+
+func (i2p *I2PProto) Close() {}

@@ -4,7 +4,9 @@ import (
 	"net"
 )
 
-type NetTransport interface {
+type NetProto interface {
 	Listen() (net.Listener, error)
+
+	GetAddressString() string
 	Close()
 }

@@ -41,7 +41,7 @@ const (
 	TOR_SOCKS5_PROXY                   = "tor_socks5_proxy"
 	NODE_SERVICE                       = "node_service"
 	ENABLED                            = "enabled"
-	CREATE_HIDDEN_SERVICE              = "create_hidden_service"
+	HIDDEN_SERVICE                     = "hidden_service"
 	TOR_CONTROL_PORT                   = "tor_control_port"
 	TOR_CONTROL_AUTH_PASSWORD          = "tor_control_auth_password"
 	I2P_SAM_PORT                       = "i2p_sam_port"
@@ -99,13 +99,6 @@ func StrToDataType(token string) ResultDataType {
 	}
 }
 
-type NodeServiceSettings struct {
-	Enabled             bool
-	CreateHiddenService bool
-	OnionService        bool
-	BindAddress         string
-}
-
 type SdsConfig struct {
 	workDirPath              string
 	searchDBMaxCacheSize     int
@@ -113,8 +106,8 @@ type SdsConfig struct {
 	WebServiceBindAddress    string
 	KnownPeers               []Peer
 	proxySettings            proxies.ProxySettings
-	ServiceSettings          NodeServiceSettings
-	OnionServiceSettings     hiddenservice.OnionService
+	P2PServerEnabled         bool
+	P2PServerProto           hiddenservice.NetProto
 	searchEngines            map[string]SearchEngine
 }
 
@@ -219,54 +212,60 @@ func NewSdsConfig(path string) SdsConfig {
 	if iniData.HasSection(NODE_SERVICE) {
 		nodeServiceSection := iniData.Section(NODE_SERVICE)
 		if nodeServiceSection.HasKey(ENABLED) {
-			cfg.ServiceSettings.Enabled, err = nodeServiceSection.Key(ENABLED).Bool()
+			cfg.P2PServerEnabled, err = nodeServiceSection.Key(ENABLED).Bool()
 			if err != nil {
-				cfg.ServiceSettings.Enabled = true
+				cfg.P2PServerEnabled = true
 			}
 		} else {
-			cfg.ServiceSettings.Enabled = true
+			cfg.P2PServerEnabled = true
 		}
-		if cfg.ServiceSettings.Enabled {
-			if nodeServiceSection.HasKey(CREATE_HIDDEN_SERVICE) {
-				cfg.ServiceSettings.CreateHiddenService, err = nodeServiceSection.Key(CREATE_HIDDEN_SERVICE).Bool()
-				if err != nil {
-					cfg.ServiceSettings.CreateHiddenService = false
-				}
-			}
-			if cfg.ServiceSettings.CreateHiddenService {
-				if nodeServiceSection.HasKey(TOR_CONTROL_PORT) {
-					cfg.ServiceSettings.OnionService = true
-					cfg.OnionServiceSettings.TorControlPort, err = nodeServiceSection.Key(TOR_CONTROL_PORT).Int()
-					if err != nil {
-						cfg.OnionServiceSettings.TorControlPort = 9051
+		if cfg.P2PServerEnabled {
+			if nodeServiceSection.HasKey(HIDDEN_SERVICE) {
+				hiddenService := nodeServiceSection.Key(HIDDEN_SERVICE).String()
+				if hiddenService == "tor" {
+					serviceProto := &hiddenservice.TorProto{}
+
+					if nodeServiceSection.HasKey(TOR_CONTROL_PORT) {
+						serviceProto.TorControlPort, err = nodeServiceSection.Key(TOR_CONTROL_PORT).Int()
+						if err != nil {
+							serviceProto.TorControlPort = 9051
+						}
+						if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
+							serviceProto.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+						}
 					}
-					if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
-						cfg.OnionServiceSettings.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+					cfg.P2PServerProto = serviceProto
+				} else if hiddenService == "i2p" {
+
+					if nodeServiceSection.HasKey(I2P_SAM_PORT) {
+						serviceProto := &hiddenservice.I2PProto{}
+
+						serviceProto.SamAPIPort, err = nodeServiceSection.Key(I2P_SAM_PORT).Int()
+						if err != nil {
+							serviceProto.SamAPIPort = 7656
+						}
+						if nodeServiceSection.HasKey(I2P_SAM_USER) {
+							serviceProto.NeedAuth = true
+							serviceProto.SamUser = nodeServiceSection.Key(I2P_SAM_USER).String()
+							if nodeServiceSection.HasKey(I2P_SAM_PASSWORD) {
+								serviceProto.SamPassword = nodeServiceSection.Key(I2P_SAM_PASSWORD).String()
+							} else {
+								panicNoKey(I2P_SAM_PASSWORD)
+							}
+						} else {
+							serviceProto.NeedAuth = false
+						}
+						cfg.P2PServerProto = serviceProto
 					}
-				} else if nodeServiceSection.HasKey(I2P_SAM_PORT) {
-					/* I2P hidden service not supported for now */
-					// cfg.ServiceSettings.HiddenServiceSettings.IsTor = false
-					// cfg.ServiceSettings.HiddenServiceSettings.SamPort, err = nodeServiceSection.Key(I2P_SAM_PORT).Int()
-					// if err != nil {
-					// 	cfg.ServiceSettings.HiddenServiceSettings.SamPort = 7656
-					// }
-					// if nodeServiceSection.HasKey(I2P_SAM_USER) {
-					// 	cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = true
-					// 	cfg.ServiceSettings.HiddenServiceSettings.SamUser = nodeServiceSection.Key(I2P_SAM_USER).String()
-					// 	if nodeServiceSection.HasKey(I2P_SAM_PASSWORD) {
-					// 		cfg.ServiceSettings.HiddenServiceSettings.SamPassword = nodeServiceSection.Key(I2P_SAM_PASSWORD).String()
-					// 	} else {
-					// 		panicNoKey(I2P_SAM_PASSWORD)
-					// 	}
-					// } else {
-					// 	cfg.ServiceSettings.HiddenServiceSettings.NeedAuth = false
-					// }
 				}
-			}
-			if nodeServiceSection.HasKey(BIND_ADDRESS) {
-				cfg.ServiceSettings.BindAddress = nodeServiceSection.Key(BIND_ADDRESS).String()
 			} else {
-				cfg.ServiceSettings.BindAddress = "127.0.0.1:4222"
+				serviceProto := &hiddenservice.IP4TCPProto{}
+				if nodeServiceSection.HasKey(BIND_ADDRESS) {
+					serviceProto.BindAddress = nodeServiceSection.Key(BIND_ADDRESS).String()
+				} else {
+					serviceProto.BindAddress = "127.0.0.1:4222"
+				}
+				cfg.P2PServerProto = serviceProto
 			}
 		}
 	} else {

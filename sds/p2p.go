@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/util/logging"
@@ -114,15 +115,15 @@ type NodeServer struct {
 	cond      *sync.Cond
 }
 
-func InitNodeServer(node *LocalNode) NodeServer {
-	return NodeServer{
+func InitNodeServer(node *LocalNode) *NodeServer {
+	return &NodeServer{
 		node:      node,
 		connQueue: NewDeque(),
 		cond:      sync.NewCond(&sync.Mutex{}),
 	}
 }
 
-func (srv *NodeServer) Serve(bindAddress string) {
+func (srv *NodeServer) Serve(proto hiddenservice.NetProto) {
 	/*
 	 * Initialize the request handlig function, to avoid infinite thread spawning
 	 * the server works with a queued thread pool: the handler waits until one or more
@@ -134,12 +135,15 @@ func (srv *NodeServer) Serve(bindAddress string) {
 		go srv.handleAndDispatchRequests()
 	}
 
-	listener, err := net.Listen("tcp", bindAddress)
-	logging.LogInfo("NodeServer is listening on", bindAddress)
+	listener, err := proto.Listen()
+
 	if err != nil {
 		logging.LogError(err.Error())
 		return
 	}
+	logging.LogInfo("NodeServer is listening on", proto.GetAddressString())
+	srv.node.SelfPeer.Address = proto.GetAddressString()
+
 	defer listener.Close()
 	for {
 		conn, err := listener.Accept()
