@@ -24,24 +24,23 @@ const MAX_SYNC_SIZE = 104857600 / SEARCH_RESULT_BYTE_SIZE // 100 MBytes / 512 by
 type LocalNode struct {
 	proxySettings         proxies.ProxySettings
 	canInvalidate         bool
-	tsLock                sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
+	tsLock                *sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB              SearchDB
 	searchEngines         map[string]SearchEngine
 	minResultsThr         int
 	FirstSync             bool
 	firstSyncLockFilePath string
 	peerDB                PeerDB
-	canStartSync          bool
 	SelfPeer              Peer
 }
 
-func GetNodeInstance(configs SdsConfig) *LocalNode {
+func NewNode(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize)
 	ln.peerDB.Open(configs.WorkDirPath, configs.KnownPeers)
 	ln.proxySettings = configs.proxySettings
 	ln.canInvalidate = configs.AllowResultsInvalidation
-	ln.tsLock = sync.Mutex{}
+	ln.tsLock = &sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
 	ln.firstSyncLockFilePath = filepath.Join(configs.WorkDirPath, FIRST_SYNC_LOCK_FILE_NAME)
@@ -52,20 +51,15 @@ func GetNodeInstance(configs SdsConfig) *LocalNode {
 		ln.FirstSync = true
 		logging.LogWarn("Your Node is not already synced with the rest of the network, you are in FIRSTSYNC mode!")
 	}
-	ln.canStartSync = true
-	ln.SelfPeer = NewPeer("")
 	return &ln
+}
+
+func (ln *LocalNode) SetNodeAddress(addr string) {
+	ln.SelfPeer = NewPeer(addr)
 }
 
 func (ln *LocalNode) firstSyncLockFileExists() bool {
 	return util.FileExists(ln.firstSyncLockFilePath)
-}
-
-func (ln *LocalNode) SetBindAddress(addr string) {
-	ln.tsLock.Lock()
-	ln.SelfPeer = NewPeer(addr)
-	ln.canStartSync = true
-	ln.tsLock.Unlock()
 }
 
 func (ln *LocalNode) CalculateAgreementThreshold() int {
@@ -252,12 +246,6 @@ func (ln *LocalNode) SyncWithPeer() {
 }
 
 func (ln *LocalNode) StartSyncTask() {
-	for {
-		if ln.canStartSync {
-			break
-		}
-	}
-
 	ticker := time.NewTicker(time.Duration(FIRST_SYNC_DELAY) * time.Millisecond)
 	syncCycles := 0
 	go func() {

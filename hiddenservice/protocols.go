@@ -4,7 +4,7 @@ import (
 	"net"
 )
 
-type NetProto interface {
+type NetProtocol interface {
 	Listen() (net.Listener, error)
 
 	GetAddressString() string

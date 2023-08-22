@@ -115,7 +115,7 @@ type NodeServer struct {
 	cond      *sync.Cond
 }
 
-func InitNodeServer(node *LocalNode) *NodeServer {
+func NewNodeServer(node *LocalNode) *NodeServer {
 	return &NodeServer{
 		node:      node,
 		connQueue: NewDeque(),
@@ -123,7 +123,7 @@ func InitNodeServer(node *LocalNode) *NodeServer {
 	}
 }
 
-func (srv *NodeServer) Serve(proto hiddenservice.NetProto) {
+func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
 	/*
 	 * Initialize the request handlig function, to avoid infinite thread spawning
 	 * the server works with a queued thread pool: the handler waits until one or more
@@ -142,8 +142,11 @@ func (srv *NodeServer) Serve(proto hiddenservice.NetProto) {
 		return
 	}
 	logging.LogInfo("NodeServer is listening on", proto.GetAddressString())
-	srv.node.SelfPeer.Address = proto.GetAddressString()
 
+	go srv.acceptConns(listener)
+}
+
+func (srv *NodeServer) acceptConns(listener net.Listener) {
 	defer listener.Close()
 	for {
 		conn, err := listener.Accept()

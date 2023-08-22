@@ -121,11 +121,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	node := sds.GetNodeInstance(cfg)
+	node := sds.NewNode(cfg)
 
-	p2pServer := sds.InitNodeServer(node)
-	go p2pServer.Serve(cfg.P2PServerProto)
+	p2pServer := sds.NewNodeServer(node)
+	p2pServer.Serve(cfg.P2PServerProto)
 
+	node.SetNodeAddress(cfg.P2PServerProto.GetAddressString())
 	node.StartSyncTask()
 
 	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")

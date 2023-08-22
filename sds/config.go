@@ -115,7 +115,7 @@ type SdsConfig struct {
 	KnownPeers               []Peer
 	proxySettings            proxies.ProxySettings
 	P2PServerEnabled         bool
-	P2PServerProto           hiddenservice.NetProto
+	P2PServerProto           hiddenservice.NetProtocol
 	searchEngines            map[string]SearchEngine
 }
 
