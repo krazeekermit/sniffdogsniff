@@ -37,14 +37,14 @@ type LocalNode struct {
 
 func GetNodeInstance(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
-	ln.searchDB.Open(configs.workDirPath, configs.searchDBMaxCacheSize)
-	ln.peerDB.Open(configs.workDirPath, configs.KnownPeers)
+	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize)
+	ln.peerDB.Open(configs.WorkDirPath, configs.KnownPeers)
 	ln.proxySettings = configs.proxySettings
 	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
-	ln.firstSyncLockFilePath = filepath.Join(configs.workDirPath, FIRST_SYNC_LOCK_FILE_NAME)
+	ln.firstSyncLockFilePath = filepath.Join(configs.WorkDirPath, FIRST_SYNC_LOCK_FILE_NAME)
 	if ln.searchDB.IsEmpty() {
 		os.Create(ln.firstSyncLockFilePath)
 	}

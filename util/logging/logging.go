@@ -3,6 +3,7 @@ package logging
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -43,6 +44,15 @@ func SprintTrimmed(a ...any) string {
 
 func InitLogging(level int) {
 	logLevel = level
+}
+
+func SetLoggingToFile(path string) {
+	fp, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		panic("failed to create log file")
+	}
+
+	log.SetOutput(fp)
 }
 
 func LogInfo(a ...any) {

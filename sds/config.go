@@ -14,8 +14,14 @@ import (
 const MAX_RAM_DB_SIZE = 268435456 // 256 MB
 
 const (
+	DEFAULT_LOG_FILE_NAME = "sds.log"
+)
+
+const (
 	SERVICE_RPC_PORT                   = "service_rpc_port"
 	WORK_DIR_PATH                      = "work_dir_path"
+	LOG_FILE_NAME                      = "log_file_name"
+	LOG_TO_FILE                        = "log_to_file"
 	ALLOW_RESULTS_INVALIDATION         = "allow_results_invalidation"
 	SEARCH_DATABASE_MAX_RAM_CACHE_SIZE = "search_database_max_ram_cache_size"
 	KNOWN_PEERS                        = "known_peers"
@@ -100,7 +106,9 @@ func StrToDataType(token string) ResultDataType {
 }
 
 type SdsConfig struct {
-	workDirPath              string
+	WorkDirPath              string
+	LogFileName              string
+	LogToFile                bool
 	searchDBMaxCacheSize     int
 	AllowResultsInvalidation bool
 	WebServiceBindAddress    string
@@ -121,9 +129,19 @@ func NewSdsConfig(path string) SdsConfig {
 
 	defaultSection := iniData.Section(ini.DefaultSection)
 	if defaultSection.HasKey(WORK_DIR_PATH) {
-		cfg.workDirPath = defaultSection.Key(WORK_DIR_PATH).String()
+		cfg.WorkDirPath = defaultSection.Key(WORK_DIR_PATH).String()
 	} else {
 		panicNoKey(WORK_DIR_PATH)
+	}
+	if defaultSection.HasKey(LOG_TO_FILE) {
+		cfg.LogToFile = defaultSection.Key(LOG_TO_FILE).MustBool(false)
+	} else {
+		cfg.LogToFile = false
+	}
+	if defaultSection.HasKey(LOG_FILE_NAME) {
+		cfg.LogFileName = defaultSection.Key(LOG_TO_FILE).String()
+	} else {
+		cfg.LogFileName = DEFAULT_LOG_FILE_NAME
 	}
 	if defaultSection.HasKey(SEARCH_DATABASE_MAX_RAM_CACHE_SIZE) {
 		cfg.searchDBMaxCacheSize = stringToByteSize(
