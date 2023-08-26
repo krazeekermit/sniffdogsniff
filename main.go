@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/sniffdogsniff/sds"
+	"github.com/sniffdogsniff/core"
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/util"
-	"github.com/sniffdogsniff/util/logging"
 	"github.com/sniffdogsniff/webui"
 )
 
@@ -44,7 +44,7 @@ func parseArgs() (string, bool, string) {
 	return cfgFilePath, runAsDaemon, logLevel
 }
 
-func createPidFile(cfg sds.SdsConfig) (string, error) {
+func createPidFile(cfg core.SdsConfig) (string, error) {
 	pidFilePath := filepath.Join(cfg.WorkDirPath, PID_FILE_NAME)
 
 	if util.FileExists(pidFilePath) {
@@ -68,7 +68,7 @@ func deletePidFile(pidFilePath string) {
 	}
 }
 
-func shutdownHook(configs sds.SdsConfig, node *sds.LocalNode, pidFilePath string) {
+func shutdownHook(configs core.SdsConfig, node *core.LocalNode, pidFilePath string) {
 	sigchnl := make(chan os.Signal, 1)
 	signal.Notify(sigchnl)
 
@@ -90,7 +90,7 @@ func main() {
 	cfgFilePath, daemon, logLevelStr := parseArgs()
 	logging.InitLogging(logging.StrToLogLevel(logLevelStr))
 
-	cfg := sds.NewSdsConfig(cfgFilePath)
+	cfg := core.NewSdsConfig(cfgFilePath)
 
 	isDaemon := os.Getenv("SDS_IS_DAEMON") == "true"
 	if daemon && !isDaemon {
@@ -121,9 +121,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	node := sds.NewNode(cfg)
+	node := core.NewNode(cfg)
 
-	p2pServer := sds.NewNodeServer(node)
+	p2pServer := core.NewNodeServer(node)
 	p2pServer.Serve(cfg.P2PServerProto)
 
 	node.SetNodeAddress(cfg.P2PServerProto.GetAddressString())

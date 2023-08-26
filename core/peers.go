@@ -1,4 +1,4 @@
-package sds
+package core
 
 import (
 	"bytes"
@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/util"
-	"github.com/sniffdogsniff/util/logging"
 )
 
 const PEER_DB_DIR_NAME = "peers"

@@ -1,4 +1,4 @@
-package sds
+package core
 
 // TABLE SEARCHES (RHASH, TIMESTAMP, URL, TITLE, DESCRIPTION)
 // TABLE SEARCHES_META (RHASH, TIMESTAMP, SCORE, INVALIDATED)
@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/util"
-	"github.com/sniffdogsniff/util/logging"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 

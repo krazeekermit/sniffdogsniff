@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/logging"
 	"golang.org/x/net/proxy"
 )
 

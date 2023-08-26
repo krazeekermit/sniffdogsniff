@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sniffdogsniff/sds"
-	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/core"
+	"github.com/sniffdogsniff/logging"
 )
 
 const (
@@ -22,7 +22,7 @@ const MAX_RESULTS_PER_PAGE int = 12
 
 const RESULTS_TEMPLATE_FILE_NAME = "results_%s.html"
 
-func getResultsForPage(results []sds.SearchResult, page int) []sds.SearchResult {
+func getResultsForPage(results []core.SearchResult, page int) []core.SearchResult {
 	if len(results) <= MAX_RESULTS_PER_PAGE {
 		return results
 	} else {
@@ -58,10 +58,10 @@ func matchesUrlType(urlStr, urlType string) bool {
 	}
 }
 
-func filterSearchResults(results []sds.SearchResult, urlType, dataTypeStr string) []sds.SearchResult {
-	filtered := make([]sds.SearchResult, 0)
+func filterSearchResults(results []core.SearchResult, urlType, dataTypeStr string) []core.SearchResult {
+	filtered := make([]core.SearchResult, 0)
 	for _, sr := range results {
-		if matchesUrlType(sr.Url, urlType) && sr.DataType == sds.StrToDataType(dataTypeStr) {
+		if matchesUrlType(sr.Url, urlType) && sr.DataType == core.StrToDataType(dataTypeStr) {
 			filtered = append(filtered, sr)
 		}
 	}
@@ -69,12 +69,12 @@ func filterSearchResults(results []sds.SearchResult, urlType, dataTypeStr string
 }
 
 type resultsPageView struct {
-	results  []sds.SearchResult
+	results  []core.SearchResult
 	query    string
 	dataType string
 }
 
-func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node *sds.LocalNode) {
+func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node *core.LocalNode) {
 	query := r.URL.Query().Get("q")
 	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
 

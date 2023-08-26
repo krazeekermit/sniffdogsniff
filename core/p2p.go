@@ -1,4 +1,4 @@
-package sds
+package core
 
 import (
 	"errors"
@@ -9,9 +9,9 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
-	"github.com/sniffdogsniff/util/logging"
 
 	"github.com/vmihailenco/msgpack"
 )

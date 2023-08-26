@@ -1,4 +1,4 @@
-package sds
+package core
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/gocolly/colly"
-	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/logging"
 )
 
 const NO_DESCRIPTION_AVAILABLE string = "No description available"

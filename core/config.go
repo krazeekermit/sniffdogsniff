@@ -1,4 +1,4 @@
-package sds
+package core
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
-	"github.com/sniffdogsniff/util/logging"
 	"gopkg.in/ini.v1"
 )
 

@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/logging"
 )
 
 const TXT_BUFFER_SIZE = 2048

@@ -1,4 +1,4 @@
-package sds
+package core
 
 import (
 	"errors"
@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
-	"github.com/sniffdogsniff/util/logging"
 )
 
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"

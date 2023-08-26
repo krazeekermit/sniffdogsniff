@@ -3,8 +3,8 @@ package webui
 import (
 	"net/http"
 
-	"github.com/sniffdogsniff/sds"
-	"github.com/sniffdogsniff/util/logging"
+	"github.com/sniffdogsniff/core"
+	"github.com/sniffdogsniff/logging"
 )
 
 func getVarOrDefault_GET(r *http.Request, varName, def string) string {
@@ -16,11 +16,11 @@ func getVarOrDefault_GET(r *http.Request, varName, def string) string {
 }
 
 type SdsWebServer struct {
-	node        *sds.LocalNode
+	node        *core.LocalNode
 	resultsView *resultsPageView
 }
 
-func InitSdsWebServer(node *sds.LocalNode) SdsWebServer {
+func InitSdsWebServer(node *core.LocalNode) SdsWebServer {
 	return SdsWebServer{
 		node:        node,
 		resultsView: new(resultsPageView),
@@ -47,16 +47,16 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 		title := r.FormValue("link_title")
 		url := r.FormValue("link_url")
 		description := r.FormValue("link_description")
-		dataType := sds.StrToDataType(r.FormValue("data_type"))
+		dataType := core.StrToDataType(r.FormValue("data_type"))
 		logging.LogTrace("inserti link", dataType)
-		server.node.InsertSearchResult(sds.NewSearchResult(title, url,
-			sds.ResultPropertiesMap{sds.RP_DESCRIPTION: description}, dataType))
+		server.node.InsertSearchResult(core.NewSearchResult(title, url,
+			core.ResultPropertiesMap{core.RP_DESCRIPTION: description}, dataType))
 	}
 	renderTemplate(w, "insert_link.html", nil)
 }
 
 func (server *SdsWebServer) invalidateLinkHandleFunc(w http.ResponseWriter, r *http.Request) {
-	server.node.InvalidateSearchResult(sds.B64UrlsafeStringToHash(r.URL.Query().Get("hash")))
+	server.node.InvalidateSearchResult(core.B64UrlsafeStringToHash(r.URL.Query().Get("hash")))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
