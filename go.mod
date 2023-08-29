@@ -6,7 +6,6 @@ require (
 	github.com/gocolly/colly v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	golang.org/x/net v0.4.0
 	gopkg.in/ini.v1 v1.67.0
 )

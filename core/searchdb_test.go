@@ -8,7 +8,6 @@ import (
 
 	"github.com/sniffdogsniff/core"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/vmihailenco/msgpack"
 )
 
 const TEST_DIR = "./test_dir"
@@ -91,19 +90,19 @@ func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
 	assertSearchResult(one, from.ResultHash, from.Title, from.Url, from.Properties, t)
 }
 
-func TestSearchResult_SERIALIZE_MSGPACK(t *testing.T) {
+func TestSearchResult_SERIALIZE(t *testing.T) {
 	one := core.NewSearchResult("title1", "http://url1.net", core.ResultPropertiesMap{
 		core.RP_DESCRIPTION: "descriptionnnnnnn",
 		core.RP_THUMB_LINK:  "http://blabla",
 	}, core.IMAGE_DATA_TYPE)
 
-	b_one, err := msgpack.Marshal(one)
+	b_one, err := core.GobMarshal(one)
 	if err != nil {
 		t.Fail()
 	}
 
 	var from core.SearchResult
-	err = msgpack.Unmarshal(b_one, &from)
+	err = core.GobUnmarshal(b_one, &from)
 	if err != nil {
 		t.Fail()
 	}
@@ -123,17 +122,17 @@ func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
 	assertMetaRecord(one, from.ResultHash, from.Score, from.Invalidated, t)
 }
 
-func TestResultMeta_SERIALIZE_MSGPACK(t *testing.T) {
+func TestResultMeta_SERIALIZE(t *testing.T) {
 	one := core.NewResultMeta(core.NewSearchResult("title1", "http://url1.net",
 		core.ResultPropertiesMap{}, core.VIDEO_DATA_TYPE).ResultHash, 744, 234, 5)
 
-	b_one, err := msgpack.Marshal(one)
+	b_one, err := core.GobMarshal(one)
 	if err != nil {
 		t.Fail()
 	}
 
 	var from core.ResultMeta
-	err = msgpack.Unmarshal(b_one, &from)
+	err = core.GobUnmarshal(b_one, &from)
 	if err != nil {
 		t.Fail()
 	}

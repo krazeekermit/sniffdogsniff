@@ -3,7 +3,9 @@ package util
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/hex"
 	"io/ioutil"
+	"math/rand"
 	"os"
 )
 
@@ -96,4 +98,11 @@ func DirExists(path string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+/* Random id */
+func GenerateId12_Str() string {
+	buf := make([]byte, 12)
+	rand.Read(buf)
+	return hex.EncodeToString(buf)
 }
