@@ -75,7 +75,7 @@ func (a KadId) lessThan(b KadId) bool {
 	return a[0] < b[0]
 }
 
-// evaluates the bucket depth for the id -> 2^depth < id < 2^depth+1
+// evaluates the bucket height for the id -> 2^height < id < 2^height+1
 func (a KadId) EvalHeight() int {
 	for s := 0; s < KAD_ID_LEN; s++ {
 		i := KAD_ID_LEN - 1 - s
@@ -147,14 +147,14 @@ func remove(list []*KNode, idx int) []*KNode {
 type KBucket struct {
 	nodes            []*KNode
 	replacementNodes []*KNode
-	depth            uint
+	height           uint
 }
 
-func NewKBucket(depth uint) *KBucket {
+func NewKBucket(height uint) *KBucket {
 	return &KBucket{
 		nodes:            make([]*KNode, 0),
 		replacementNodes: make([]*KNode, 0),
-		depth:            depth,
+		height:           height,
 	}
 }
 
@@ -289,7 +289,7 @@ func (ktable *KadRoutingTable) ToBytes() []byte {
 
 	buffer := bytes.NewBuffer(nil)
 	for _, bucket := range ktable.kbuckets {
-		buffer.WriteByte(byte(bucket.depth))
+		buffer.WriteByte(byte(bucket.height))
 		buffer.WriteByte(byte(len(bucket.nodes) + len(bucket.replacementNodes)))
 		for _, node := range bucket.nodes {
 			buffer.WriteByte(0)
