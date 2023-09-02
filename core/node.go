@@ -21,6 +21,15 @@ const FIRST_SYNC_DELAY = 1      // milliseconds
 /* Maximum lenght of searches that a peer can send per time */
 const MAX_SYNC_SIZE = 104857600 / SEARCH_RESULT_BYTE_SIZE // 100 MBytes / 512 bytes
 
+type NodeInterface interface {
+	Ping(peer Peer) error
+	GetStatus() (uint64, uint64)
+	GetResultsForSync(timestamp uint64) []SearchResult
+	GetMetadataForSync(ts uint64) []ResultMeta
+	GetMetadataOf(hashes []Hash256) []ResultMeta
+	GetPeersForSync() []Peer
+}
+
 type LocalNode struct {
 	proxySettings         proxies.ProxySettings
 	canInvalidate         bool
@@ -87,14 +96,14 @@ func (ln *LocalNode) GetResultsForSync(timestamp uint64) []SearchResult {
 	return results
 }
 
-func (ln *LocalNode) getPeersForSync() []Peer {
+func (ln *LocalNode) GetPeersForSync() []Peer {
 	ln.tsLock.Lock()
 	results := ln.peerDB.GetAll()
 	ln.tsLock.Unlock()
 	return results
 }
 
-func (ln *LocalNode) Handshake(peer Peer) error {
+func (ln *LocalNode) Ping(peer Peer) error {
 	if ln.firstSyncLockFileExists() {
 		return errors.New("first sync, handshake refused")
 	}
@@ -155,7 +164,7 @@ func (ln *LocalNode) SyncWithPeer() {
 	ln.tsLock.Unlock()
 	logging.LogInfo("Sync with ", p.Address)
 
-	err := rn.Handshake(ln.SelfPeer)
+	err, _ := rn.Ping(ln.SelfPeer)
 	/* if the first peer does not respond and the db is
 	empty first sync flag is set back to false to avoid
 	infinite loop cycle blocking the all node.*/
@@ -169,7 +178,7 @@ func (ln *LocalNode) SyncWithPeer() {
 	}
 
 	/* Sync of peers */
-	newPeers := rn.GetPeersForSync()
+	newPeers, _ := rn.GetPeersForSync()
 	logging.LogTrace("Received", len(newPeers), "peers")
 
 	if len(newPeers) > 0 {
@@ -179,7 +188,7 @@ func (ln *LocalNode) SyncWithPeer() {
 	}
 
 	searchesTimestamp, metasTimestamp := ln.GetStatus()
-	remoteSearchesTimestamp, remoteMetasTimestamp := rn.GetStatus()
+	remoteSearchesTimestamp, remoteMetasTimestamp, _ := rn.GetStatus()
 	logging.LogTrace("Remote Time", remoteSearchesTimestamp)
 
 	if firstSyncFileExists {
@@ -190,7 +199,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	/* Sync of searches */
 	if searchesTimestamp < remoteSearchesTimestamp {
-		newSearches := rn.GetResultsForSync(searchesTimestamp)
+		newSearches, _ := rn.GetResultsForSync(searchesTimestamp)
 		logging.LogTrace("Received", len(newSearches), "searches")
 
 		if len(newSearches) > 0 {
@@ -206,7 +215,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 	/* Sync of metadatada of searches */
 	if metasTimestamp < remoteMetasTimestamp {
-		newMetadata := rn.GetMetadataForSync(metasTimestamp)
+		newMetadata, _ := rn.GetMetadataForSync(metasTimestamp)
 		logging.LogTrace("Received", len(newMetadata), "results metadata")
 
 		if (!firstSyncFileExists) && ln.canInvalidate && len(newMetadata) > 0 {
@@ -222,7 +231,8 @@ func (ln *LocalNode) SyncWithPeer() {
 			nConfirmations := ln.CalculateAgreementThreshold()
 			for _, pi := range ln.peerDB.GetRandomPeerList(nConfirmations) {
 				rni := NewNodeClient(pi, ln.proxySettings)
-				for _, rmi := range rni.GetMetadataOf(hashList) {
+				rmiMetas, _ := rni.GetMetadataOf(hashList)
+				for _, rmi := range rmiMetas {
 					if rmi.Invalidated > INVALIDATION_LEVEL_NONE {
 						invalidations[rmi.ResultHash] += 1
 					}

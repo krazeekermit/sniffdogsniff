@@ -121,8 +121,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	core.InitializeGob()
-
 	node := core.NewNode(cfg)
 
 	p2pServer := core.NewNodeServer(node)

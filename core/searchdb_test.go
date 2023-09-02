@@ -8,6 +8,7 @@ import (
 
 	"github.com/sniffdogsniff/core"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 const TEST_DIR = "./test_dir"
@@ -44,6 +45,10 @@ func assertMetaRecord(meta core.ResultMeta, rHash core.Hash256, score uint16, in
 	}
 }
 
+func assertMetaEq(meta, meta0 core.ResultMeta, t *testing.T) {
+	assertMetaRecord(meta, meta0.ResultHash, meta0.Score, meta0.Invalidated, t)
+}
+
 func assertSearchResult(sr core.SearchResult, rHash core.Hash256, title, url string, properties core.ResultPropertiesMap, t *testing.T) {
 	if sr.ResultHash != rHash {
 		differentValues("hash", sr.ResultHash, rHash, t)
@@ -60,6 +65,10 @@ func assertSearchResult(sr core.SearchResult, rHash core.Hash256, title, url str
 			differentValues(fmt.Sprintf("property[%d]", k), p, p1, t)
 		}
 	}
+}
+
+func assertSearchResultEq(sr, sr0 core.SearchResult, t *testing.T) {
+	assertSearchResult(sr, sr0.ResultHash, sr0.Title, sr0.Url, sr0.Properties, t)
 }
 
 func getAllDBSearchesAsMap(db *leveldb.DB) map[core.Hash256]core.SearchResult {
@@ -90,19 +99,19 @@ func TestSearchResult_TOBYTES_FROMBYTES(t *testing.T) {
 	assertSearchResult(one, from.ResultHash, from.Title, from.Url, from.Properties, t)
 }
 
-func TestSearchResult_SERIALIZE(t *testing.T) {
+func TestSearchResult_MarshalUnmarshal(t *testing.T) {
 	one := core.NewSearchResult("title1", "http://url1.net", core.ResultPropertiesMap{
 		core.RP_DESCRIPTION: "descriptionnnnnnn",
 		core.RP_THUMB_LINK:  "http://blabla",
 	}, core.IMAGE_DATA_TYPE)
 
-	b_one, err := core.GobMarshal(one)
+	b_one, err := msgpack.Marshal(one)
 	if err != nil {
 		t.Fail()
 	}
 
 	var from core.SearchResult
-	err = core.GobUnmarshal(b_one, &from)
+	err = msgpack.Unmarshal(b_one, &from)
 	if err != nil {
 		t.Fail()
 	}
@@ -122,17 +131,17 @@ func TestResultMeta_TOBYTES_FROMBYTES(t *testing.T) {
 	assertMetaRecord(one, from.ResultHash, from.Score, from.Invalidated, t)
 }
 
-func TestResultMeta_SERIALIZE(t *testing.T) {
+func TestResultMeta_MarshalUnmarshal(t *testing.T) {
 	one := core.NewResultMeta(core.NewSearchResult("title1", "http://url1.net",
 		core.ResultPropertiesMap{}, core.VIDEO_DATA_TYPE).ResultHash, 744, 234, 5)
 
-	b_one, err := core.GobMarshal(one)
+	b_one, err := msgpack.Marshal(one)
 	if err != nil {
 		t.Fail()
 	}
 
 	var from core.ResultMeta
-	err = core.GobUnmarshal(b_one, &from)
+	err = msgpack.Unmarshal(b_one, &from)
 	if err != nil {
 		t.Fail()
 	}

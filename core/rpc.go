@@ -12,6 +12,7 @@ import (
 	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 /*
@@ -44,6 +45,8 @@ func errCodeToError(funCode, errCode byte) error {
 		return errors.New("remote error - msgpack marshal error")
 	case ERRCODE_NOFUNCT:
 		return fmt.Errorf("remote error - no function %d", funCode)
+	case ERRCODE_TYPE_ARGUMENT:
+		return fmt.Errorf("remote error - unmarshal args fail for funct %d", funCode)
 	}
 	return nil
 }
@@ -112,30 +115,97 @@ func compressAndSend(stream []byte, conn net.Conn) error {
 	return err
 }
 
+const RPC_REQ_BYTESIZE int = 40
+
 type RpcRequest struct {
-	FuncCode  uint8
-	Id        string // 24-bytes string
-	Arguments []any
+	FuncCode uint8
+	Id       string // 24-bytes string
 }
 
+const RPC_RESP_BYTESIZE int = 39
+
 type RpcResponse struct {
-	ErrCode  uint8
-	Id       string // 24-bytes string
-	RetValue any
+	ErrCode uint8
+	Id      string // 24-bytes string
 }
 
 type NodeServer struct {
-	node      *LocalNode
+	node      NodeInterface
 	connQueue Deque
 	cond      *sync.Cond
 }
 
-func NewNodeServer(node *LocalNode) *NodeServer {
+func NewNodeServer(node NodeInterface) *NodeServer {
 	return &NodeServer{
 		node:      node,
 		connQueue: NewDeque(),
 		cond:      sync.NewCond(&sync.Mutex{}),
 	}
+}
+
+type PingArgs struct {
+	Pinger Peer
+}
+
+type PingReply struct {
+	Error error
+}
+
+func (srv *NodeServer) ping(args PingArgs, reply *PingReply) {
+	(*reply).Error = srv.node.Ping(args.Pinger)
+}
+
+type GetPeersForSyncArgs struct {
+}
+
+type GetPeersForSyncReply struct {
+	Peers []Peer
+}
+
+func (srv *NodeServer) getPeersForSync(args GetPeersForSyncArgs, reply *GetPeersForSyncReply) {
+	(*reply).Peers = srv.node.GetPeersForSync()
+}
+
+type GetStatusArgs struct {
+}
+
+type GetStatusReply struct {
+	LastTimestamp     uint64
+	LastMetaTimestamp uint64
+}
+
+func (srv *NodeServer) getStatus(args GetStatusArgs, reply *GetStatusReply) {
+	lts, lmts := srv.node.GetStatus()
+	(*reply).LastTimestamp = lts
+	(*reply).LastMetaTimestamp = lmts
+}
+
+type TimestampArgs struct {
+	Timestamp uint64
+}
+
+type GetResultsForSyncReply struct {
+	Results []SearchResult
+}
+
+func (srv *NodeServer) getResultsForSync(args TimestampArgs, reply *GetResultsForSyncReply) {
+	(*reply).Results = srv.node.GetResultsForSync(args.Timestamp)
+}
+
+type GetMetadataForSyncReply struct {
+	Metadatas []ResultMeta
+}
+
+func (srv *NodeServer) getMetadataForSync(args TimestampArgs, reply *GetMetadataForSyncReply) {
+	(*reply).Metadatas = srv.node.GetMetadataForSync(args.Timestamp)
+}
+
+type GetMetadataOfArgs struct {
+	Hashes []Hash256
+}
+
+func (srv *NodeServer) getMetadataOf(args GetMetadataOfArgs, reply *GetMetadataForSyncReply) {
+	(*reply).Metadatas = srv.node.GetMetadataOf(args.Hashes)
 }
 
 func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
@@ -185,61 +255,99 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 		conn := srv.connQueue.popFirst()
 		srv.cond.L.Unlock()
 
-		req_bytes, _, err := receiveAndDecompress(conn)
+		recvBytez, _, err := receiveAndDecompress(conn)
 		if err != nil {
 			logging.LogError(err.Error())
 			conn.Close()
 			return
 		}
 		/*
-		 * Request structure :
-		 * [[function code (1byte, 0 to 255)]+[request args (msgpack marshalled, n bytes)]]
+		 * Request structure : [RpcRequest(40); Args ....]
 		 */
 
-		errCode := ERRCODE_NULL
-		var returned any
-
 		var request RpcRequest
-		if GobUnmarshal(req_bytes, &request) != nil {
-			logging.LogTrace("Malformed rpc request")
+		var argsBytes []byte
+		var returned interface{}
+
+		errCode := ERRCODE_NULL
+
+		if len(recvBytez) <= RPC_REQ_BYTESIZE {
+			errCode = ERRCODE_MARSHAL
 			goto send_resp
 		}
 
-		logging.LogTrace("Function request", request.FuncCode, len(req_bytes))
+		if msgpack.Unmarshal(recvBytez[:RPC_REQ_BYTESIZE], &request) != nil {
+			logging.LogTrace("Malformed rpc request")
+			errCode = ERRCODE_MARSHAL
+			goto send_resp
+		}
+		argsBytes = recvBytez[RPC_REQ_BYTESIZE:]
+
+		logging.LogTrace("Function request", request.FuncCode, len(recvBytez))
 
 		switch request.FuncCode {
 		case FCODE_HANDSHAKE:
-			peer, ok := request.Arguments[0].(Peer)
-			if !ok {
+			var args PingArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
+				logging.LogTrace(err.Error())
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			returned = srv.node.Handshake(peer)
+			var reply PingReply
+			srv.ping(args, &reply)
+			returned = reply
 		case FCODE_GETSTATUS:
-			returned = util.TwoUint64ToArr(srv.node.GetStatus())
+			var args GetStatusArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
+				errCode = ERRCODE_TYPE_ARGUMENT
+				goto send_resp
+			}
+			var reply GetStatusReply
+			srv.getStatus(args, &reply)
+			returned = reply
 		case FCODE_GET_RESULTS_FOR_SYNC:
-			time, ok := request.Arguments[0].(uint64)
-			if !ok {
+			var args TimestampArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			returned = srv.node.GetResultsForSync(time)
+			var reply GetResultsForSyncReply
+			srv.getResultsForSync(args, &reply)
+			returned = reply
 		case FCODE_GET_PEERS_FOR_SYNC:
-			returned = srv.node.getPeersForSync()
+			var args GetPeersForSyncArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
+				logging.LogTrace(err.Error())
+				errCode = ERRCODE_TYPE_ARGUMENT
+				goto send_resp
+			}
+			var reply GetPeersForSyncReply
+			srv.getPeersForSync(args, &reply)
+			returned = reply
 		case FCODE_GET_METADATA_FOR_SYNC:
-			time, ok := request.Arguments[0].(uint64)
-			if !ok {
+			var args TimestampArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			returned = srv.node.GetMetadataForSync(time)
+			var reply GetMetadataForSyncReply
+			srv.getMetadataForSync(args, &reply)
+			returned = reply
 		case FCODE_GET_METADATA_OF:
-			hashes, ok := request.Arguments[0].([]Hash256)
-			if !ok {
+			var args GetMetadataOfArgs
+			err := msgpack.Unmarshal(argsBytes, &args)
+			if err != nil {
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			returned = srv.node.GetMetadataOf(hashes)
+			var reply GetMetadataForSyncReply
+			srv.getMetadataOf(args, &reply)
+			returned = reply
 		default:
 			returned = nil
 			errCode = ERRCODE_NOFUNCT
@@ -247,17 +355,20 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 
 	send_resp:
 		response := RpcResponse{
-			ErrCode:  uint8(errCode),
-			Id:       request.Id,
-			RetValue: returned,
+			ErrCode: uint8(errCode),
+			Id:      request.Id,
 		}
 
-		responseBytes, err := GobMarshal(response)
+		responseBytes, err := msgpack.Marshal(response)
+		if err != nil {
+			logging.LogTrace(err.Error())
+		}
+		replyBytes, err := msgpack.Marshal(returned)
 		if err != nil {
 			logging.LogTrace(err.Error())
 		}
 
-		err = compressAndSend(responseBytes, conn)
+		err = compressAndSend(append(responseBytes, replyBytes...), conn)
 		if err != nil {
 			logging.LogError(err.Error())
 		}
@@ -279,134 +390,116 @@ func NewNodeClient(peer Peer, proxySettings proxies.ProxySettings) NodeClient {
 
 /***************************** Remote Node (Client) ******************************/
 
-func (rn *NodeClient) Handshake(peer Peer) error {
-	ret, err := rn.callRemoteFunction(FCODE_HANDSHAKE, []any{peer})
+func (rn *NodeClient) Ping(peer Peer) (error, error) {
+	var reply PingReply
+	err := rn.callRemoteFunction(FCODE_HANDSHAKE, PingArgs{peer}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
+		return nil, err
 	}
-
-	remoteErr, ok := ret.(error)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return remoteErr
+	return reply.Error, nil
 }
 
-func (rn *NodeClient) GetStatus() (uint64, uint64) {
-	ret, err := rn.callRemoteFunction(FCODE_GETSTATUS, nil)
+func (rn *NodeClient) GetStatus() (uint64, uint64, error) {
+	var reply GetStatusReply
+	err := rn.callRemoteFunction(FCODE_GETSTATUS, GetStatusArgs{}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
+		return 0, 0, nil
 	}
-
-	timestamps, ok := ret.([2]uint64)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return util.ArrToTwoUint64(timestamps)
+	return reply.LastTimestamp, reply.LastMetaTimestamp, nil
 }
 
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
-func (rn *NodeClient) GetResultsForSync(timestamp uint64) []SearchResult {
-	ret, err := rn.callRemoteFunction(FCODE_GET_RESULTS_FOR_SYNC, []any{timestamp})
+func (rn *NodeClient) GetResultsForSync(ts uint64) ([]SearchResult, error) {
+	var reply GetResultsForSyncReply
+	err := rn.callRemoteFunction(FCODE_GET_RESULTS_FOR_SYNC, TimestampArgs{ts}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
-		return nil
+		return nil, err
 	}
-
-	searches, ok := ret.([]SearchResult)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return searches
+	return reply.Results, nil
 }
 
-func (rn *NodeClient) GetMetadataForSync(timestamp uint64) []ResultMeta {
-	ret, err := rn.callRemoteFunction(FCODE_GET_METADATA_FOR_SYNC, []any{timestamp})
+func (rn *NodeClient) GetMetadataForSync(ts uint64) ([]ResultMeta, error) {
+	var reply GetMetadataForSyncReply
+	err := rn.callRemoteFunction(FCODE_GET_METADATA_FOR_SYNC, TimestampArgs{ts}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
-		return nil
+		return nil, err
 	}
-
-	metadata, ok := ret.([]ResultMeta)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return metadata
+	return reply.Metadatas, nil
 }
 
-func (rn *NodeClient) GetPeersForSync() []Peer {
-	ret, err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, nil)
+func (rn *NodeClient) GetPeersForSync() ([]Peer, error) {
+	var reply GetPeersForSyncReply
+	err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, GetPeersForSyncArgs{}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
-		return nil
+		return nil, err
 	}
-
-	peers, ok := ret.([]Peer)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return peers
+	return reply.Peers, nil
 }
 
-func (rn *NodeClient) GetMetadataOf(hashes []Hash256) []ResultMeta {
-	var metadata []ResultMeta
-	ret, err := rn.callRemoteFunction(FCODE_GET_METADATA_OF, []any{hashes})
+func (rn *NodeClient) GetMetadataOf(hashes []Hash256) ([]ResultMeta, error) {
+	var reply GetMetadataForSyncReply
+	err := rn.callRemoteFunction(FCODE_GET_METADATA_OF, []any{hashes}, &reply)
 	if err != nil {
-		logging.LogError(err.Error())
-		return nil
+		return nil, err
 	}
-
-	metadata, ok := ret.([]ResultMeta)
-	if !ok {
-		logging.LogError("error: return type mismatch")
-	}
-	return metadata
+	return reply.Metadatas, nil
 }
 
-func (rn *NodeClient) callRemoteFunction(funCode byte, args []any) (any, error) {
+func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, reply interface{}) error {
 	conn, err := rn.proxySettings.NewConnection(rn.peer.Address)
 	if err != nil {
 		logging.LogTrace("connection error")
-		return nil, err
+		return err
 	}
 
 	request := RpcRequest{
-		FuncCode:  funCode,
-		Id:        util.GenerateId12_Str(),
-		Arguments: args,
+		FuncCode: funCode,
+		Id:       util.GenerateId12_Str(),
 	}
 
-	reqBytes, err := GobMarshal(request)
+	reqBytes, err := msgpack.Marshal(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	err = compressAndSend(reqBytes, conn)
+	argsBytes, err := msgpack.Marshal(args)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	respBytes, _, err := receiveAndDecompress(conn)
+	err = compressAndSend(append(reqBytes, argsBytes...), conn)
+	if err != nil {
+		return err
+	}
+
+	recvBytes, _, err := receiveAndDecompress(conn)
 	if err != nil {
 		conn.Close()
-		return nil, err
+		return err
 	}
 	conn.Close()
 
+	if len(recvBytes) <= RPC_RESP_BYTESIZE {
+		return errors.New("rpc error: malformed reply")
+	}
+
 	var response RpcResponse
-	err = GobUnmarshal(respBytes, &response)
+	err = msgpack.Unmarshal(recvBytes[:RPC_RESP_BYTESIZE], &response)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if response.Id != request.Id {
-		return nil, errors.New("rpc error: the request and response id did not match")
+		return errors.New("rpc error: the request and response id did not match")
 	}
 
 	if response.ErrCode != ERRCODE_NULL {
-		return nil, errCodeToError(request.FuncCode, response.ErrCode)
+		return errCodeToError(request.FuncCode, response.ErrCode)
 	}
 
-	return response.RetValue, nil
+	err = msgpack.Unmarshal(recvBytes[RPC_RESP_BYTESIZE:], reply)
+	if err != nil {
+		return err
+	}
+	return nil
 }
