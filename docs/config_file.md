@@ -1,14 +1,22 @@
 ## Config file (ini)
 
 ```ini
-search_database_path = ./searches.db              # Path of the Searches database
-peers_database_path = ./peers.db                  # Path of the Peers database
-web_service_bind_address = 0.0.0.0:8081           # Web Ui bind address
+work_dir_path = ./ # work dir path usually is /var/sniffdogsniff
+log_to_file = no
+log_file_name = sds.log
+search_database_max_ram_cache_size = 512M # max cache in ram before flush to disk
+allow_results_invalidation = no 
 min_search_results_threshold = 50                 # minimum results threshold for sds to search on other engines (if there is no 50 results found in the database then sds search on centralized engines)
-
-known_peers = peer1, peer2 # name of the peers sections
-external_search_engines = startpage, yandex, onesearch, brave # name of the engines sections
 ```
+
+### Initial Peers
+```ini
+[peer]
+address = 127.0.0.1:4222
+id = 199ee773164f7a8bedcbef3afa1bf398cf5febeb
+```
+The initial peers to let you jump into the p2p network. Sniffdogsniff uses kademlia
+so the id of a peer is required. Usually is the sha1 of the address.
 
 #### Proxy Settings
 ```ini
@@ -20,15 +28,29 @@ tor_socks5_proxy = 127.0.0.1:9050
 * *i2p_socks5_proxy* is the address of the i2p or i2pd daemon socks proxy on your machine
 * *tor_socks5_proxy* is the address of the tor daemon socks proxy on your machine
 
+### Node RPC p2p server
+```ini
+[node_service]
+enabled = yes # node is visible to other nodes
+```
+If enabled allows other nodes to sync with your node.
+
+* Example of configuration for tor onionservice listen address auto configuration
 ```ini
 [node_service]
 enabled = yes
-create_hidden_service = no
-# Note: sniffdogsniff only supports auto-creation of a Tor Hidden Service, I2P must be done manually
-# tor_control_port = 9051
-bind_address = 0.0.0.0:4111
-proxy_type = none
+hidden_service = tor
+tor_control_port = 9051
+tor_control_auth_password = password
 ```
 
-If enabled allows other nodes to sync with your node. If you want to let the TOR Hidden service to be created automatically set *create_hidden_service* to yes.
-Only TOR Hidden Service creation is supported! If you use for xample I2P you need to setup your address manually. In case you use I2P you need to specify the *bind_address* as i2paddress_yadayadayada.b32.i2p and set the *proxy_type* to i2p. In case you use the hidden service auto creation you do not need to specify the proxy type.
+* Example of configuration for i2p hiddenservice listen address auto configuration
+```ini
+[node_service]
+enabled = yes # node is visible to other nodes
+hidden_service = i2p
+i2p_sam_port = 7656
+i2p_sam_user = user
+i2p_sam_password = password
+```
+

@@ -29,7 +29,7 @@ const (
 	PEER                               = "peer"
 	ID                                 = "id"
 	ADDRESS                            = "address"
-	EXTERNAL_SEARCH_ENGINES            = "external_search_engines"
+	EXTERNAL_SEARCH_ENGINE             = "external_search_engine"
 	NAME                               = "name"
 	USER_AGENT                         = "user_agent"
 	SEARCH_QUERY_URL                   = "search_query_url"
@@ -54,7 +54,7 @@ const (
 	TOR_CONTROL_PORT                   = "tor_control_port"
 	TOR_CONTROL_AUTH_PASSWORD          = "tor_control_auth_password"
 	I2P_SAM_PORT                       = "i2p_sam_port"
-	I2P_SAM_USER                       = "i2p_sam_port"
+	I2P_SAM_USER                       = "i2p_sam_user"
 	I2P_SAM_PASSWORD                   = "i2p_sam_password"
 )
 
@@ -170,27 +170,27 @@ func NewSdsConfig(path string) SdsConfig {
 			cfg.KnownPeers[kadId] = pSec.Key(ADDRESS).String()
 		}
 	}
-	if defaultSection.HasKey(EXTERNAL_SEARCH_ENGINES) {
-		engineNames := iniData.Section(ini.DefaultSection).Key(EXTERNAL_SEARCH_ENGINES).Strings(",")
 
-		cfg.searchEngines = make(map[string]SearchEngine)
-		for _, engineName := range engineNames {
-			engineKey := strings.Trim(engineName, " ")
-			engine := iniData.Section(engineName)
-			cfg.searchEngines[engineKey] = SearchEngine{
-				name:                    engine.Key(NAME).String(),
-				userAgent:               engine.Key(USER_AGENT).String(),
-				searchQueryUrl:          engine.Key(SEARCH_QUERY_URL).String(),
-				resultsContainerElement: engine.Key(RESULTS_CONTAINER_ELEMENT).String(),
-				resultContainerElement:  engine.Key(RESULT_CONTAINER_ELEMENT).String(),
-				resultUrlElement:        engine.Key(RESULT_URL_ELEMENT).String(),
-				resultUrlProperty:       engine.Key(RESULT_URL_PROPERTY).String(),
-				resultUrlIsJson:         engine.Key(RESULT_URL_IS_JSON).MustBool(false),
-				resultUrlJsonProperty:   engine.Key(RESULT_URL_JSON_PROPERTY).String(),
-				resultTitleElement:      engine.Key(RESULT_TITLE_ELEMENT).String(),
-				resultTitleProperty:     engine.Key(RESULT_TITLE_PROPERTY).String(),
-				providedDataType:        StrToDataType(engine.Key(PROVIDED_DATA_TYPE).String()),
-			}
+	cfg.searchEngines = make(map[string]SearchEngine)
+	enginesSections, err := iniData.SectionsByName(EXTERNAL_SEARCH_ENGINE)
+	if err != nil {
+		logging.LogWarn("Failed to parse config file: external search engines")
+	}
+	for _, sec := range enginesSections {
+		name := sec.Key(NAME).String()
+		cfg.searchEngines[name] = SearchEngine{
+			name:                    name,
+			userAgent:               sec.Key(USER_AGENT).String(),
+			searchQueryUrl:          sec.Key(SEARCH_QUERY_URL).String(),
+			resultsContainerElement: sec.Key(RESULTS_CONTAINER_ELEMENT).String(),
+			resultContainerElement:  sec.Key(RESULT_CONTAINER_ELEMENT).String(),
+			resultUrlElement:        sec.Key(RESULT_URL_ELEMENT).String(),
+			resultUrlProperty:       sec.Key(RESULT_URL_PROPERTY).String(),
+			resultUrlIsJson:         sec.Key(RESULT_URL_IS_JSON).MustBool(false),
+			resultUrlJsonProperty:   sec.Key(RESULT_URL_JSON_PROPERTY).String(),
+			resultTitleElement:      sec.Key(RESULT_TITLE_ELEMENT).String(),
+			resultTitleProperty:     sec.Key(RESULT_TITLE_PROPERTY).String(),
+			providedDataType:        StrToDataType(sec.Key(PROVIDED_DATA_TYPE).String()),
 		}
 	}
 

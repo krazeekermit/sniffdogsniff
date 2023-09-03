@@ -1,10 +1,9 @@
 work_dir_path = ./
+# log_to_file = no
+# log_file_name = sds.log
 search_database_max_ram_cache_size = 512M
-p2p_rpc_port = 4222
 min_search_results_threshold = 50
-allow_results_invalidation = no
-
-external_search_engines = bing_images, bing, startpage, brave, 
+allow_results_invalidation = no 
 
 [web_ui]
 bind_address = 0.0.0.0:8081
@@ -16,10 +15,13 @@ tor_socks5_proxy = 127.0.0.1:9050
 
 [node_service]
 enabled = yes
-create_hidden_service = no
+# hidden_service = none
 # Note: sniffdogsniff only supports auto-creation of a Tor Hidden Service, I2P must be done manually
 # tor_control_port = 9051
 # tor_control_auth_password = password
+# i2p_sam_port = 7656
+# i2p_sam_user = 
+# i2p_sam_password = 
 bind_address = 0.0.0.0:4111
 proxy_type = none
 
@@ -34,7 +36,7 @@ id = 2b199de909a1cb2773d45e8a2fdbe85175fe6ee4
 
 # search engines
 
-[brave]
+[external_search_engine]
 name = Brave Search
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
 search_query_url = https://search.brave.com/search?q=%s&source=desktop
@@ -45,7 +47,7 @@ result_url_property = href
 result_title_element = span.snippet-header
 result_title_property = text
 
-[startpage]
+[external_search_engine]
 name = StartPage
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
 search_query_url = https://www.startpage.com/sp/search?q=%s
@@ -56,7 +58,7 @@ result_url_property = href
 result_title_element = h3
 result_title_property = text
 
-[bing]
+[external_search_engine]
 name = Bing
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
 search_query_url = https://www.bing.com/search?q=%s&count=35
@@ -67,7 +69,7 @@ result_url_property = href
 result_title_element = a
 result_title_property = text
 
-[bing_images]
+[external_search_engine]
 name = Bing
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
 search_query_url = https://www.bing.com/images/async?q=%s&first=155&count=35
