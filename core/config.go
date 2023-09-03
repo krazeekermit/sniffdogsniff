@@ -1,11 +1,13 @@
 package core
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
 	"gopkg.in/ini.v1"
@@ -24,7 +26,8 @@ const (
 	LOG_TO_FILE                        = "log_to_file"
 	ALLOW_RESULTS_INVALIDATION         = "allow_results_invalidation"
 	SEARCH_DATABASE_MAX_RAM_CACHE_SIZE = "search_database_max_ram_cache_size"
-	KNOWN_PEERS                        = "known_peers"
+	PEER                               = "peer"
+	ID                                 = "id"
 	ADDRESS                            = "address"
 	EXTERNAL_SEARCH_ENGINES            = "external_search_engines"
 	NAME                               = "name"
@@ -61,17 +64,6 @@ func panicNoKey(key string) {
 
 func panicNoSection(key string) {
 	panic(fmt.Sprint("Config file parse error: required section: ", key))
-}
-
-func parsePeer(sec *ini.Section, addressKey string) Peer {
-	if sec.HasKey(addressKey) {
-		return Peer{
-			Address: sec.Key(addressKey).String(),
-		}
-	} else {
-		panicNoKey(addressKey)
-		return Peer{}
-	}
 }
 
 func stringToByteSize(text string) int {
@@ -112,7 +104,7 @@ type SdsConfig struct {
 	searchDBMaxCacheSize     int
 	AllowResultsInvalidation bool
 	WebServiceBindAddress    string
-	KnownPeers               []Peer
+	KnownPeers               map[kademlia.KadId]string
 	proxySettings            proxies.ProxySettings
 	P2PServerEnabled         bool
 	P2PServerProto           hiddenservice.NetProtocol
@@ -121,7 +113,9 @@ type SdsConfig struct {
 
 func NewSdsConfig(path string) SdsConfig {
 	cfg := SdsConfig{}
-	iniData, err := ini.Load(path)
+	iniData, err := ini.LoadSources(ini.LoadOptions{
+		AllowNonUniqueSections: true,
+	}, path)
 
 	if err != nil {
 		panic(err.Error())
@@ -159,13 +153,21 @@ func NewSdsConfig(path string) SdsConfig {
 	} else {
 		cfg.AllowResultsInvalidation = false
 	}
-	if defaultSection.HasKey(KNOWN_PEERS) {
-		peerNames := iniData.Section(ini.DefaultSection).Key(KNOWN_PEERS).Strings(",")
 
-		cfg.KnownPeers = make([]Peer, 0)
-		for _, peerName := range peerNames {
-			peer := iniData.Section(strings.Trim(peerName, " "))
-			cfg.KnownPeers = append(cfg.KnownPeers, parsePeer(peer, ADDRESS))
+	cfg.KnownPeers = make(map[kademlia.KadId]string)
+	peersSections, err := iniData.SectionsByName(PEER)
+	if err != nil {
+		panicNoSection(PEER)
+	}
+	for _, pSec := range peersSections {
+		logging.LogTrace("read.config.ini")
+		if pSec.HasKey(ADDRESS) && pSec.HasKey(ID) {
+			idBytez, err := hex.DecodeString(pSec.Key(ID).String())
+			if err != nil {
+				continue
+			}
+			kadId := kademlia.KadIdFromBytes(idBytez)
+			cfg.KnownPeers[kadId] = pSec.Key(ADDRESS).String()
 		}
 	}
 	if defaultSection.HasKey(EXTERNAL_SEARCH_ENGINES) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/sniffdogsniff/core"
 	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/vmihailenco/msgpack/v5"
@@ -19,8 +20,11 @@ var RESULT2 = core.NewSearchResult("title2", "http://www.title2.com", core.Resul
 var RMETA1 = core.NewResultMeta(RESULT1.ResultHash, 1234, 23, 0)
 var RMETA2 = core.NewResultMeta(RESULT2.ResultHash, 7654, 89, 1)
 
-var PEER1 = core.NewPeer("thirstingcagecagesubtitle.onion")
-var PEER2 = core.NewPeer("tallunearthrethinkblurt.onion")
+var PEER1_ADDR = "thirstingcagecagesubtitle.onion"
+var PEER2_ADDR = "tallunearthrethinkblurt.onion"
+
+var PEER1_ID = kademlia.NewKadId(PEER1_ADDR)
+var PEER2_ID = kademlia.NewKadId(PEER2_ADDR)
 
 type fakeNode struct {
 	args map[string]error
@@ -35,10 +39,13 @@ func (fn *fakeNode) argsDoMatch(funcName string) error {
 	return fn.args[funcName]
 }
 
-func (fn *fakeNode) Ping(peer core.Peer) error {
+func (fn *fakeNode) Ping(id kademlia.KadId, addr string) error {
 	fn.args["Ping"] = nil
-	if peer.Address != PEER1.Address {
-		fn.args["Ping"] = fmt.Errorf("arguments does not match: %s != %s", peer.Address, PEER1.Address)
+	if !id.Eq(PEER1_ID) {
+		fn.args["Ping"] = fmt.Errorf("arguments does not match: %s != %s", id, PEER1_ID)
+	}
+	if addr != PEER1_ADDR {
+		fn.args["Ping"] = fmt.Errorf("arguments does not match: %s != %s", addr, PEER1_ADDR)
 	}
 	return nil
 }
@@ -79,9 +86,12 @@ func (fn *fakeNode) GetMetadataOf(hashes []core.Hash256) []core.ResultMeta {
 	return []core.ResultMeta{RMETA1, RMETA2}
 }
 
-func (fn *fakeNode) GetPeersForSync() []core.Peer {
+func (fn *fakeNode) GetKClosestNodes() map[kademlia.KadId]string {
 	fn.args["GetPeersForSync"] = nil
-	return []core.Peer{PEER1, PEER2}
+	return map[kademlia.KadId]string{
+		PEER1_ID: PEER1_ADDR,
+		PEER2_ID: PEER2_ADDR,
+	}
 }
 
 var server *core.NodeServer = nil
@@ -102,7 +112,7 @@ func setupFakeNodeServer() {
 }
 
 func _testRpc_Ping(client core.NodeClient, t *testing.T) {
-	_, err := client.Ping(PEER1)
+	_, err := client.Ping(PEER1_ID, PEER1_ADDR)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -119,14 +129,14 @@ func _testRpc_Ping(client core.NodeClient, t *testing.T) {
 func TestRpc_Ping(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 	_testRpc_Ping(client, t)
 }
 
 func TestRpc_Ping_1000(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 	for i := 0; i < 1000; i++ {
 		_testRpc_Ping(client, t)
 	}
@@ -157,14 +167,14 @@ func _testRpc_GetStatus(client core.NodeClient, t *testing.T) {
 func TestRpc_GetStatus(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 	_testRpc_GetStatus(client, t)
 }
 
 func TestRpc_GetStatus_1000(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 	for i := 0; i < 1000; i++ {
 		_testRpc_GetStatus(client, t)
 	}
@@ -173,9 +183,9 @@ func TestRpc_GetStatus_1000(t *testing.T) {
 func TestRpc_GetPeersForSync(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	peers, err := client.GetPeersForSync()
+	peers, err := client.GetKClosestNodes()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -188,10 +198,10 @@ func TestRpc_GetPeersForSync(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	if peers[0].Address != PEER1.Address {
+	if peers[PEER1_ID] != PEER1_ADDR {
 		t.Fatal()
 	}
-	if peers[1].Address != PEER2.Address {
+	if peers[PEER2_ID] != PEER2_ADDR {
 		t.Fatal()
 	}
 }
@@ -199,7 +209,7 @@ func TestRpc_GetPeersForSync(t *testing.T) {
 func TestRpc_GetResultsForSync(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
 	results, err := client.GetResultsForSync(1936)
 	if err != nil {
@@ -221,7 +231,7 @@ func TestRpc_GetResultsForSync(t *testing.T) {
 func TestRpc_GetMetadataForSync(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
 	metas, err := client.GetMetadataForSync(4567)
 	if err != nil {
@@ -243,7 +253,7 @@ func TestRpc_GetMetadataForSync(t *testing.T) {
 func TestRpc_GetMetadataOf(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(core.NewPeer(":3000"), proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
 	metas, err := client.GetMetadataOf([]core.Hash256{RESULT1.ResultHash, RESULT2.ResultHash})
 	if err != nil {

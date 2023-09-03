@@ -9,16 +9,12 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sniffdogsniff/hiddenservice"
+	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/vmihailenco/msgpack/v5"
 )
-
-/*
- * SniffDogSniff uses Epidemic Gossip protocol SI model
- * pull method for syncing SearchResults and Peers
- */
 
 const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
@@ -144,7 +140,8 @@ func NewNodeServer(node NodeInterface) *NodeServer {
 }
 
 type PingArgs struct {
-	Pinger Peer
+	PingerId      kademlia.KadId
+	PingerAddress string
 }
 
 type PingReply struct {
@@ -152,18 +149,18 @@ type PingReply struct {
 }
 
 func (srv *NodeServer) ping(args PingArgs, reply *PingReply) {
-	(*reply).Error = srv.node.Ping(args.Pinger)
+	(*reply).Error = srv.node.Ping(args.PingerId, args.PingerAddress)
 }
 
-type GetPeersForSyncArgs struct {
+type GetKCLosestNodesArgs struct {
 }
 
-type GetPeersForSyncReply struct {
-	Peers []Peer
+type GetKCLosestNodesReply struct {
+	NewNodes map[kademlia.KadId]string
 }
 
-func (srv *NodeServer) getPeersForSync(args GetPeersForSyncArgs, reply *GetPeersForSyncReply) {
-	(*reply).Peers = srv.node.GetPeersForSync()
+func (srv *NodeServer) getPeersForSync(args GetKCLosestNodesArgs, reply *GetKCLosestNodesReply) {
+	(*reply).NewNodes = srv.node.GetKClosestNodes()
 }
 
 type GetStatusArgs struct {
@@ -318,14 +315,14 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			srv.getResultsForSync(args, &reply)
 			returned = reply
 		case FCODE_GET_PEERS_FOR_SYNC:
-			var args GetPeersForSyncArgs
+			var args GetKCLosestNodesArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
 				logging.LogTrace(err.Error())
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			var reply GetPeersForSyncReply
+			var reply GetKCLosestNodesReply
 			srv.getPeersForSync(args, &reply)
 			returned = reply
 		case FCODE_GET_METADATA_FOR_SYNC:
@@ -377,22 +374,22 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 }
 
 type NodeClient struct {
-	peer          Peer
+	addr          string
 	proxySettings proxies.ProxySettings
 }
 
-func NewNodeClient(peer Peer, proxySettings proxies.ProxySettings) NodeClient {
+func NewNodeClient(addr string, proxySettings proxies.ProxySettings) NodeClient {
 	return NodeClient{
-		peer:          peer,
+		addr:          addr,
 		proxySettings: proxySettings,
 	}
 }
 
 /***************************** Remote Node (Client) ******************************/
 
-func (rn *NodeClient) Ping(peer Peer) (error, error) {
+func (rn *NodeClient) Ping(id kademlia.KadId, addr string) (error, error) {
 	var reply PingReply
-	err := rn.callRemoteFunction(FCODE_HANDSHAKE, PingArgs{peer}, &reply)
+	err := rn.callRemoteFunction(FCODE_HANDSHAKE, PingArgs{id, addr}, &reply)
 	if err != nil {
 		return nil, err
 	}
@@ -428,13 +425,13 @@ func (rn *NodeClient) GetMetadataForSync(ts uint64) ([]ResultMeta, error) {
 	return reply.Metadatas, nil
 }
 
-func (rn *NodeClient) GetPeersForSync() ([]Peer, error) {
-	var reply GetPeersForSyncReply
-	err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, GetPeersForSyncArgs{}, &reply)
+func (rn *NodeClient) GetKClosestNodes() (map[kademlia.KadId]string, error) {
+	var reply GetKCLosestNodesReply
+	err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, GetKCLosestNodesArgs{}, &reply)
 	if err != nil {
 		return nil, err
 	}
-	return reply.Peers, nil
+	return reply.NewNodes, nil
 }
 
 func (rn *NodeClient) GetMetadataOf(hashes []Hash256) ([]ResultMeta, error) {
@@ -447,9 +444,8 @@ func (rn *NodeClient) GetMetadataOf(hashes []Hash256) ([]ResultMeta, error) {
 }
 
 func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, reply interface{}) error {
-	conn, err := rn.proxySettings.NewConnection(rn.peer.Address)
+	conn, err := rn.proxySettings.NewConnection(rn.addr)
 	if err != nil {
-		logging.LogTrace("connection error")
 		return err
 	}
 

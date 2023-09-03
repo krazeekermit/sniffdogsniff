@@ -4,7 +4,6 @@ p2p_rpc_port = 4222
 min_search_results_threshold = 50
 allow_results_invalidation = no
 
-known_peers = peer1, peer2
 external_search_engines = bing_images, bing, startpage, brave, 
 
 [web_ui]
@@ -24,13 +23,14 @@ create_hidden_service = no
 bind_address = 0.0.0.0:4111
 proxy_type = none
 
-[peer1]
+[peer]
 address = 127.0.0.1:4222
-proxy_type = none
+id = 199ee773164f7a8bedcbef3afa1bf398cf5febeb
 
-[peer2]
+[peer]
 address = 192.178.1.1:4222
-proxy_type = tor # or i2p 
+id = 2b199de909a1cb2773d45e8a2fdbe85175fe6ee4
+
 
 # search engines
 

@@ -1,11 +1,9 @@
 package kademlia
 
 import (
-	"bytes"
 	"crypto/sha1"
-	"encoding/binary"
-	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
 	"time"
 )
@@ -21,6 +19,13 @@ func NewKadId(addr string) KadId {
 	for i, ib := range sha1.Sum([]byte(addr)) {
 		bytez[i] = ib
 	}
+
+	return KadIdFromBytes(bytez)
+}
+
+func NewRandKadId() KadId {
+	bytez := make([]byte, 20)
+	rand.Read(bytez)
 
 	return KadIdFromBytes(bytez)
 }
@@ -90,6 +95,10 @@ func (a KadId) EvalHeight() int {
 		}
 	}
 	return 0
+}
+
+func (a KadId) String() string {
+	return fmt.Sprintf("%x%x%x%x%x", a[4], a[3], a[2], a[1], a[0])
 }
 
 type KNode struct {
@@ -174,6 +183,14 @@ func (kbuck *KBucket) insertReplacementNode(kn *KNode) {
 	kbuck.replacementNodes = append(kbuck.replacementNodes, kn)
 }
 
+func (kbuck *KBucket) isEmpty() bool {
+	return len(kbuck.nodes) == 0 && len(kbuck.nodes) == 0
+}
+
+func (kbuck *KBucket) isFull() bool {
+	return len(kbuck.nodes) == K
+}
+
 func (kbuck *KBucket) GetNodes() []*KNode {
 	return kbuck.nodes
 }
@@ -231,154 +248,4 @@ func (kbuck *KBucket) RemoveNode(kn *KNode) bool {
 		}
 	}
 	return present
-}
-
-/*
- Ktable (former peerDB)
-*/
-
-type KadRoutingTable struct {
-	self     *KNode
-	kbuckets []*KBucket
-}
-
-func NewKadRoutingTable(self *KNode) *KadRoutingTable {
-	ktable := KadRoutingTable{
-		self:     self,
-		kbuckets: make([]*KBucket, KAD_ID_LEN),
-	}
-
-	for i := 0; i < KAD_ID_LEN; i++ {
-		ktable.kbuckets[i] = NewKBucket(uint(i))
-	}
-	return &ktable
-}
-
-func (ktable *KadRoutingTable) GetKBuckets() []*KBucket {
-	return ktable.kbuckets
-}
-
-func (ktable *KadRoutingTable) PushNode(kn *KNode) {
-	ktable.kbuckets[kn.Id.EvalDistance(ktable.self.Id).EvalHeight()].PushNode(kn)
-}
-
-func (ktable *KadRoutingTable) RemoveNode(kn *KNode) bool {
-	return ktable.kbuckets[kn.Id.EvalDistance(ktable.self.Id).EvalHeight()].RemoveNode(kn)
-}
-
-func (ktable *KadRoutingTable) GetNClosestOf(kn *KNode, n int) []*KNode {
-	allNodes := make([]*KNode, 0)
-	for _, bucket := range ktable.kbuckets {
-		allNodes = append(allNodes, bucket.nodes...)
-	}
-	sort.Slice(allNodes, func(i, j int) bool {
-		iDistance := allNodes[i].Id.EvalDistance(kn.Id)
-		jDistance := allNodes[j].Id.EvalDistance(kn.Id)
-		return iDistance.lessThan(jDistance)
-	})
-	return allNodes[:n+1]
-}
-
-func (ktable *KadRoutingTable) GetNClosest(n int) []*KNode {
-	return ktable.GetNClosestOf(ktable.self, n)
-}
-
-func (ktable *KadRoutingTable) ToBytes() []byte {
-	//ktableHeader [height(1byte)][nentries(1byte)]
-	//knode_row [replacement(1byte)][kad_id(20 bytes)][lastseen(8bytes)][stales(1byte)][address(n-bytes)]
-
-	buffer := bytes.NewBuffer(nil)
-	for _, bucket := range ktable.kbuckets {
-		buffer.WriteByte(byte(bucket.height))
-		buffer.WriteByte(byte(len(bucket.nodes) + len(bucket.replacementNodes)))
-		for _, node := range bucket.nodes {
-			buffer.WriteByte(0)
-			buffer.Write(node.Id.ToBytes())
-			buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
-			buffer.WriteByte(byte(node.Stales))
-			buffer.WriteByte(byte(len(node.Address)))
-			buffer.Write([]byte(node.Address))
-		}
-		for _, node := range bucket.replacementNodes {
-			buffer.WriteByte(1)
-			buffer.Write(node.Id.ToBytes())
-			buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
-			buffer.WriteByte(byte(node.Stales))
-			buffer.WriteByte(byte(len(node.Address)))
-			buffer.Write([]byte(node.Address))
-		}
-	}
-
-	return buffer.Bytes()
-}
-
-func (ktable *KadRoutingTable) FromBytes(bytez []byte) error {
-	//ktableHeader [height(1byte)][nentries(1byte)]
-	//knode_row [replacement(1byte)][kad_id(20 bytes)][lastseen(8bytes)][stales(1byte)][address(n-bytes)]
-
-	buffer := bytes.NewBuffer(bytez)
-	for i := 0; i < 160; i++ {
-		height, err := buffer.ReadByte()
-		if err != nil {
-			return err
-		}
-		size, err := buffer.ReadByte()
-		if err != nil {
-			return err
-		}
-		for j := 0; j < int(size); j++ {
-			replacementByte, err := buffer.ReadByte()
-			if err != nil {
-				return err
-			}
-			kadIdBytez := make([]byte, 20)
-			n, err := buffer.Read(kadIdBytez)
-			if err != nil {
-				return err
-			}
-			if n != 20 {
-				return errors.New(" read: n != 20")
-			}
-			lastSeenBytez := make([]byte, 8)
-			n, err = buffer.Read(lastSeenBytez)
-			if err != nil {
-				return err
-			}
-			if n != 8 {
-				return errors.New(" read: n != 8")
-			}
-			stalesByte, err := buffer.ReadByte()
-			if err != nil {
-				return err
-			}
-			addressStrSize, err := buffer.ReadByte()
-			if err != nil {
-				return err
-			}
-			addressBytez := make([]byte, addressStrSize)
-			n, err = buffer.Read(addressBytez)
-			if err != nil {
-				return err
-			}
-			if n != int(addressStrSize) {
-				return fmt.Errorf(" read: n != %d", addressStrSize)
-			}
-
-			kn := KNode{
-				Id:       KadIdFromBytes(kadIdBytez),
-				LastSeen: binary.LittleEndian.Uint64(lastSeenBytez),
-				Stales:   uint(stalesByte),
-				Address:  string(addressBytez),
-			}
-
-			if replacementByte == 1 {
-				ktable.kbuckets[height].insertReplacementNode(&kn)
-			} else {
-				ktable.kbuckets[height].insertNode(&kn)
-			}
-		}
-		ktable.kbuckets[height].sortReplacements()
-	}
-
-	return nil
 }

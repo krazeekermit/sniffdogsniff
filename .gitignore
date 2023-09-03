@@ -7,7 +7,7 @@ __pycache__*
 *.db/
 *.pid
 *.log
-peers/
+*.dat
 
 #build dir
 build/
