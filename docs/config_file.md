@@ -14,9 +14,14 @@ min_search_results_threshold = 50                 # minimum results threshold fo
 [peer]
 address = 127.0.0.1:4222
 id = 199ee773164f7a8bedcbef3afa1bf398cf5febeb
+
+[peer]
+address = somepeer.onion
+id = 1ec6c7a7ec625077c958e9a321ec7f20c7725e70
 ```
 The initial peers to let you jump into the p2p network. Sniffdogsniff uses kademlia
 so the id of a peer is required. Usually is the sha1 of the address.
+Can be added as much initial peers as wanted by adding peer section multiple times.
 
 #### Proxy Settings
 ```ini
@@ -32,8 +37,11 @@ tor_socks5_proxy = 127.0.0.1:9050
 ```ini
 [node_service]
 enabled = yes # node is visible to other nodes
+bind_address = 0.0.0.0:4222
 ```
-If enabled allows other nodes to sync with your node.
+If enabled allows other nodes to sync with your node. Bind address specify the p2p
+bind address. If using tor or i2p service auto creation bind_address key is not 
+needed.
 
 * Example of configuration for tor onionservice listen address auto configuration
 ```ini
@@ -52,5 +60,11 @@ hidden_service = i2p
 i2p_sam_port = 7656
 i2p_sam_user = user
 i2p_sam_password = password
+```
+
+### Web Ui
+```ini
+[web_ui]
+bind_address = 0.0.0.0:8081 # bind address for web server
 ```
 
