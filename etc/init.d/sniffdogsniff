@@ -1,0 +1,39 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          sniffdogsniff
+# Short-Description: Start daemon at boot time
+# Description:       init script for SniffDogSniff.
+### END INIT INFO
+
+NAME="sniffdogsniff"
+DESC="P2P decentralized search engine"
+DAEMON=/usr/local/bin/sniffdogsniff
+CONFIG_FILE=/usr/local/etc/sniffdogsniff.ini
+PIDFILE=/var/sniffdogsniff/sds.pid
+
+case $1 in
+  start)
+    echo "Starting $NAME" "$NAME"
+    $DAEMON -c $CONFIG_FILE -d
+  ;;
+
+  stop)
+    echo "Stopping $DESC" "$NAME"
+    kill -INT $(cat $PIDFILE)
+    rm -f $PIDFILE
+  ;;
+    
+  restart)
+    $0 stop
+    sleep 2
+    $0 start
+  ;;
+
+  *)
+    echo "Usage: /etc/init.d/sniffdogsniff {start|stop|restart}"
+    exit 1
+  ;;
+esac
+
+# End of file

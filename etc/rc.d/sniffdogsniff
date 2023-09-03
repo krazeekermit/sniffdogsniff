@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# Init script for SniffDogSniff
+#
+
+. /etc/rc.subr
+
+name=sniffdogsniff
+rcvar=sniffdogsniff_enable 
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+
+load_rc_config $name 
+: ${sniffdogsniff_enable:=no} 
+: ${work_dir=/var/sniffdogsniff} 
+: ${conf_file=/usr/local/etc/sniffdogsniff.ini}  
+: ${pid_file=$work_dir/sds.pid} 
+
+sniffdogsniff_start()
+{
+        /usr/local/bin/sniffdogsniff -c $conf_file -d
+}
+
+sniffdogsniff_stop()
+{
+        kill -INT $(cat $pid_file)
+        rm -f $pid_file
+}
+
+
+run_rc_command "$1"

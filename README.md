@@ -13,7 +13,7 @@ sniffdogsniff --config config.ini
 
 
 ### Documentation
-* [Build](docs/build.md)
+* [Build and Install](docs/build.md)
 * [Configuration file](docs/config_file.md)
 
 ### Code contribution
