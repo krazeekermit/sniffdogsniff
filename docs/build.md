@@ -1,14 +1,23 @@
 ## Build and Install
 ### Build
 
-You need to setup go development environment first [see here](https://go.dev/doc/install).
+* Install Go
+Download Go here [see here](https://go.dev/doc/install).
 
-This is how to build in linux and unix Operating Systems:
+On FreeBSD you can install Go from the packages repos or from ports
+```bash
+pkg install lang/go
+```
+or
+```bash
+cd /usr/ports/lang/go/ && make install clean
+```
 
+* Build
 ```bash
 cd <your goroot>/src/
-mkdir gitlab.com && cd gitlab.com
-git clone https://gitlab.com/c3rzthefrog/sniffdogsniff.git
+mkdir github.com && cd github.com
+git clone https://github.com/krazeekermit/sniffdogsniff.git
 cd sniffdogsniff
 make
 ```
