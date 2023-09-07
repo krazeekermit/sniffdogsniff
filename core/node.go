@@ -46,20 +46,15 @@ type LocalNode struct {
 	firstSyncLockFilePath string
 	selfNodeFilePath      string
 	ktable                *kademlia.KadRoutingTable
-	SelfNode              *kademlia.KNode
+	knownNodes            map[kademlia.KadId]string
 }
 
 func NewNode(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
+	ln.knownNodes = configs.KnownPeers
 	ln.selfNodeFilePath = filepath.Join(configs.WorkDirPath, SELF_PEER_FILE_NAME)
-	ln.ktable = kademlia.NewKadRoutingTable(ln.GetSelfNode())
+	ln.ktable = kademlia.NewKadRoutingTable()
 	ln.ktable.Open(configs.WorkDirPath)
-	if ln.ktable.IsEmpty() {
-		for id, addr := range configs.KnownPeers {
-			logging.LogTrace(addr)
-			ln.ktable.PushNode(kademlia.NewKNode(id, addr))
-		}
-	}
 
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize)
 	ln.proxySettings = configs.ProxySettings
@@ -78,59 +73,21 @@ func NewNode(configs SdsConfig) *LocalNode {
 	return &ln
 }
 
-func (ln *LocalNode) GetSelfNode() *kademlia.KNode {
-	if util.FileExists(ln.selfNodeFilePath) {
-		fp, err := os.OpenFile(ln.selfNodeFilePath, os.O_RDONLY, 0600)
-		if err != nil {
-			logging.LogError("failed to open file", ln.selfNodeFilePath, err)
-			goto fail_read
-		}
-		kadIdBytez := make([]byte, 20)
-		n, err := fp.Read(kadIdBytez)
-		if err != nil || n != 20 {
-			fp.Close()
-			goto fail_read
-		}
-		kadId := kademlia.KadIdFromBytes(kadIdBytez)
-
-		addressBytez := make([]byte, 0)
-		for {
-			buf := make([]byte, 1024)
-			n, err := fp.Read(buf)
-			if err != nil {
-				fp.Close()
-				goto fail_read
-			}
-			addressBytez = append(addressBytez, buf[:n]...)
-			if n < 1024 {
-				break
-			}
-		}
-		fp.Close()
-		addr := string(addressBytez)
-
-		logging.LogInfo("Using cahched node address", addr, "with id", kadId)
-		return &kademlia.KNode{
-			Id:      kadId,
-			Address: addr,
-		}
-	}
-fail_read:
-	return kademlia.NewKNode(kademlia.NewRandKadId(), "")
+func (ln *LocalNode) SelfNode() *kademlia.KNode {
+	return ln.ktable.SelfNode()
 }
 
 func (ln *LocalNode) SetNodeAddress(addr string) {
-	selfNode := kademlia.NewKNode(kademlia.NewKadId(addr), addr)
-	ln.ktable.SetSelfNode(selfNode)
-	ln.SelfNode = selfNode
-	fp, err := os.OpenFile(ln.selfNodeFilePath, os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		logging.LogError("failed to open file", ln.selfNodeFilePath, err)
-		return
+	ln.tsLock.Lock()
+	ln.ktable.SetSelfNode(kademlia.NewKNode(kademlia.NewKadId(addr), addr))
+	if ln.ktable.IsEmpty() {
+		for id, addr := range ln.knownNodes {
+			logging.LogTrace(addr)
+			ln.ktable.PushNode(kademlia.NewKNode(id, addr))
+		}
 	}
-	fp.Write(selfNode.Id.ToBytes())
-	fp.Write([]byte(selfNode.Address))
-	fp.Close()
+	// ln.ktable.Flush() // is needed?
+	ln.tsLock.Unlock()
 }
 
 func (ln *LocalNode) KadRoutingTable() *kademlia.KadRoutingTable {
@@ -168,12 +125,13 @@ func (ln *LocalNode) GetResultsForSync(timestamp uint64) []SearchResult {
 
 func (ln *LocalNode) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	ln.tsLock.Lock()
-	closest := ln.ktable.GetKClosest()
+	closest := ln.ktable.GetKClosestTo(id)
+	ln.tsLock.Unlock()
+
 	closestMap := make(map[kademlia.KadId]string)
 	for _, ikn := range closest {
 		closestMap[ikn.Id] = ikn.Address
 	}
-	ln.tsLock.Unlock()
 	return closestMap
 }
 
@@ -249,39 +207,18 @@ func (ln *LocalNode) SyncWithPeer() {
 		rn := NewNodeClient(ikn.Address, ln.proxySettings)
 		logging.LogInfo("Sync with ", ikn.Address)
 
-		remoteErr, err := rn.Ping(ln.SelfNode.Id, ln.SelfNode.Address)
+		remoteErr, err := rn.Ping(ln.SelfNode().Id, ln.SelfNode().Address)
 		/* if the first peer does not respond and the db is
 		empty first sync flag is set back to false to avoid
 		infinite loop cycle blocking the all node.*/
 
 		if firstSyncFileExists {
-			logging.LogTrace("firstSync :: ", err == nil)
 			ln.firstSync = err == nil
 		}
 		if err != nil {
 			logging.LogWarn("Unsuccessful peer ping: aborting sync: caused by", err)
 			goto sync_fail
 		}
-
-		/* Sync of peers */
-		// if !ln.ktable.IsFull() {
-		// 	newNodes, err := rn.FindNode()
-		// 	if err != nil {
-		// 		goto sync_fail
-		// 	}
-
-		// 	logging.LogTrace("Received", len(newNodes), "new nodes")
-		// 	if len(newNodes) > 0 {
-		// 		ln.tsLock.Lock()
-		// 		for id, addr := range newNodes {
-		// 			if id.Eq(ln.SelfNode.Id) {
-		// 				continue
-		// 			}
-		// 			ln.ktable.PushNode(kademlia.NewKNode(id, addr))
-		// 		}
-		// 		ln.tsLock.Unlock()
-		// 	}
-		// }
 
 		if remoteErr == CANT_SYNC_ERROR {
 			continue
@@ -510,7 +447,7 @@ func (ln *LocalNode) StartNodesLookupTask() {
 			logging.LogInfo("Nodes Lookup rounds started")
 			d := 0
 			for i := 0; i < kademlia.KAD_ID_LEN; i++ {
-				ln.DoNodesLookup(kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode.Id, i), "")) // node of distance i from self
+				ln.DoNodesLookup(kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode().Id, i), "")) // node of distance i from self
 			}
 			logging.LogInfo("Discovered", d, "new nodes")
 		}

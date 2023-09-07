@@ -355,7 +355,8 @@ func TestKTable_PushNodes(t *testing.T) {
 	k0[2] = 0xa51b26e5
 	k0[3] = 0x7b6cf56b
 	k0[4] = 0x8737fa6d
-	ktable := kademlia.NewKadRoutingTable(kademlia.NewKNode(k0, "self.onion"))
+	ktable := kademlia.NewKadRoutingTable()
+	ktable.SetSelfNode(kademlia.NewKNode(k0, "self.onion"))
 
 	// 0x7d152893 aba66ff1 0fc9e598 114d90d6 e013471a
 	var k1 kademlia.KadId
@@ -427,7 +428,8 @@ func TestKTable_RemoveNodes(t *testing.T) {
 	k0[2] = 0xa51b26e5
 	k0[3] = 0x7b6cf56b
 	k0[4] = 0x8737fa6d
-	ktable := kademlia.NewKadRoutingTable(kademlia.NewKNode(k0, "self.onion"))
+	ktable := kademlia.NewKadRoutingTable()
+	ktable.SetSelfNode(kademlia.NewKNode(k0, "self.onion"))
 
 	// 0x7d152893 aba66ff1 0fc9e598 114d90d6 e013471a
 	var k1 kademlia.KadId
@@ -499,7 +501,8 @@ func TestKTable_GetClosest(t *testing.T) {
 	k0[2] = 0xa51b26e5
 	k0[3] = 0x7b6cf56b
 	k0[4] = 0x8737fa6d
-	ktable := kademlia.NewKadRoutingTable(kademlia.NewKNode(k0, "self.onion"))
+	ktable := kademlia.NewKadRoutingTable()
+	ktable.SetSelfNode(kademlia.NewKNode(k0, "self.onion"))
 
 	// 0x7d152893 aba66ff1 0fc9e598 114d90d6 e013471a
 	var k1 kademlia.KadId
@@ -577,7 +580,9 @@ func TestKTable_ToBytesFromBytes(t *testing.T) {
 	k0[2] = 0xa51b26e5
 	k0[3] = 0x7b6cf56b
 	k0[4] = 0x8737fa6d
-	ktable := kademlia.NewKadRoutingTable(kademlia.NewKNode(k0, "self.onion"))
+	ktable := kademlia.NewKadRoutingTable()
+	kself := kademlia.NewKNode(k0, "self.onion")
+	ktable.SetSelfNode(kself)
 
 	// 0x7d152893 aba66ff1 0fc9e598 114d90d6 e013471a
 	var k1 kademlia.KadId
@@ -625,11 +630,19 @@ func TestKTable_ToBytesFromBytes(t *testing.T) {
 	kn4 := kademlia.NewKNode(k4, "thirstingcagecagesubtitle.onion")
 	ktable.PushNode(kn4)
 
-	ktable2 := kademlia.NewKadRoutingTable(kademlia.NewKNode(k0, "self1.onion"))
+	ktable2 := kademlia.NewKadRoutingTable()
 
 	err := ktable2.FromBytes(ktable.ToBytes())
 	if err != nil {
 		t.Fatalf(err.Error())
+	}
+
+	// self node
+	if !ktable2.SelfNode().Id.Eq(kself.Id) {
+		t.Fatal()
+	}
+	if ktable2.SelfNode().Address != kself.Address {
+		t.Fatal()
 	}
 
 	//k1 in buck 159
