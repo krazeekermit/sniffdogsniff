@@ -9,6 +9,7 @@ import (
 )
 
 const K int = 20
+const ALPHA int = 3
 const KAD_ID_LEN int = 160
 const STALES_THR uint = 5 //to be changed
 
@@ -28,6 +29,22 @@ func NewRandKadId() KadId {
 	rand.Read(bytez)
 
 	return KadIdFromBytes(bytez)
+}
+
+func GenKadIdFarNBitsFrom(a KadId, d int) KadId {
+	dIdx := KAD_ID_LEN - d
+	var ax KadId
+	var i int
+	for i = 0; i < dIdx/32; i++ {
+		ax[i] = 0x00000000
+	}
+	if i < 5 {
+		ax[i] = 0xffffffff << ((dIdx - i*32) % 32)
+	}
+	for i++; i < 5; i++ {
+		ax[i] = 0xffffffff
+	}
+	return a.EvalDistance(ax)
 }
 
 func KadIdFromBytes(bz []byte) KadId {
@@ -64,7 +81,7 @@ func (a KadId) EvalDistance(b KadId) KadId {
 	return d
 }
 
-func (a KadId) lessThan(b KadId) bool {
+func (a KadId) LessThan(b KadId) bool {
 	if a[4] != b[4] {
 		return a[4] < b[4]
 	}
@@ -98,7 +115,11 @@ func (a KadId) EvalHeight() int {
 }
 
 func (a KadId) String() string {
-	return fmt.Sprintf("%x%x%x%x%x", a[4], a[3], a[2], a[1], a[0])
+	return fmt.Sprintf("0x%08x%08x%08x%08x%08x", a[4], a[3], a[2], a[1], a[0])
+}
+
+func (a KadId) StrBts() string {
+	return fmt.Sprintf("0b%032b%032b%032b%032b%032b", a[4], a[3], a[2], a[1], a[0])
 }
 
 type KNode struct {
@@ -184,7 +205,7 @@ func (kbuck *KBucket) insertReplacementNode(kn *KNode) {
 }
 
 func (kbuck *KBucket) isEmpty() bool {
-	return len(kbuck.nodes) == 0 && len(kbuck.nodes) == 0
+	return len(kbuck.nodes) == 0 && len(kbuck.replacementNodes) == 0
 }
 
 func (kbuck *KBucket) isFull() bool {

@@ -86,8 +86,11 @@ func (fn *fakeNode) GetMetadataOf(hashes []core.Hash256) []core.ResultMeta {
 	return []core.ResultMeta{RMETA1, RMETA2}
 }
 
-func (fn *fakeNode) GetKClosestNodes() map[kademlia.KadId]string {
-	fn.args["GetPeersForSync"] = nil
+func (fn *fakeNode) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
+	fn.args["FindNode"] = nil
+	if !id.Eq(PEER1_ID) {
+		fn.args["FindNode"] = fmt.Errorf("arguments does not match: %s != %s", id, PEER1_ID)
+	}
 	return map[kademlia.KadId]string{
 		PEER1_ID: PEER1_ADDR,
 		PEER2_ID: PEER2_ADDR,
@@ -180,20 +183,20 @@ func TestRpc_GetStatus_1000(t *testing.T) {
 	}
 }
 
-func TestRpc_GetPeersForSync(t *testing.T) {
+func TestRpc_FindNode(t *testing.T) {
 	setupFakeNodeServer()
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	peers, err := client.GetKClosestNodes()
+	peers, err := client.FindNode(PEER1_ID)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	if !node.wasCalled("GetPeersForSync") {
+	if !node.wasCalled("FindNode") {
 		t.Fatal()
 	}
-	err = node.argsDoMatch("GetPeersForSync")
+	err = node.argsDoMatch("FindNode")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}

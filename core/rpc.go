@@ -23,7 +23,7 @@ const (
 	FCODE_HANDSHAKE             = 100
 	FCODE_GETSTATUS             = 101
 	FCODE_GET_RESULTS_FOR_SYNC  = 102
-	FCODE_GET_PEERS_FOR_SYNC    = 103
+	FCODE_FIND_NODE             = 103
 	FCODE_GET_METADATA_FOR_SYNC = 104
 	FCODE_GET_METADATA_OF       = 105
 )
@@ -152,15 +152,16 @@ func (srv *NodeServer) ping(args PingArgs, reply *PingReply) {
 	(*reply).Error = srv.node.Ping(args.PingerId, args.PingerAddress)
 }
 
-type GetKCLosestNodesArgs struct {
+type FindNodeArgs struct {
+	Id kademlia.KadId
 }
 
-type GetKCLosestNodesReply struct {
+type FindNodeReply struct {
 	NewNodes map[kademlia.KadId]string
 }
 
-func (srv *NodeServer) getPeersForSync(args GetKCLosestNodesArgs, reply *GetKCLosestNodesReply) {
-	(*reply).NewNodes = srv.node.GetKClosestNodes()
+func (srv *NodeServer) findNode(args FindNodeArgs, reply *FindNodeReply) {
+	(*reply).NewNodes = srv.node.FindNode(args.Id)
 }
 
 type GetStatusArgs struct {
@@ -314,16 +315,16 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			var reply GetResultsForSyncReply
 			srv.getResultsForSync(args, &reply)
 			returned = reply
-		case FCODE_GET_PEERS_FOR_SYNC:
-			var args GetKCLosestNodesArgs
+		case FCODE_FIND_NODE:
+			var args FindNodeArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
 				logging.LogTrace(err.Error())
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			var reply GetKCLosestNodesReply
-			srv.getPeersForSync(args, &reply)
+			var reply FindNodeReply
+			srv.findNode(args, &reply)
 			returned = reply
 		case FCODE_GET_METADATA_FOR_SYNC:
 			var args TimestampArgs
@@ -425,9 +426,9 @@ func (rn *NodeClient) GetMetadataForSync(ts uint64) ([]ResultMeta, error) {
 	return reply.Metadatas, nil
 }
 
-func (rn *NodeClient) GetKClosestNodes() (map[kademlia.KadId]string, error) {
-	var reply GetKCLosestNodesReply
-	err := rn.callRemoteFunction(FCODE_GET_PEERS_FOR_SYNC, GetKCLosestNodesArgs{}, &reply)
+func (rn *NodeClient) FindNode(id kademlia.KadId) (map[kademlia.KadId]string, error) {
+	var reply FindNodeReply
+	err := rn.callRemoteFunction(FCODE_FIND_NODE, FindNodeArgs{id}, &reply)
 	if err != nil {
 		return nil, err
 	}

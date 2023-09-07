@@ -18,6 +18,14 @@ const KTABLE_FILENAME = "ktable.dat"
  Ktable (former peerDB)
 */
 
+func SortNodesByDistance(id KadId, nodes []*KNode) {
+	sort.Slice(nodes, func(i, j int) bool {
+		iDistance := nodes[i].Id.EvalDistance(id)
+		jDistance := nodes[j].Id.EvalDistance(id)
+		return iDistance.LessThan(jDistance)
+	})
+}
+
 type KadRoutingTable struct {
 	self     *KNode
 	filePath string
@@ -71,16 +79,12 @@ func (ktable *KadRoutingTable) RemoveNode(kn *KNode) bool {
 	return ktable.kbuckets[kn.Id.EvalDistance(ktable.self.Id).EvalHeight()].RemoveNode(kn)
 }
 
-func (ktable *KadRoutingTable) GetNClosestOf(kn *KNode, n int) []*KNode {
+func (ktable *KadRoutingTable) GetNClosestTo(targetId KadId, n int) []*KNode {
 	allNodes := make([]*KNode, 0)
 	for _, bucket := range ktable.kbuckets {
 		allNodes = append(allNodes, bucket.nodes...)
 	}
-	sort.Slice(allNodes, func(i, j int) bool {
-		iDistance := allNodes[i].Id.EvalDistance(kn.Id)
-		jDistance := allNodes[j].Id.EvalDistance(kn.Id)
-		return iDistance.lessThan(jDistance)
-	})
+	SortNodesByDistance(targetId, allNodes)
 
 	if len(allNodes) < n {
 		n = len(allNodes)
@@ -89,11 +93,15 @@ func (ktable *KadRoutingTable) GetNClosestOf(kn *KNode, n int) []*KNode {
 }
 
 func (ktable *KadRoutingTable) GetNClosest(n int) []*KNode {
-	return ktable.GetNClosestOf(ktable.self, n)
+	return ktable.GetNClosestTo(ktable.self.Id, n)
 }
 
 func (ktable *KadRoutingTable) GetKClosest() []*KNode {
-	return ktable.GetNClosestOf(ktable.self, K)
+	return ktable.GetNClosestTo(ktable.self.Id, K)
+}
+
+func (ktable *KadRoutingTable) GetKClosestTo(id KadId) []*KNode {
+	return ktable.GetNClosestTo(id, K)
 }
 
 func (ktable *KadRoutingTable) ToBytes() []byte {

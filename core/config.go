@@ -105,7 +105,7 @@ type SdsConfig struct {
 	AllowResultsInvalidation bool
 	WebServiceBindAddress    string
 	KnownPeers               map[kademlia.KadId]string
-	proxySettings            proxies.ProxySettings
+	ProxySettings            proxies.ProxySettings
 	P2PServerEnabled         bool
 	P2PServerProto           hiddenservice.NetProtocol
 	searchEngines            map[string]SearchEngine
@@ -208,22 +208,22 @@ func NewSdsConfig(path string) SdsConfig {
 	if iniData.HasSection(PROXY_SETTINGS) {
 		proxySettingsSection := iniData.Section(PROXY_SETTINGS)
 		if proxySettingsSection.HasKey(FORCE_TOR_PROXY) {
-			cfg.proxySettings.ForceTor, err = proxySettingsSection.Key(FORCE_TOR_PROXY).Bool()
+			cfg.ProxySettings.ForceTor, err = proxySettingsSection.Key(FORCE_TOR_PROXY).Bool()
 			if err != nil {
-				cfg.proxySettings.ForceTor = false
+				cfg.ProxySettings.ForceTor = false
 			}
 		} else {
-			cfg.proxySettings.ForceTor = false
+			cfg.ProxySettings.ForceTor = false
 		}
 		if proxySettingsSection.HasKey(TOR_SOCKS5_PROXY) {
-			cfg.proxySettings.TorSocks5Addr = proxySettingsSection.Key(TOR_SOCKS5_PROXY).String()
+			cfg.ProxySettings.TorSocks5Addr = proxySettingsSection.Key(TOR_SOCKS5_PROXY).String()
 		} else {
-			cfg.proxySettings.TorSocks5Addr = "127.0.0.1:9050"
+			cfg.ProxySettings.TorSocks5Addr = "127.0.0.1:9050"
 		}
 		if proxySettingsSection.HasKey(I2P_SOCKS5_PROXY) {
-			cfg.proxySettings.I2pSocks5Addr = proxySettingsSection.Key(I2P_SOCKS5_PROXY).String()
+			cfg.ProxySettings.I2pSocks5Addr = proxySettingsSection.Key(I2P_SOCKS5_PROXY).String()
 		} else {
-			cfg.proxySettings.I2pSocks5Addr = "127.0.0.1:4447"
+			cfg.ProxySettings.I2pSocks5Addr = "127.0.0.1:4447"
 		}
 	} else {
 		panicNoSection(PROXY_SETTINGS)

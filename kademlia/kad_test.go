@@ -128,6 +128,33 @@ func TestKadId_Xor(t *testing.T) {
 
 }
 
+func TestKadId_GenIdDistant(t *testing.T) {
+	var k1 kademlia.KadId
+
+	k1[0] = 0
+	k1[1] = 0
+	k1[2] = 0
+	k1[3] = 0
+	k1[4] = 0
+
+	if kademlia.GenKadIdFarNBitsFrom(k1, 7)[4] != 0xfe000000 {
+		t.Fatal()
+	}
+
+	if kademlia.GenKadIdFarNBitsFrom(k1, 27)[4] != 0xffffffe0 {
+		t.Fatal()
+	}
+
+	if kademlia.GenKadIdFarNBitsFrom(k1, 43)[3] != 0xffe00000 {
+		t.Fatal()
+	}
+
+	if kademlia.GenKadIdFarNBitsFrom(k1, 92)[2] != 0xfffffff0 {
+		t.Fatal()
+	}
+
+}
+
 func TestKBucket_AddNodes(t *testing.T) {
 	kBucket := kademlia.NewKBucket(0)
 
@@ -527,7 +554,7 @@ func TestKTable_GetClosest(t *testing.T) {
 	ka1[4] = 0x0ca57664
 	kna1 := kademlia.NewKNode(ka1, "ka1.onion")
 
-	closest := ktable.GetNClosestOf(kna1, 4)
+	closest := ktable.GetNClosestTo(kna1.Id, 4)
 	if !closest[0].Id.Eq(kn1.Id) {
 		t.Fatal()
 	}

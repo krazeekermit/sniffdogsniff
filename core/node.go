@@ -15,8 +15,9 @@ import (
 
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"
 
-const NORMAL_SYNC_DELAY = 30000 // milliseconds
-const FIRST_SYNC_DELAY = 1      // milliseconds
+const NORMAL_NODES_LOOKUP_DELAY = 300 // seconds
+const NORMAL_SYNC_DELAY = 30          // seconds
+const FIRST_SYNC_DELAY = 1            // seconds
 
 const SELF_PEER_FILE_NAME = "selfnode.dat"
 
@@ -31,7 +32,7 @@ type NodeInterface interface {
 	GetResultsForSync(timestamp uint64) []SearchResult
 	GetMetadataForSync(ts uint64) []ResultMeta
 	GetMetadataOf(hashes []Hash256) []ResultMeta
-	GetKClosestNodes() map[kademlia.KadId]string
+	FindNode(id kademlia.KadId) map[kademlia.KadId]string
 }
 
 type LocalNode struct {
@@ -41,7 +42,7 @@ type LocalNode struct {
 	searchDB              SearchDB
 	searchEngines         map[string]SearchEngine
 	minResultsThr         int
-	FirstSync             bool
+	firstSync             bool
 	firstSyncLockFilePath string
 	selfNodeFilePath      string
 	ktable                *kademlia.KadRoutingTable
@@ -61,7 +62,7 @@ func NewNode(configs SdsConfig) *LocalNode {
 	}
 
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize)
-	ln.proxySettings = configs.proxySettings
+	ln.proxySettings = configs.ProxySettings
 	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = &sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
@@ -71,7 +72,7 @@ func NewNode(configs SdsConfig) *LocalNode {
 		os.Create(ln.firstSyncLockFilePath)
 	}
 	if util.FileExists(ln.firstSyncLockFilePath) {
-		ln.FirstSync = true
+		ln.firstSync = true
 		logging.LogWarn("Your Node is not already synced with the rest of the network, you are in FIRSTSYNC mode!")
 	}
 	return &ln
@@ -132,6 +133,10 @@ func (ln *LocalNode) SetNodeAddress(addr string) {
 	fp.Close()
 }
 
+func (ln *LocalNode) KadRoutingTable() *kademlia.KadRoutingTable {
+	return ln.ktable
+}
+
 func (ln *LocalNode) firstSyncLockFileExists() bool {
 	return util.FileExists(ln.firstSyncLockFilePath)
 }
@@ -161,7 +166,7 @@ func (ln *LocalNode) GetResultsForSync(timestamp uint64) []SearchResult {
 	return results
 }
 
-func (ln *LocalNode) GetKClosestNodes() map[kademlia.KadId]string {
+func (ln *LocalNode) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	ln.tsLock.Lock()
 	closest := ln.ktable.GetKClosest()
 	closestMap := make(map[kademlia.KadId]string)
@@ -250,7 +255,8 @@ func (ln *LocalNode) SyncWithPeer() {
 		infinite loop cycle blocking the all node.*/
 
 		if firstSyncFileExists {
-			ln.FirstSync = err == nil
+			logging.LogTrace("firstSync :: ", err == nil)
+			ln.firstSync = err == nil
 		}
 		if err != nil {
 			logging.LogWarn("Unsuccessful peer ping: aborting sync: caused by", err)
@@ -258,24 +264,24 @@ func (ln *LocalNode) SyncWithPeer() {
 		}
 
 		/* Sync of peers */
-		if !ln.ktable.IsFull() {
-			newNodes, err := rn.GetKClosestNodes()
-			if err != nil {
-				goto sync_fail
-			}
+		// if !ln.ktable.IsFull() {
+		// 	newNodes, err := rn.FindNode()
+		// 	if err != nil {
+		// 		goto sync_fail
+		// 	}
 
-			logging.LogTrace("Received", len(newNodes), "new nodes")
-			if len(newNodes) > 0 {
-				ln.tsLock.Lock()
-				for id, addr := range newNodes {
-					if id.Eq(ln.SelfNode.Id) {
-						continue
-					}
-					ln.ktable.PushNode(kademlia.NewKNode(id, addr))
-				}
-				ln.tsLock.Unlock()
-			}
-		}
+		// 	logging.LogTrace("Received", len(newNodes), "new nodes")
+		// 	if len(newNodes) > 0 {
+		// 		ln.tsLock.Lock()
+		// 		for id, addr := range newNodes {
+		// 			if id.Eq(ln.SelfNode.Id) {
+		// 				continue
+		// 			}
+		// 			ln.ktable.PushNode(kademlia.NewKNode(id, addr))
+		// 		}
+		// 		ln.tsLock.Unlock()
+		// 	}
+		// }
 
 		if remoteErr == CANT_SYNC_ERROR {
 			continue
@@ -311,8 +317,8 @@ func (ln *LocalNode) SyncWithPeer() {
 				ln.tsLock.Unlock()
 			}
 		} else {
-			if ln.FirstSync {
-				ln.FirstSync = false
+			if ln.firstSync {
+				ln.firstSync = false
 			}
 		}
 
@@ -370,24 +376,143 @@ func (ln *LocalNode) SyncWithPeer() {
 }
 
 func (ln *LocalNode) StartSyncTask() {
-	ticker := time.NewTicker(time.Duration(FIRST_SYNC_DELAY) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(FIRST_SYNC_DELAY) * time.Second)
 	syncCycles := 0
 	go func() {
 		for range ticker.C {
 			delay := NORMAL_SYNC_DELAY
-			if ln.FirstSync {
+			if ln.firstSync {
 				delay = FIRST_SYNC_DELAY
 			}
-			ticker.Reset(time.Duration(delay) * time.Millisecond)
+			ticker.Reset(time.Duration(delay) * time.Second)
 			ln.SyncWithPeer()
 			syncCycles++
-			if syncCycles >= 5 { // every 5 cycles the data is flushed to disk (number choice is totally hempiric)
-				ln.tsLock.Lock()
-				ln.searchDB.Flush()
-				ln.ktable.Flush()
-				ln.tsLock.Unlock()
-				syncCycles = 0
+			// if syncCycles >= 5 { // every 5 cycles the data is flushed to disk (number choice is totally hempiric)
+			// 	ln.tsLock.Lock()
+			// 	ln.searchDB.Flush()
+			// 	ln.ktable.Flush()
+			// 	ln.tsLock.Unlock()
+			// 	syncCycles = 0
+			// }
+		}
+	}()
+}
+
+func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet operational
+	alphaClosest := ln.ktable.GetNClosest(kademlia.ALPHA)
+	if len(alphaClosest) == 0 {
+		return 0
+	}
+
+	nDiscovered := 0
+	var closest *kademlia.KNode = alphaClosest[0]
+	var wg sync.WaitGroup
+	var discovered, probed, failed sync.Map
+
+	for {
+		for _, ikn := range alphaClosest {
+			wg.Add(1)
+			go func(kn *kademlia.KNode, targetId kademlia.KadId, proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
+				defer wg.Done()
+				rn := NewNodeClient(kn.Address, proxySettings)
+				newNodes, err := rn.FindNode(targetId) //FIXME: needs to be changed in FindNode(id *kademlia.KadId) []*kademlia.KNode
+				probed.Store(kn.Id, kn)
+				if err != nil {
+					failed.Store(kn.Id, kn)
+					return
+				} else {
+					for id, addr := range newNodes {
+						discovered.Store(id, kademlia.NewKNode(id, addr))
+					}
+				}
+
+			}(ikn, targetNode.Id, ln.proxySettings, &discovered, &probed, &failed)
+		}
+
+		// Usage of wait group to speed up the process
+		wg.Wait()
+
+		/* Insert Nodes into the ktable */
+		ln.tsLock.Lock()
+		for _, ikn := range alphaClosest {
+			_, present := failed.Load(ikn.Id)
+			if present {
+				ln.ktable.RemoveNode(ikn)
+			} else {
+				ln.ktable.PushNode(ikn)
 			}
+		}
+
+		/* resets the alpha closest */
+		alphaClosest = make([]*kademlia.KNode, 0)
+
+		/* insert the new nodes and populates the not-yet-probed nodes list*/
+		discovered.Range(func(key, value any) bool {
+			kn, ok := value.(*kademlia.KNode)
+			if !ok {
+				return true // continue
+			}
+
+			_, present := probed.Load(key)
+			if !present { // if not present in failed means that it has not already been probed
+				nDiscovered++
+				//inserts the new node
+				ln.ktable.PushNode(kn)
+				alphaClosest = append(alphaClosest, kn)
+			}
+			return true
+		})
+		ln.tsLock.Unlock()
+
+		/* The algo finishes when all the nodes are probed */
+		if len(alphaClosest) == 0 {
+			break
+		}
+
+		kademlia.SortNodesByDistance(targetNode.Id, alphaClosest)
+
+		newClosest := alphaClosest[0]
+		if closest != nil {
+			previousDistance := closest.Id.EvalDistance(targetNode.Id)
+			newDistance := newClosest.Id.EvalDistance(targetNode.Id)
+			if newDistance.LessThan(previousDistance) {
+				closest = newClosest
+
+				/*
+					if the closest node found by this round of find_nodes is actually closest than the previous
+					closest node only the alpha nodes are going to be probed, if the round did not found a closer
+					node than the previous one then the next round of find_nodes will ask all the unprobed nodes found.
+				*/
+				if len(alphaClosest) >= kademlia.ALPHA {
+					alphaClosest = alphaClosest[:kademlia.ALPHA-1]
+				}
+			}
+		} else {
+			closest = newClosest
+		}
+	}
+
+	return nDiscovered
+}
+
+func (ln *LocalNode) StartNodesLookupTask() {
+	delay := time.Duration(NORMAL_NODES_LOOKUP_DELAY)
+	if ln.firstSync {
+		delay = time.Duration(FIRST_SYNC_DELAY)
+	}
+	ticker := time.NewTicker(delay * time.Second) // node refresh every 20 minutes
+	go func() {
+		for range ticker.C {
+			if delay == 1 {
+				delay = NORMAL_NODES_LOOKUP_DELAY
+			}
+			ticker.Reset(delay * time.Second)
+			logging.LogInfo("Nodes Lookup rounds started")
+			d := 0
+			for i := 0; i < kademlia.KAD_ID_LEN; i++ {
+				ln.DoNodesLookup(kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode.Id, i), "")) // node of distance i from self
+			}
+			logging.LogInfo("Discovered", d, "new nodes")
 		}
 	}()
 }
