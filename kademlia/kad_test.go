@@ -224,22 +224,19 @@ func TestKBucket_AddNodes_LastSeen(t *testing.T) {
 	if kBucket.GetNodes()[4].LastSeen != t1 {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[7].LastSeen != t1 {
+	if kBucket.GetNodes()[3].LastSeen != t1 {
 		t.Fatal()
 	}
 	if kBucket.GetNodes()[2].LastSeen != t1 {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[15].LastSeen != t1+1 {
+	if kBucket.GetNodes()[1].LastSeen != t1+1 {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[9].LastSeen != t1+2 {
+	if kBucket.GetNodes()[0].LastSeen != t1+2 {
 		t.Fatal()
 	}
-	for i := 0; i < 20; i++ {
-		if i == 4 || i == 2 || i == 7 || i == 15 || i == 9 {
-			continue
-		}
+	for i := 5; i < 20; i++ {
 		if kBucket.GetNodes()[i].LastSeen != 0 {
 			t.Fatal()
 		}
@@ -334,7 +331,7 @@ func TestKBucket_RemoveThenAddNode_WithReplacementCache(t *testing.T) {
 	if kBucket.GetNodes()[9].Id.Eq(nodesList[9].Id) {
 		t.Fatal()
 	}
-	if !kBucket.GetNodes()[19].Id.Eq(nodesList[21].Id) {
+	if !kBucket.GetNodes()[0].Id.Eq(nodesList[21].Id) {
 		t.Fatal()
 	}
 

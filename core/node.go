@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,9 +16,11 @@ import (
 
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"
 
-const NORMAL_NODES_LOOKUP_DELAY = 300 // seconds
-const NORMAL_SYNC_DELAY = 30          // seconds
-const FIRST_SYNC_DELAY = 1            // seconds
+const LOOKUP_ROUND_TIME_THR = 20        // seconds
+const NORMAL_NODES_LOOKUP_DELAY = 900   // seconds
+const NON_FULL_NODES_LOOKUP_DELAY = 120 // seconds
+const NORMAL_SYNC_DELAY = 30            // seconds
+const FIRST_SYNC_DELAY = 1              // seconds
 
 const SELF_PEER_FILE_NAME = "selfnode.dat"
 
@@ -192,6 +195,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
  * SniffDogSniff uses:
  *  * Kademlia for peers discovery;
  *  * Epidemic Gossip protocol SI model pull method for syncing SearchResults;
+ *  (gossip SI will be replaced entirely with Kademlia DHT, in the future)
  */
 
 func (ln *LocalNode) SyncWithPeer() {
@@ -342,6 +346,8 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 	}
 
 	nDiscovered := 0
+	startTime := time.Now().Unix()
+
 	var closest *kademlia.KNode = alphaClosest[0]
 	var wg sync.WaitGroup
 	var discovered, probed, failed sync.Map
@@ -401,6 +407,10 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 		})
 		ln.tsLock.Unlock()
 
+		if time.Now().Unix()-startTime >= LOOKUP_ROUND_TIME_THR {
+			break
+		}
+
 		/* The algo finishes when all the nodes are probed */
 		if len(alphaClosest) == 0 {
 			break
@@ -433,23 +443,37 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 }
 
 func (ln *LocalNode) StartNodesLookupTask() {
-	delay := time.Duration(NORMAL_NODES_LOOKUP_DELAY)
-	if ln.firstSync {
-		delay = time.Duration(FIRST_SYNC_DELAY)
-	}
-	ticker := time.NewTicker(delay * time.Second) // node refresh every 20 minutes
+	delay := time.Duration(NON_FULL_NODES_LOOKUP_DELAY)
+	ticker := time.NewTicker(delay * time.Second) // node refresh every 15 minutes
 	go func() {
 		for range ticker.C {
-			if delay == 1 {
+			toLook := make([]*kademlia.KNode, 0)
+			startTime := time.Now().Unix()
+			if ln.ktable.IsFull() {
 				delay = NORMAL_NODES_LOOKUP_DELAY
+
+				for i := 0; i < kademlia.KAD_ID_LEN; i++ {
+					if ln.ktable.GetKBuckets()[i].First().LastSeen-uint64(startTime) > uint64(util.TIME_HOUR_UNIX) {
+						toLook = append(toLook, ln.ktable.GetKBuckets()[i].GetNodes()[rand.Intn(20)])
+					}
+				}
+			} else {
+				for i := 0; i < kademlia.KAD_ID_LEN; i++ {
+					// node of distance i from self
+					toLook = append(toLook, kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode().Id, i), ""))
+				}
 			}
-			ticker.Reset(delay * time.Second)
-			logging.LogInfo("Nodes Lookup rounds started")
+			logging.LogInfo("Started node lookup")
 			d := 0
-			for i := 0; i < kademlia.KAD_ID_LEN; i++ {
-				ln.DoNodesLookup(kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode().Id, i), "")) // node of distance i from self
+			for i := 0; i < len(toLook); i++ {
+				if time.Now().Unix()-startTime >= int64(LOOKUP_ROUND_TIME_THR*len(toLook)) {
+					logging.LogWarn("Node lookup taking too much, giving up. Discovered", d, "new nodes")
+					break
+				}
+				ln.DoNodesLookup(toLook[i])
 			}
 			logging.LogInfo("Discovered", d, "new nodes")
+			ticker.Reset(delay * time.Second)
 		}
 	}()
 }

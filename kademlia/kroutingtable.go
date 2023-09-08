@@ -246,7 +246,7 @@ func (ktable *KadRoutingTable) FromBytes(bytez []byte) error {
 				ktable.kbuckets[height].insertNode(&kn)
 			}
 		}
-		ktable.kbuckets[height].sortReplacements()
+		ktable.kbuckets[height].sort()
 	}
 
 	return nil

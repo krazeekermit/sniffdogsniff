@@ -188,7 +188,10 @@ func NewKBucket(height uint) *KBucket {
 	}
 }
 
-func (kbuck *KBucket) sortReplacements() {
+func (kbuck *KBucket) sort() {
+	sort.Slice(kbuck.nodes, func(i, j int) bool {
+		return kbuck.nodes[i].LastSeen > kbuck.nodes[j].LastSeen
+	})
 	sort.Slice(kbuck.replacementNodes, func(i, j int) bool {
 		return kbuck.replacementNodes[i].LastSeen > kbuck.replacementNodes[j].LastSeen
 	})
@@ -214,6 +217,10 @@ func (kbuck *KBucket) isFull() bool {
 
 func (kbuck *KBucket) GetNodes() []*KNode {
 	return kbuck.nodes
+}
+
+func (kbuck *KBucket) First() *KNode {
+	return kbuck.nodes[0]
 }
 
 func (kbuck *KBucket) GetReplacementNodes() []*KNode {
@@ -250,7 +257,7 @@ func (kbuck *KBucket) PushNode(kn *KNode) {
 				kbuck.replacementNodes = remove(kbuck.replacementNodes, len(kbuck.replacementNodes)-1)
 				kbuck.replacementNodes = append(kbuck.replacementNodes, kn)
 			}
-			kbuck.sortReplacements()
+			kbuck.sort()
 		}
 	}
 }
@@ -263,7 +270,7 @@ func (kbuck *KBucket) RemoveNode(kn *KNode) bool {
 			first := kbuck.replacementNodes[0]
 			kbuck.nodes = append(kbuck.nodes, first)
 			kbuck.replacementNodes = remove(kbuck.replacementNodes, 0)
-			kbuck.sortReplacements()
+			kbuck.sort()
 		} else {
 			kbuck.nodes[idx].Stales++
 		}

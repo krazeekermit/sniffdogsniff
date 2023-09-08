@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+const TIME_HOUR_UNIX int64 = 3600
+
 func SliceContains[T comparable](s []T, e T) bool {
 	for _, v := range s {
 		if v == e {
