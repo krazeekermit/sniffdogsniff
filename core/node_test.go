@@ -59,6 +59,9 @@ func (fn *fakeNode2) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	return fn.nearest
 }
 
+func (fn *fakeNode2) NodeConnected(id kademlia.KadId, addr string) {
+}
+
 var localNode *core.LocalNode
 var remoteNodes []*fakeNode2
 

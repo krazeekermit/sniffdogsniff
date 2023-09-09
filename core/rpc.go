@@ -153,7 +153,10 @@ func (srv *NodeServer) ping(args PingArgs, reply *PingReply) {
 }
 
 type FindNodeArgs struct {
-	Id kademlia.KadId
+	SourceNodeId      kademlia.KadId
+	SourceNodeAddress string
+
+	TargetNodeId kademlia.KadId
 }
 
 type FindNodeReply struct {
@@ -161,10 +164,13 @@ type FindNodeReply struct {
 }
 
 func (srv *NodeServer) findNode(args FindNodeArgs, reply *FindNodeReply) {
-	(*reply).NewNodes = srv.node.FindNode(args.Id)
+	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
+	(*reply).NewNodes = srv.node.FindNode(args.TargetNodeId)
 }
 
 type GetStatusArgs struct {
+	SourceNodeId      kademlia.KadId
+	SourceNodeAddress string
 }
 
 type GetStatusReply struct {
@@ -173,12 +179,16 @@ type GetStatusReply struct {
 }
 
 func (srv *NodeServer) getStatus(args GetStatusArgs, reply *GetStatusReply) {
+	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	lts, lmts := srv.node.GetStatus()
 	(*reply).LastTimestamp = lts
 	(*reply).LastMetaTimestamp = lmts
 }
 
 type TimestampArgs struct {
+	SourceNodeId      kademlia.KadId
+	SourceNodeAddress string
+
 	Timestamp uint64
 }
 
@@ -187,6 +197,7 @@ type GetResultsForSyncReply struct {
 }
 
 func (srv *NodeServer) getResultsForSync(args TimestampArgs, reply *GetResultsForSyncReply) {
+	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	(*reply).Results = srv.node.GetResultsForSync(args.Timestamp)
 }
 
@@ -195,6 +206,7 @@ type GetMetadataForSyncReply struct {
 }
 
 func (srv *NodeServer) getMetadataForSync(args TimestampArgs, reply *GetMetadataForSyncReply) {
+	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	(*reply).Metadatas = srv.node.GetMetadataForSync(args.Timestamp)
 }
 
@@ -397,9 +409,13 @@ func (rn *NodeClient) Ping(id kademlia.KadId, addr string) (error, error) {
 	return reply.Error, nil
 }
 
-func (rn *NodeClient) GetStatus() (uint64, uint64, error) {
+func (rn *NodeClient) GetStatus(source *kademlia.KNode) (uint64, uint64, error) {
 	var reply GetStatusReply
-	err := rn.callRemoteFunction(FCODE_GETSTATUS, GetStatusArgs{}, &reply)
+	err := rn.callRemoteFunction(
+		FCODE_GETSTATUS,
+		GetStatusArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address},
+		&reply,
+	)
 	if err != nil {
 		return 0, 0, nil
 	}
@@ -408,27 +424,39 @@ func (rn *NodeClient) GetStatus() (uint64, uint64, error) {
 
 // the LocalNode rpc method equivalent
 // Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
-func (rn *NodeClient) GetResultsForSync(ts uint64) ([]SearchResult, error) {
+func (rn *NodeClient) GetResultsForSync(ts uint64, source *kademlia.KNode) ([]SearchResult, error) {
 	var reply GetResultsForSyncReply
-	err := rn.callRemoteFunction(FCODE_GET_RESULTS_FOR_SYNC, TimestampArgs{ts}, &reply)
+	err := rn.callRemoteFunction(
+		FCODE_GET_RESULTS_FOR_SYNC,
+		TimestampArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address, Timestamp: ts},
+		&reply,
+	)
 	if err != nil {
 		return nil, err
 	}
 	return reply.Results, nil
 }
 
-func (rn *NodeClient) GetMetadataForSync(ts uint64) ([]ResultMeta, error) {
+func (rn *NodeClient) GetMetadataForSync(ts uint64, source *kademlia.KNode) ([]ResultMeta, error) {
 	var reply GetMetadataForSyncReply
-	err := rn.callRemoteFunction(FCODE_GET_METADATA_FOR_SYNC, TimestampArgs{ts}, &reply)
+	err := rn.callRemoteFunction(
+		FCODE_GET_METADATA_FOR_SYNC,
+		TimestampArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address, Timestamp: ts},
+		&reply,
+	)
 	if err != nil {
 		return nil, err
 	}
 	return reply.Metadatas, nil
 }
 
-func (rn *NodeClient) FindNode(id kademlia.KadId) (map[kademlia.KadId]string, error) {
+func (rn *NodeClient) FindNode(targetId kademlia.KadId, source *kademlia.KNode) (map[kademlia.KadId]string, error) {
 	var reply FindNodeReply
-	err := rn.callRemoteFunction(FCODE_FIND_NODE, FindNodeArgs{id}, &reply)
+	err := rn.callRemoteFunction(
+		FCODE_FIND_NODE,
+		FindNodeArgs{TargetNodeId: targetId, SourceNodeId: source.Id, SourceNodeAddress: source.Address},
+		&reply,
+	)
 	if err != nil {
 		return nil, err
 	}

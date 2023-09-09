@@ -39,6 +39,14 @@ func (fn *fakeNode) argsDoMatch(funcName string) error {
 	return fn.args[funcName]
 }
 
+func (fn *fakeNode) sourceNodeConnected() bool {
+	err, present := fn.args["NodeConnected"]
+	if present {
+		return err == nil
+	}
+	return present
+}
+
 func (fn *fakeNode) Ping(id kademlia.KadId, addr string) error {
 	fn.args["Ping"] = nil
 	if !id.Eq(PEER1_ID) {
@@ -97,6 +105,16 @@ func (fn *fakeNode) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	}
 }
 
+func (fn *fakeNode) NodeConnected(id kademlia.KadId, addr string) {
+	fn.args["NodeConnected"] = nil
+	if !id.Eq(SELF_NODE.Id) {
+		fn.args["NodeConnected"] = fmt.Errorf("arguments does not match: %s != %s", id, SELF_NODE.Id)
+	}
+	if addr != SELF_NODE.Address {
+		fn.args["NodeConnected"] = fmt.Errorf("arguments does not match: %s != %s", addr, SELF_NODE.Address)
+	}
+}
+
 var server *core.NodeServer = nil
 var node *fakeNode = nil
 
@@ -146,11 +164,14 @@ func TestRpc_Ping_1000(t *testing.T) {
 }
 
 func _testRpc_GetStatus(client core.NodeClient, t *testing.T) {
-	s1, s2, err := client.GetStatus()
+	s1, s2, err := client.GetStatus(SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
+	if !node.sourceNodeConnected() {
+		t.Fatal()
+	}
 	if !node.wasCalled("GetStatus") {
 		t.Fatal()
 	}
@@ -188,11 +209,14 @@ func TestRpc_FindNode(t *testing.T) {
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	peers, err := client.FindNode(PEER1_ID)
+	peers, err := client.FindNode(PEER1_ID, SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
+	if !node.sourceNodeConnected() {
+		t.Fatal()
+	}
 	if !node.wasCalled("FindNode") {
 		t.Fatal()
 	}
@@ -214,11 +238,14 @@ func TestRpc_GetResultsForSync(t *testing.T) {
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	results, err := client.GetResultsForSync(1936)
+	results, err := client.GetResultsForSync(1936, SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
+	if !node.sourceNodeConnected() {
+		t.Fatal()
+	}
 	if !node.wasCalled("GetResultsForSync") {
 		t.Fatal()
 	}
@@ -236,11 +263,14 @@ func TestRpc_GetMetadataForSync(t *testing.T) {
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	metas, err := client.GetMetadataForSync(4567)
+	metas, err := client.GetMetadataForSync(4567, SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
+	if !node.sourceNodeConnected() {
+		t.Fatal()
+	}
 	if !node.wasCalled("GetMetadataForSync") {
 		t.Fatal()
 	}

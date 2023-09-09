@@ -36,6 +36,10 @@ type NodeInterface interface {
 	GetMetadataForSync(ts uint64) []ResultMeta
 	GetMetadataOf(hashes []Hash256) []ResultMeta
 	FindNode(id kademlia.KadId) map[kademlia.KadId]string
+
+	// used to insert new connected node into the ktable
+	// usually called by the rpc request handler
+	NodeConnected(id kademlia.KadId, addr string)
 }
 
 type LocalNode struct {
@@ -149,6 +153,12 @@ func (ln *LocalNode) Ping(id kademlia.KadId, addr string) error {
 	return nil
 }
 
+func (ln *LocalNode) NodeConnected(id kademlia.KadId, addr string) {
+	ln.tsLock.Lock()
+	ln.ktable.PushNode(kademlia.NewKNode(id, addr))
+	ln.tsLock.Unlock()
+}
+
 func (ln *LocalNode) GetStatus() (uint64, uint64) {
 	return ln.searchDB.LastTimestamp, ln.searchDB.LastMetaTimestamp
 }
@@ -229,7 +239,7 @@ func (ln *LocalNode) SyncWithPeer() {
 		}
 
 		searchesTimestamp, metasTimestamp = ln.GetStatus()
-		remoteSearchesTimestamp, remoteMetasTimestamp, err = rn.GetStatus()
+		remoteSearchesTimestamp, remoteMetasTimestamp, err = rn.GetStatus(ln.SelfNode())
 		if err != nil {
 			goto sync_fail
 		}
@@ -243,7 +253,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 		/* Sync of searches */
 		if searchesTimestamp < remoteSearchesTimestamp {
-			newSearches, err := rn.GetResultsForSync(searchesTimestamp)
+			newSearches, err := rn.GetResultsForSync(searchesTimestamp, ln.ktable.SelfNode())
 			if err != nil {
 				ln.tsLock.Lock()
 				ln.ktable.RemoveNode(ikn)
@@ -265,7 +275,7 @@ func (ln *LocalNode) SyncWithPeer() {
 
 		/* Sync of metadatada of searches */
 		if metasTimestamp < remoteMetasTimestamp {
-			newMetadata, err := rn.GetMetadataForSync(metasTimestamp)
+			newMetadata, err := rn.GetMetadataForSync(metasTimestamp, ln.ktable.SelfNode())
 			if err != nil {
 				goto sync_fail
 			}
@@ -340,7 +350,7 @@ func (ln *LocalNode) StartSyncTask() {
 }
 
 func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet operational
-	alphaClosest := ln.ktable.GetNClosest(kademlia.ALPHA)
+	alphaClosest := ln.ktable.GetNClosestTo(targetNode.Id, kademlia.ALPHA)
 	if len(alphaClosest) == 0 {
 		return 0
 	}
@@ -355,10 +365,12 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 	for {
 		for _, ikn := range alphaClosest {
 			wg.Add(1)
-			go func(kn *kademlia.KNode, targetId kademlia.KadId, proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
+			go func(kn *kademlia.KNode, targetId kademlia.KadId, source *kademlia.KNode,
+				proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
+
 				defer wg.Done()
 				rn := NewNodeClient(kn.Address, proxySettings)
-				newNodes, err := rn.FindNode(targetId) //FIXME: needs to be changed in FindNode(id *kademlia.KadId) []*kademlia.KNode
+				newNodes, err := rn.FindNode(targetId, source) //FIXME: needs to be changed in FindNode(id *kademlia.KadId) []*kademlia.KNode
 				probed.Store(kn.Id, kn)
 				if err != nil {
 					failed.Store(kn.Id, kn)
@@ -369,7 +381,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 					}
 				}
 
-			}(ikn, targetNode.Id, ln.proxySettings, &discovered, &probed, &failed)
+			}(ikn, targetNode.Id, ln.ktable.SelfNode(), ln.proxySettings, &discovered, &probed, &failed)
 		}
 
 		// Usage of wait group to speed up the process
