@@ -32,34 +32,24 @@ var NODES_MAP = map[int][]*kademlia.KNode{
 
 type fakeNode2 struct {
 	nearest map[kademlia.KadId]string
-	probed  bool
 }
 
 func (fn *fakeNode2) Ping(id kademlia.KadId, addr string) error {
 	return nil
 }
 
-func (fn *fakeNode2) GetStatus() (uint64, uint64) {
-	return 0, 0
+func (fn *fakeNode2) StoreResult(sr core.SearchResult) {
 }
 
-func (fn *fakeNode2) GetResultsForSync(timestamp uint64) []core.SearchResult {
+func (fn *fakeNode2) FindResults(query string) []core.SearchResult {
 	return []core.SearchResult{}
 }
 
-func (fn *fakeNode2) GetMetadataForSync(ts uint64) []core.ResultMeta {
-	return []core.ResultMeta{}
-}
-
-func (fn *fakeNode2) GetMetadataOf(hashes []core.Hash256) []core.ResultMeta {
-	return []core.ResultMeta{}
+func (fn *fakeNode2) NodeConnected(id kademlia.KadId, addr string) {
 }
 
 func (fn *fakeNode2) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	return fn.nearest
-}
-
-func (fn *fakeNode2) NodeConnected(id kademlia.KadId, addr string) {
 }
 
 var localNode *core.LocalNode
@@ -70,7 +60,7 @@ func setupNodes() {
 		return
 	}
 
-	localNode = core.NewNode(core.SdsConfig{})
+	localNode = core.NewLocalNode(core.SdsConfig{})
 	localNode.KadRoutingTable().SetSelfNode(SELF_NODE)
 	localNode.KadRoutingTable().PushNode(NODE_1)
 	localNode.KadRoutingTable().PushNode(NODE_2)

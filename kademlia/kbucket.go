@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"time"
+
+	"github.com/sniffdogsniff/util"
 )
 
 const K int = 20
@@ -139,7 +140,7 @@ func NewKNode(id KadId, addr string) *KNode {
 }
 
 func (kn *KNode) SeenNow() {
-	kn.LastSeen = uint64(time.Now().Unix())
+	kn.LastSeen = uint64(util.CurrentUnixTime())
 }
 
 /*

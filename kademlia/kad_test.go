@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sniffdogsniff/kademlia"
+	"github.com/sniffdogsniff/util"
 )
 
 func TestKadId_EvalHeight(t *testing.T) {
@@ -206,34 +207,39 @@ func TestKBucket_AddNodes_LastSeen(t *testing.T) {
 		kBucket.PushNode(nodesList[i])
 	}
 
-	var t1 uint64 = uint64(time.Now().Unix())
+	var t1 = time.Now().Unix()
+	util.SetTestTime(t1)
 	kBucket.PushNode(nodesList[4])
 	kBucket.PushNode(nodesList[7])
 	kBucket.PushNode(nodesList[2])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 1)
 	kBucket.PushNode(nodesList[15])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 2)
 	kBucket.PushNode(nodesList[9])
 
 	kBucket.PushNode(nodesList[22])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 3)
 	kBucket.PushNode(nodesList[23])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 4)
 	kBucket.PushNode(nodesList[21])
 
-	if kBucket.GetNodes()[4].LastSeen != t1 {
+	if kBucket.GetNodes()[4].LastSeen != uint64(t1) {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[3].LastSeen != t1 {
+	if kBucket.GetNodes()[3].LastSeen != uint64(t1) {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[2].LastSeen != t1 {
+	if kBucket.GetNodes()[2].LastSeen != uint64(t1) {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[1].LastSeen != t1+1 {
+	if kBucket.GetNodes()[1].LastSeen != uint64(t1+1) {
 		t.Fatal()
 	}
-	if kBucket.GetNodes()[0].LastSeen != t1+2 {
+	if kBucket.GetNodes()[0].LastSeen != uint64(t1+2) {
 		t.Fatal()
 	}
 	for i := 5; i < 20; i++ {
@@ -317,10 +323,15 @@ func TestKBucket_RemoveThenAddNode_WithReplacementCache(t *testing.T) {
 		kBucket.PushNode(nodesList[i])
 	}
 
+	var t1 = time.Now().Unix()
+	util.SetTestTime(t1)
+
 	kBucket.PushNode(nodesList[22])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 1)
 	kBucket.PushNode(nodesList[23])
-	time.Sleep(1 * time.Second)
+
+	util.SetTestTime(t1 + 2)
 	kBucket.PushNode(nodesList[21])
 
 	kBucket.RemoveNode(nodesList[9])
@@ -499,7 +510,8 @@ func TestKTable_GetClosest(t *testing.T) {
 	k0[3] = 0x7b6cf56b
 	k0[4] = 0x8737fa6d
 	ktable := kademlia.NewKadRoutingTable()
-	ktable.SetSelfNode(kademlia.NewKNode(k0, "self.onion"))
+	kself := kademlia.NewKNode(k0, "self.onion")
+	ktable.SetSelfNode(kself)
 
 	// 0x7d152893 aba66ff1 0fc9e598 114d90d6 e013471a
 	var k1 kademlia.KadId
@@ -554,17 +566,20 @@ func TestKTable_GetClosest(t *testing.T) {
 	ka1[4] = 0x0ca57664
 	kna1 := kademlia.NewKNode(ka1, "ka1.onion")
 
-	closest := ktable.GetNClosestTo(kna1.Id, 4)
+	closest := ktable.GetNClosestTo(kna1.Id, 5)
 	if !closest[0].Id.Eq(kn1.Id) {
 		t.Fatal()
 	}
-	if !closest[1].Id.Eq(kn3.Id) {
+	if !closest[1].Id.Eq(kself.Id) {
 		t.Fatal()
 	}
-	if !closest[2].Id.Eq(kn2.Id) {
+	if !closest[2].Id.Eq(kn3.Id) {
 		t.Fatal()
 	}
-	if !closest[3].Id.Eq(kn4.Id) {
+	if !closest[3].Id.Eq(kn2.Id) {
+		t.Fatal()
+	}
+	if !closest[4].Id.Eq(kn4.Id) {
 		t.Fatal()
 	}
 }
@@ -590,7 +605,10 @@ func TestKTable_ToBytesFromBytes(t *testing.T) {
 	k1[4] = 0x7d152893
 
 	kn1 := kademlia.NewKNode(k1, "altitudegullydetoxifyjugular.onion")
-	var t1 uint64 = uint64(time.Now().Unix())
+
+	var t1 = time.Now().Unix()
+	util.SetTestTime(t1)
+
 	ktable.PushNode(kn1)
 	ktable.PushNode(kn1)
 
@@ -646,7 +664,7 @@ func TestKTable_ToBytesFromBytes(t *testing.T) {
 	if !ktable2.GetKBuckets()[159].GetNodes()[0].Id.Eq(kn1.Id) {
 		t.Fatal()
 	}
-	if ktable2.GetKBuckets()[159].GetNodes()[0].LastSeen != t1 {
+	if ktable2.GetKBuckets()[159].GetNodes()[0].LastSeen != uint64(t1) {
 		t.Fatal()
 	}
 	if ktable2.GetKBuckets()[159].GetNodes()[0].Address != "altitudegullydetoxifyjugular.onion" {

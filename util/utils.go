@@ -4,12 +4,35 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"sync"
+	"time"
 )
 
 const TIME_HOUR_UNIX int64 = 3600
+
+var fakeTime int64 = -1
+
+/*
+	Time
+*/
+
+func SetTestTime(t int64) {
+	fakeTime = t
+}
+
+func CurrentUnixTime() int64 {
+	if fakeTime > 0 {
+		// Leave this message here is useful to check if using the test time in the real
+		// runtime execution
+		fmt.Println(" **** WARNING USING OF FAKE TIME FOR TESTS **** ")
+		return fakeTime
+	}
+	return time.Now().Unix()
+}
 
 func SliceContains[T comparable](s []T, e T) bool {
 	for _, v := range s {
@@ -48,6 +71,15 @@ func MergeMaps[K comparable, V interface{}](m1, m2 map[K]V) map[K]V {
 		m1[k] = v
 	}
 	return m1
+}
+
+func SyncMapLen(m *sync.Map) int {
+	i := 0
+	m.Range(func(key, value any) bool {
+		i++
+		return true
+	})
+	return i
 }
 
 func TwoUint64ToArr(a, b uint64) [2]uint64 {

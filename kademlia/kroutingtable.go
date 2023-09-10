@@ -94,6 +94,9 @@ func (ktable *KadRoutingTable) IsFull() bool {
 }
 
 func (ktable *KadRoutingTable) PushNode(kn *KNode) {
+	if kn.Id.Eq(ktable.selfNode.Id) {
+		return
+	}
 	ktable.kbuckets[kn.Id.EvalDistance(ktable.selfNode.Id).EvalHeight()].PushNode(kn)
 }
 
@@ -103,6 +106,12 @@ func (ktable *KadRoutingTable) RemoveNode(kn *KNode) bool {
 
 func (ktable *KadRoutingTable) GetNClosestTo(targetId KadId, n int) []*KNode {
 	allNodes := ktable.allNodes()
+
+	// avoids adding self node with distance 0
+	if !targetId.Eq(ktable.selfNode.Id) {
+		allNodes = append(allNodes, ktable.selfNode)
+	}
+
 	SortNodesByDistance(targetId, allNodes)
 
 	if len(allNodes) < n {

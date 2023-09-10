@@ -121,14 +121,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	node := core.NewNode(cfg)
+	node := core.NewLocalNode(cfg)
 
 	p2pServer := core.NewNodeServer(node)
 	p2pServer.Serve(cfg.P2PServerProto)
 
 	node.SetNodeAddress(cfg.P2PServerProto.GetAddressString())
 	node.StartNodesLookupTask()
-	node.StartSyncTask()
+	node.StartPublishTask()
 
 	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")
 	shutdownHook(cfg, node, pidFilePath)

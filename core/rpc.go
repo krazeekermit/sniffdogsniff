@@ -20,12 +20,10 @@ const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
 
 const (
-	FCODE_HANDSHAKE             = 100
-	FCODE_GETSTATUS             = 101
-	FCODE_GET_RESULTS_FOR_SYNC  = 102
-	FCODE_FIND_NODE             = 103
-	FCODE_GET_METADATA_FOR_SYNC = 104
-	FCODE_GET_METADATA_OF       = 105
+	FCODE_HANDSHAKE    = 100
+	FCODE_FIND_NODE    = 101
+	FCODE_STORE_RESULT = 102
+	FCODE_FIND_RESULTS = 103
 )
 
 const (
@@ -168,54 +166,35 @@ func (srv *NodeServer) findNode(args FindNodeArgs, reply *FindNodeReply) {
 	(*reply).NewNodes = srv.node.FindNode(args.TargetNodeId)
 }
 
-type GetStatusArgs struct {
-	SourceNodeId      kademlia.KadId
-	SourceNodeAddress string
-}
-
-type GetStatusReply struct {
-	LastTimestamp     uint64
-	LastMetaTimestamp uint64
-}
-
-func (srv *NodeServer) getStatus(args GetStatusArgs, reply *GetStatusReply) {
-	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
-	lts, lmts := srv.node.GetStatus()
-	(*reply).LastTimestamp = lts
-	(*reply).LastMetaTimestamp = lmts
-}
-
-type TimestampArgs struct {
+type StoreResultArgs struct {
 	SourceNodeId      kademlia.KadId
 	SourceNodeAddress string
 
-	Timestamp uint64
+	Value SearchResult
 }
 
-type GetResultsForSyncReply struct {
-	Results []SearchResult
+type StoreResultReply struct {
 }
 
-func (srv *NodeServer) getResultsForSync(args TimestampArgs, reply *GetResultsForSyncReply) {
+func (srv *NodeServer) storeResult(args StoreResultArgs, reply *StoreResultReply) {
 	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
-	(*reply).Results = srv.node.GetResultsForSync(args.Timestamp)
+	srv.node.StoreResult(args.Value)
 }
 
-type GetMetadataForSyncReply struct {
-	Metadatas []ResultMeta
+type FindResultsArgs struct {
+	SourceNodeId      kademlia.KadId
+	SourceNodeAddress string
+
+	QueryString string
 }
 
-func (srv *NodeServer) getMetadataForSync(args TimestampArgs, reply *GetMetadataForSyncReply) {
+type FindResultsReply struct {
+	Values []SearchResult
+}
+
+func (srv *NodeServer) findResults(args FindResultsArgs, reply *FindResultsReply) {
 	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
-	(*reply).Metadatas = srv.node.GetMetadataForSync(args.Timestamp)
-}
-
-type GetMetadataOfArgs struct {
-	Hashes []Hash256
-}
-
-func (srv *NodeServer) getMetadataOf(args GetMetadataOfArgs, reply *GetMetadataForSyncReply) {
-	(*reply).Metadatas = srv.node.GetMetadataOf(args.Hashes)
+	(*reply).Values = srv.node.FindResults(args.QueryString)
 }
 
 func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
@@ -307,26 +286,6 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			var reply PingReply
 			srv.ping(args, &reply)
 			returned = reply
-		case FCODE_GETSTATUS:
-			var args GetStatusArgs
-			err := msgpack.Unmarshal(argsBytes, &args)
-			if err != nil {
-				errCode = ERRCODE_TYPE_ARGUMENT
-				goto send_resp
-			}
-			var reply GetStatusReply
-			srv.getStatus(args, &reply)
-			returned = reply
-		case FCODE_GET_RESULTS_FOR_SYNC:
-			var args TimestampArgs
-			err := msgpack.Unmarshal(argsBytes, &args)
-			if err != nil {
-				errCode = ERRCODE_TYPE_ARGUMENT
-				goto send_resp
-			}
-			var reply GetResultsForSyncReply
-			srv.getResultsForSync(args, &reply)
-			returned = reply
 		case FCODE_FIND_NODE:
 			var args FindNodeArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
@@ -338,25 +297,25 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			var reply FindNodeReply
 			srv.findNode(args, &reply)
 			returned = reply
-		case FCODE_GET_METADATA_FOR_SYNC:
-			var args TimestampArgs
+		case FCODE_STORE_RESULT:
+			var args StoreResultArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			var reply GetMetadataForSyncReply
-			srv.getMetadataForSync(args, &reply)
+			var reply StoreResultReply
+			srv.storeResult(args, &reply)
 			returned = reply
-		case FCODE_GET_METADATA_OF:
-			var args GetMetadataOfArgs
+		case FCODE_FIND_RESULTS:
+			var args FindResultsArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
-			var reply GetMetadataForSyncReply
-			srv.getMetadataOf(args, &reply)
+			var reply FindResultsReply
+			srv.findResults(args, &reply)
 			returned = reply
 		default:
 			returned = nil
@@ -409,47 +368,6 @@ func (rn *NodeClient) Ping(id kademlia.KadId, addr string) (error, error) {
 	return reply.Error, nil
 }
 
-func (rn *NodeClient) GetStatus(source *kademlia.KNode) (uint64, uint64, error) {
-	var reply GetStatusReply
-	err := rn.callRemoteFunction(
-		FCODE_GETSTATUS,
-		GetStatusArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address},
-		&reply,
-	)
-	if err != nil {
-		return 0, 0, nil
-	}
-	return reply.LastTimestamp, reply.LastMetaTimestamp, nil
-}
-
-// the LocalNode rpc method equivalent
-// Note: style is Function(proxySetting ProxySetting, args) // Proxy settings are mandatory as first argument!!!
-func (rn *NodeClient) GetResultsForSync(ts uint64, source *kademlia.KNode) ([]SearchResult, error) {
-	var reply GetResultsForSyncReply
-	err := rn.callRemoteFunction(
-		FCODE_GET_RESULTS_FOR_SYNC,
-		TimestampArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address, Timestamp: ts},
-		&reply,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return reply.Results, nil
-}
-
-func (rn *NodeClient) GetMetadataForSync(ts uint64, source *kademlia.KNode) ([]ResultMeta, error) {
-	var reply GetMetadataForSyncReply
-	err := rn.callRemoteFunction(
-		FCODE_GET_METADATA_FOR_SYNC,
-		TimestampArgs{SourceNodeId: source.Id, SourceNodeAddress: source.Address, Timestamp: ts},
-		&reply,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return reply.Metadatas, nil
-}
-
 func (rn *NodeClient) FindNode(targetId kademlia.KadId, source *kademlia.KNode) (map[kademlia.KadId]string, error) {
 	var reply FindNodeReply
 	err := rn.callRemoteFunction(
@@ -463,13 +381,30 @@ func (rn *NodeClient) FindNode(targetId kademlia.KadId, source *kademlia.KNode) 
 	return reply.NewNodes, nil
 }
 
-func (rn *NodeClient) GetMetadataOf(hashes []Hash256) ([]ResultMeta, error) {
-	var reply GetMetadataForSyncReply
-	err := rn.callRemoteFunction(FCODE_GET_METADATA_OF, []any{hashes}, &reply)
+func (rn *NodeClient) StoreResult(sr SearchResult, source *kademlia.KNode) error {
+	var reply StoreResultReply
+	err := rn.callRemoteFunction(
+		FCODE_STORE_RESULT,
+		StoreResultArgs{Value: sr, SourceNodeId: source.Id, SourceNodeAddress: source.Address},
+		&reply,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (rn *NodeClient) FindResults(query string, source *kademlia.KNode) ([]SearchResult, error) {
+	var reply FindResultsReply
+	err := rn.callRemoteFunction(
+		FCODE_FIND_RESULTS,
+		FindResultsArgs{QueryString: query, SourceNodeId: source.Id, SourceNodeAddress: source.Address},
+		&reply,
+	)
 	if err != nil {
 		return nil, err
 	}
-	return reply.Metadatas, nil
+	return reply.Values, nil
 }
 
 func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, reply interface{}) error {

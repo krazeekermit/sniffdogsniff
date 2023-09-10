@@ -17,9 +17,6 @@ const FAKENODE_ADDRESS = ":3000"
 var RESULT1 = core.NewSearchResult("title1", "http://www.title1.com", core.ResultPropertiesMap{}, core.IMAGE_DATA_TYPE)
 var RESULT2 = core.NewSearchResult("title2", "http://www.title2.com", core.ResultPropertiesMap{}, core.LINK_DATA_TYPE)
 
-var RMETA1 = core.NewResultMeta(RESULT1.ResultHash, 1234, 23, 0)
-var RMETA2 = core.NewResultMeta(RESULT2.ResultHash, 7654, 89, 1)
-
 var PEER1_ADDR = "thirstingcagecagesubtitle.onion"
 var PEER2_ADDR = "tallunearthrethinkblurt.onion"
 
@@ -58,40 +55,19 @@ func (fn *fakeNode) Ping(id kademlia.KadId, addr string) error {
 	return nil
 }
 
-func (fn *fakeNode) GetStatus() (uint64, uint64) {
-	fn.args["GetStatus"] = nil
-	return 1936, 1441
+func (fn *fakeNode) StoreResult(sr core.SearchResult) {
+	fn.args["StoreResult"] = nil
+	if sr.ResultHash != RESULT1.ResultHash || sr.Title != RESULT1.Title || sr.Url != RESULT1.Url {
+		fn.args["StoreResult"] = fmt.Errorf("arguments does not match: %s != %s", sr.String(), RESULT1.String())
+	}
 }
 
-func (fn *fakeNode) GetResultsForSync(timestamp uint64) []core.SearchResult {
-	fn.args["GetResultsForSync"] = nil
-	if timestamp != 1936 {
-		fn.args["GetResultsForSync"] = fmt.Errorf("arguments does not match: %d != %d", timestamp, 1936)
+func (fn *fakeNode) FindResults(query string) []core.SearchResult {
+	fn.args["FindResults"] = nil
+	if query != "weapon of mass destruction" {
+		fn.args["FindResults"] = fmt.Errorf("arguments does not match: %s != weapon of mass destruction", query)
 	}
 	return []core.SearchResult{RESULT1, RESULT2}
-}
-
-func (fn *fakeNode) GetMetadataForSync(ts uint64) []core.ResultMeta {
-	fn.args["GetMetadataForSync"] = nil
-	if ts != 4567 {
-		fn.args["GetMetadataForSync"] = fmt.Errorf("arguments does not match: %d != %d", ts, 4567)
-	}
-	return []core.ResultMeta{RMETA1, RMETA2}
-}
-
-func (fn *fakeNode) GetMetadataOf(hashes []core.Hash256) []core.ResultMeta {
-	fn.args["GetMetadataOf"] = nil
-	if len(hashes) != 2 {
-		fn.args["GetMetadataOf"] = fmt.Errorf("sizeof hashes %d != %d", len(hashes), 2)
-		return []core.ResultMeta{}
-	}
-	if hashes[0] != RESULT1.ResultHash {
-		fn.args["GetMetadataOf"] = fmt.Errorf("arguments does not match: %s != %s", hashes[0], RESULT1.ResultHash)
-	}
-	if hashes[1] != RESULT2.ResultHash {
-		fn.args["GetMetadataOf"] = fmt.Errorf("arguments does not match: %s != %s", hashes[1], RESULT2.ResultHash)
-	}
-	return []core.ResultMeta{RMETA1, RMETA2}
 }
 
 func (fn *fakeNode) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
@@ -163,47 +139,6 @@ func TestRpc_Ping_1000(t *testing.T) {
 	}
 }
 
-func _testRpc_GetStatus(client core.NodeClient, t *testing.T) {
-	s1, s2, err := client.GetStatus(SELF_NODE)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	if !node.sourceNodeConnected() {
-		t.Fatal()
-	}
-	if !node.wasCalled("GetStatus") {
-		t.Fatal()
-	}
-	err = node.argsDoMatch("GetStatus")
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	if s1 != 1936 {
-		t.Fatal()
-	}
-	if s2 != 1441 {
-		t.Fatal()
-	}
-}
-
-func TestRpc_GetStatus(t *testing.T) {
-	setupFakeNodeServer()
-
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
-	_testRpc_GetStatus(client, t)
-}
-
-func TestRpc_GetStatus_1000(t *testing.T) {
-	setupFakeNodeServer()
-
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
-	for i := 0; i < 1000; i++ {
-		_testRpc_GetStatus(client, t)
-	}
-}
-
 func TestRpc_FindNode(t *testing.T) {
 	setupFakeNodeServer()
 
@@ -233,12 +168,12 @@ func TestRpc_FindNode(t *testing.T) {
 	}
 }
 
-func TestRpc_GetResultsForSync(t *testing.T) {
+func TestRpc_FindResults(t *testing.T) {
 	setupFakeNodeServer()
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	results, err := client.GetResultsForSync(1936, SELF_NODE)
+	results, err := client.FindResults("weapon of mass destruction", SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -246,10 +181,10 @@ func TestRpc_GetResultsForSync(t *testing.T) {
 	if !node.sourceNodeConnected() {
 		t.Fatal()
 	}
-	if !node.wasCalled("GetResultsForSync") {
+	if !node.wasCalled("FindResults") {
 		t.Fatal()
 	}
-	err = node.argsDoMatch("GetResultsForSync")
+	err = node.argsDoMatch("FindResults")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -263,7 +198,7 @@ func TestRpc_GetMetadataForSync(t *testing.T) {
 
 	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
 
-	metas, err := client.GetMetadataForSync(4567, SELF_NODE)
+	err := client.StoreResult(RESULT1, SELF_NODE)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -271,38 +206,13 @@ func TestRpc_GetMetadataForSync(t *testing.T) {
 	if !node.sourceNodeConnected() {
 		t.Fatal()
 	}
-	if !node.wasCalled("GetMetadataForSync") {
+	if !node.wasCalled("StoreResult") {
 		t.Fatal()
 	}
-	err = node.argsDoMatch("GetMetadataForSync")
+	err = node.argsDoMatch("StoreResult")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-
-	assertMetaEq(metas[0], RMETA1, t)
-	assertMetaEq(metas[1], RMETA2, t)
-}
-
-func TestRpc_GetMetadataOf(t *testing.T) {
-	setupFakeNodeServer()
-
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
-
-	metas, err := client.GetMetadataOf([]core.Hash256{RESULT1.ResultHash, RESULT2.ResultHash})
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	if !node.wasCalled("GetMetadataOf") {
-		t.Fatal()
-	}
-	err = node.argsDoMatch("GetMetadataOf")
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	assertMetaEq(metas[0], RMETA1, t)
-	assertMetaEq(metas[1], RMETA2, t)
 }
 
 func TestMarshalUnmarshal_RpcRequest(t *testing.T) {
