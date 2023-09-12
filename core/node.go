@@ -120,7 +120,7 @@ func (ln *LocalNode) NodeConnected(id kademlia.KadId, addr string) {
 }
 
 func (ln *LocalNode) InsertSearchResult(sr SearchResult) {
-	ln.RePublishResults([]SearchResult{sr})
+	ln.PublishResults([]SearchResult{sr})
 	ln.tsLock.Lock()
 	ln.searchDB.InsertResult(sr)
 	ln.tsLock.Unlock()
@@ -168,11 +168,11 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 
 		wg.Add(1)
 		wgCount++
-		go func(kn *kademlia.KNode, query string, failed, emptyProbed, results *sync.Map) {
+		go func(kn, source *kademlia.KNode, query string, failed, emptyProbed, results *sync.Map) {
 			defer wg.Done()
 
 			rn := NewNodeClient(kn.Address, ln.proxySettings)
-			vals, err := rn.FindResults(query, ln.SelfNode())
+			vals, err := rn.FindResults(query, source)
 			if err != nil {
 				failed.Store(ikn.Id, kn)
 				return
@@ -182,9 +182,9 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 					results.LoadOrStore(v.ResultHash, v)
 				}
 			} else {
-				emptyProbed.LoadOrStore(ikn.Id, ikn)
+				emptyProbed.LoadOrStore(kn.Id, kn)
 			}
-		}(ikn, query, &failed, &emptyProbed, &results)
+		}(ikn, ln.ktable.SelfNode(), query, &failed, &emptyProbed, &results)
 
 		if wgCount >= kademlia.ALPHA {
 			wgCount = 0
@@ -218,7 +218,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 			search engines. The found results are stored in the network.
 		*/
 		rSlice = append(rSlice, DoParallelSearchOnExtEngines(ln.searchEngines, query)...)
-		ln.RePublishResults(rSlice)
+		ln.PublishResults(rSlice)
 		return rSlice
 	}
 
@@ -237,8 +237,11 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	return rSlice
 }
 
-func (ln *LocalNode) RePublishResults(results []SearchResult) {
+/*
+	Publish Results
+*/
 
+func (ln *LocalNode) PublishResults(results []SearchResult) {
 	var failed sync.Map
 	var wg sync.WaitGroup
 
@@ -270,15 +273,15 @@ func (ln *LocalNode) RePublishResults(results []SearchResult) {
 
 			wg.Add(1)
 			wgCount++
-			go func(kn *kademlia.KNode, value SearchResult, failed *sync.Map) {
+			go func(kn, source *kademlia.KNode, value SearchResult, failed *sync.Map) {
 				defer wg.Done()
 
 				rn := NewNodeClient(kn.Address, ln.proxySettings)
-				err := rn.StoreResult(sr, ln.SelfNode())
+				err := rn.StoreResult(sr, source)
 				if err != nil {
-					failed.Store(ikn.Id, kn)
+					failed.Store(kn.Id, kn)
 				}
-			}(ikn, sr, &failed)
+			}(ikn, ln.ktable.SelfNode(), sr, &failed)
 
 			if wgCount >= kademlia.ALPHA {
 				wgCount = 0
@@ -313,10 +316,14 @@ func (ln *LocalNode) StartPublishTask() {
 			results := ln.searchDB.ResultsToPublish()
 			logging.LogInfo("Publishing", len(results), "results...")
 			ln.tsLock.Unlock()
-			ln.RePublishResults(results)
+			ln.PublishResults(results)
 		}
 	}()
 }
+
+/*
+	Node Lookup
+*/
 
 func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet operational
 	alphaClosest := ln.ktable.GetNClosestTo(targetNode.Id, kademlia.ALPHA)
@@ -337,7 +344,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 	for {
 		for _, ikn := range alphaClosest {
 			wg.Add(1)
-			go func(kn *kademlia.KNode, targetId kademlia.KadId, source *kademlia.KNode,
+			go func(kn, source *kademlia.KNode, targetId kademlia.KadId,
 				proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
 
 				defer wg.Done()
@@ -349,11 +356,11 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 					return
 				} else {
 					for id, addr := range newNodes {
-						discovered.Store(id, kademlia.NewKNode(id, addr))
+						discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
 					}
 				}
 
-			}(ikn, targetNode.Id, ln.ktable.SelfNode(), ln.proxySettings, &discovered, &probed, &failed)
+			}(ikn, ln.ktable.SelfNode(), targetNode.Id, ln.proxySettings, &discovered, &probed, &failed)
 		}
 
 		// Usage of wait group to speed up the process

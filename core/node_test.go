@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sniffdogsniff/core"
@@ -31,7 +32,9 @@ var NODES_MAP = map[int][]*kademlia.KNode{
 }
 
 type fakeNode2 struct {
+	name    string
 	nearest map[kademlia.KadId]string
+	store   []core.SearchResult
 }
 
 func (fn *fakeNode2) Ping(id kademlia.KadId, addr string) error {
@@ -39,10 +42,22 @@ func (fn *fakeNode2) Ping(id kademlia.KadId, addr string) error {
 }
 
 func (fn *fakeNode2) StoreResult(sr core.SearchResult) {
+	for _, isr := range fn.store {
+		if sr.ResultHash == isr.ResultHash {
+			return
+		}
+	}
+	fn.store = append(fn.store, sr)
 }
 
 func (fn *fakeNode2) FindResults(query string) []core.SearchResult {
-	return []core.SearchResult{}
+	found := make([]core.SearchResult, 0)
+	for _, isr := range fn.store {
+		if strings.Contains(isr.Title, query) {
+			found = append(found, isr)
+		}
+	}
+	return found
 }
 
 func (fn *fakeNode2) NodeConnected(id kademlia.KadId, addr string) {
@@ -56,48 +71,63 @@ var localNode *core.LocalNode
 var remoteNodes []*fakeNode2
 
 func setupNodes() {
-	if localNode != nil && remoteNodes != nil {
+	if localNode != nil && len(remoteNodes) == 6 {
 		return
 	}
 
-	localNode = core.NewLocalNode(core.SdsConfig{})
+	setupTestDir()
+	localNode = core.NewLocalNode(core.SdsConfig{WorkDirPath: test_dir})
+	clearTestDir()
 	localNode.KadRoutingTable().SetSelfNode(SELF_NODE)
 	localNode.KadRoutingTable().PushNode(NODE_1)
 	localNode.KadRoutingTable().PushNode(NODE_2)
 	localNode.KadRoutingTable().PushNode(NODE_3)
 
 	fkn1 := &fakeNode2{
+		name:    "Node1",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_4.Id: NODE_4.Address, NODE_9.Id: NODE_9.Address},
 	}
 	fkn2 := &fakeNode2{
+		name:    "Node2",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_5.Id: NODE_5.Address, NODE_13.Id: NODE_13.Address},
 	}
 	fkn3 := &fakeNode2{
+		name:    "Node3",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_6.Id: NODE_6.Address, NODE_1.Id: NODE_1.Address},
 	}
 	fkn4 := &fakeNode2{
+		name:    "Node4",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_7.Id: NODE_7.Address, NODE_8.Id: NODE_8.Address, NODE_9.Id: NODE_9.Address},
 	}
 	fkn5 := &fakeNode2{
+		name:    "Node5",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_10.Id: NODE_10.Address, NODE_11.Id: NODE_11.Address},
 	}
 	fkn6 := &fakeNode2{
+		name:    "Node6",
+		store:   make([]core.SearchResult, 0),
 		nearest: map[kademlia.KadId]string{NODE_12.Id: NODE_12.Address, NODE_13.Id: NODE_13.Address},
 	}
-	core.NewNodeServer(fkn1).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_1.Address})
-	core.NewNodeServer(fkn2).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_2.Address})
-	core.NewNodeServer(fkn3).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_3.Address})
-	core.NewNodeServer(fkn4).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_4.Address})
-	core.NewNodeServer(fkn5).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_5.Address})
-	core.NewNodeServer(fkn6).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_6.Address})
 
-	remoteNodes := make([]*fakeNode2, 6)
+	remoteNodes = make([]*fakeNode2, 6)
 	remoteNodes[0] = fkn1
 	remoteNodes[1] = fkn2
 	remoteNodes[2] = fkn3
 	remoteNodes[3] = fkn4
 	remoteNodes[4] = fkn5
 	remoteNodes[5] = fkn6
+
+	core.NewNodeServer(fkn1).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_1.Address})
+	core.NewNodeServer(fkn2).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_2.Address})
+	core.NewNodeServer(fkn3).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_3.Address})
+	core.NewNodeServer(fkn4).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_4.Address})
+	core.NewNodeServer(fkn5).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_5.Address})
+	core.NewNodeServer(fkn6).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_6.Address})
 }
 
 func TestNodesLookup(t *testing.T) {
@@ -141,4 +171,69 @@ func TestNodesLookup(t *testing.T) {
 		}
 	}
 
+}
+
+func TestDoSearch(t *testing.T) {
+	setupNodes()
+	sr := core.NewSearchResult("A weapon of mass destruction (WMD) is a chemical, biological, radiological or nuclear.",
+		"http:://title1.ycom", core.ResultPropertiesMap{}, core.LINK_DATA_TYPE)
+
+	remoteNodes[0].store = make([]core.SearchResult, 0)
+	remoteNodes[1].store = append(remoteNodes[1].store, sr)
+	remoteNodes[2].store = append(remoteNodes[2].store, sr)
+
+	if len(remoteNodes[0].store) != 0 {
+		t.Fatal()
+	}
+
+	results := localNode.DoSearch("mass destruction")
+
+	if len(results) != 1 {
+		t.Fatal()
+	}
+	if results[0].ResultHash != sr.ResultHash {
+		t.Fatal()
+	}
+
+	if len(remoteNodes[0].store) == 0 {
+		t.Fatal()
+	}
+	if remoteNodes[0].store[0].ResultHash != sr.ResultHash {
+		t.Fatal()
+	}
+}
+
+func TestPublishResult(t *testing.T) {
+	setupNodes()
+	sr := core.NewSearchResult("title1 1 2 3", "http:://title1.com", core.ResultPropertiesMap{}, core.LINK_DATA_TYPE)
+	sr.QueryMetrics[0] = NODE_1.Id
+	sr.QueryMetrics[1] = NODE_2.Id
+	sr.QueryMetrics[2] = NODE_3.Id
+
+	remoteNodes[0].store = make([]core.SearchResult, 0)
+	remoteNodes[1].store = make([]core.SearchResult, 0)
+	remoteNodes[2].store = make([]core.SearchResult, 0)
+
+	localNode.PublishResults([]core.SearchResult{sr})
+
+	if len(remoteNodes[0].store) == 0 {
+		t.Fatal()
+	}
+	if remoteNodes[0].store[0].ResultHash != sr.ResultHash {
+		t.Fatal()
+	}
+
+	if len(remoteNodes[1].store) == 0 {
+		t.Fatal()
+	}
+	if remoteNodes[1].store[0].ResultHash != sr.ResultHash {
+		t.Fatal()
+	}
+
+	if len(remoteNodes[2].store) == 0 {
+		t.Fatal()
+	}
+	if remoteNodes[2].store[0].ResultHash != sr.ResultHash {
+		t.Fatal()
+	}
 }

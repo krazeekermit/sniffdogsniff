@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -12,22 +13,40 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-const TEST_DIR = "./test_dir"
+var test_dir = ""
+
+func setupTestDir() {
+	if test_dir == "" {
+		pwd, err := os.Getwd()
+		if err != nil {
+			return
+		}
+		test_dir = fmt.Sprintf("%stest%d%d", pwd, rand.Intn(4096), rand.Intn(4096))
+	}
+	if util.DirExists(test_dir) {
+		return
+	}
+	os.Mkdir(test_dir, 0707)
+	os.Chmod(test_dir+"/*", 0707)
+}
+
+func clearTestDir() {
+	err := os.RemoveAll(test_dir)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
 
 func setupDB() core.SearchDB {
+	setupTestDir()
 	// logging.InitLogging(logging.TRACE)
 	db := core.SearchDB{}
-	os.Mkdir(TEST_DIR, 0707)
-	os.Chmod(TEST_DIR+"/*", 0707)
-	db.Open(TEST_DIR, 1024*1024*256, 24*3600)
+	db.Open(test_dir, 1024*1024*256, 24*3600)
 	return db
 }
 
 func teardownDB() {
-	err := os.RemoveAll(TEST_DIR)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
+	clearTestDir()
 }
 
 func differentValues(name string, a, b interface{}, t *testing.T) {
