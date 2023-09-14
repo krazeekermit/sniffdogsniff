@@ -14,6 +14,7 @@ import (
 )
 
 const MAX_RAM_DB_SIZE = 268435456 // 256 MB
+const DEFAULT_BIND_PORT = 4222
 
 const (
 	DEFAULT_LOG_FILE_NAME = "sds.log"
@@ -51,11 +52,15 @@ const (
 	NODE_SERVICE                       = "node_service"
 	ENABLED                            = "enabled"
 	HIDDEN_SERVICE                     = "hidden_service"
+	TOR                                = "tor"
 	TOR_CONTROL_PORT                   = "tor_control_port"
 	TOR_CONTROL_AUTH_PASSWORD          = "tor_control_auth_password"
+	TOR_CONTROL_AUTH_COOKIE            = "tor_control_auth_cookie"
+	I2P                                = "i2p"
 	I2P_SAM_PORT                       = "i2p_sam_port"
 	I2P_SAM_USER                       = "i2p_sam_user"
 	I2P_SAM_PASSWORD                   = "i2p_sam_password"
+	BIND_PORT                          = "bind_port"
 )
 
 func panicNoKey(key string) {
@@ -160,7 +165,6 @@ func NewSdsConfig(path string) SdsConfig {
 		panicNoSection(PEER)
 	}
 	for _, pSec := range peersSections {
-		logging.LogTrace("read.config.ini")
 		if pSec.HasKey(ADDRESS) && pSec.HasKey(ID) {
 			idBytez, err := hex.DecodeString(pSec.Key(ID).String())
 			if err != nil {
@@ -242,7 +246,7 @@ func NewSdsConfig(path string) SdsConfig {
 		if cfg.P2PServerEnabled {
 			if nodeServiceSection.HasKey(HIDDEN_SERVICE) {
 				hiddenService := nodeServiceSection.Key(HIDDEN_SERVICE).String()
-				if hiddenService == "tor" {
+				if hiddenService == TOR {
 					serviceProto := &hiddenservice.TorProto{}
 
 					if nodeServiceSection.HasKey(TOR_CONTROL_PORT) {
@@ -250,12 +254,23 @@ func NewSdsConfig(path string) SdsConfig {
 						if err != nil {
 							serviceProto.TorControlPort = 9051
 						}
-						if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
+						if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_COOKIE) {
+							serviceProto.TorCookieAuth = nodeServiceSection.Key(TOR_CONTROL_AUTH_COOKIE).MustBool(false)
+						} else if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
 							serviceProto.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+							serviceProto.TorCookieAuth = false
+						} else {
+							serviceProto.TorCookieAuth = true
 						}
 					}
+					if nodeServiceSection.HasKey(BIND_PORT) {
+						serviceProto.BindPort = nodeServiceSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
+					} else {
+						serviceProto.BindPort = DEFAULT_BIND_PORT
+					}
+					serviceProto.WorkDirPath = cfg.WorkDirPath
 					cfg.P2PServerProto = serviceProto
-				} else if hiddenService == "i2p" {
+				} else if hiddenService == I2P {
 
 					if nodeServiceSection.HasKey(I2P_SAM_PORT) {
 						serviceProto := &hiddenservice.I2PProto{}
