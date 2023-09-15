@@ -9,7 +9,7 @@ allow_results_invalidation = no
 bind_address = 0.0.0.0:8081
 
 [proxy_settings]
-force_tor_proxy = yes
+# force_tor_proxy = yes
 # i2p_socks5_proxy = addr:port
 tor_socks5_proxy = 127.0.0.1:9050
 
@@ -27,11 +27,11 @@ bind_port = 4222
 # bind_address = 0.0.0.0:4111
 
 [peer]
-address = 127.0.0.1:4222
+address = 127.0.0.1:4221
 id = 199ee773164f7a8bedcbef3afa1bf398cf5febeb
 
 [peer]
-address = 192.178.1.1:4222
+address = 10.10.0.34:4222
 id = 2b199de909a1cb2773d45e8a2fdbe85175fe6ee4
 
 

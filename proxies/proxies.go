@@ -61,7 +61,8 @@ func (ps ProxySettings) NewConnection(address string) (net.Conn, error) {
 	}
 
 	if ptype == NONE_PROXY_TYPE {
-		return net.Dial("tcp", address)
+		dialer := net.Dialer{Timeout: 10 * time.Second}
+		return dialer.Dial("tcp", address)
 	} else {
 		dialer, err := proxy.SOCKS5("tcp", ps.GetProxyAddress(ptype), nil, &net.Dialer{
 			Timeout:   60 * time.Second,

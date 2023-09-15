@@ -15,7 +15,8 @@ import (
 
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"
 
-const LOOKUP_ROUND_TIME_THR = 20        // seconds
+const LOOKUP_ROUND_TIMEOUT = 20         // seconds
+const LOOKUP_TIMEOUT = 60               // seconds
 const NORMAL_NODES_LOOKUP_DELAY = 900   // seconds
 const NON_FULL_NODES_LOOKUP_DELAY = 120 // seconds
 const NORMAL_SYNC_DELAY = 30            // seconds
@@ -325,8 +326,11 @@ func (ln *LocalNode) StartPublishTask() {
 	Node Lookup
 */
 
-func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet operational
+func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
+	ln.tsLock.Lock()
 	alphaClosest := ln.ktable.GetNClosestTo(targetNode.Id, kademlia.ALPHA)
+	ln.tsLock.Unlock()
+
 	if len(alphaClosest) == 0 {
 		return 0
 	}
@@ -334,7 +338,6 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 	nDiscovered := 0
 	startTime := util.CurrentUnixTime()
 
-	var closest *kademlia.KNode = alphaClosest[0]
 	var wg sync.WaitGroup
 	var discovered, probed, failed sync.Map
 
@@ -343,13 +346,17 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 
 	for {
 		for _, ikn := range alphaClosest {
+			if ikn.Id.Eq(self.Id) {
+				continue
+			}
+
 			wg.Add(1)
 			go func(kn, source *kademlia.KNode, targetId kademlia.KadId,
 				proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
 
 				defer wg.Done()
 				rn := NewNodeClient(kn.Address, proxySettings)
-				newNodes, err := rn.FindNode(targetId, source) //FIXME: needs to be changed in FindNode(id *kademlia.KadId) []*kademlia.KNode
+				newNodes, err := rn.FindNode(targetId, source)
 				probed.Store(kn.Id, kn)
 				if err != nil {
 					failed.Store(kn.Id, kn)
@@ -398,7 +405,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 		})
 		ln.tsLock.Unlock()
 
-		if util.CurrentUnixTime()-startTime >= LOOKUP_ROUND_TIME_THR {
+		if util.CurrentUnixTime()-startTime >= LOOKUP_ROUND_TIMEOUT {
 			break
 		}
 
@@ -408,25 +415,8 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int { // not yet 
 		}
 
 		kademlia.SortNodesByDistance(targetNode.Id, alphaClosest)
-
-		newClosest := alphaClosest[0]
-		if closest != nil {
-			previousDistance := closest.Id.EvalDistance(targetNode.Id)
-			newDistance := newClosest.Id.EvalDistance(targetNode.Id)
-			if newDistance.LessThan(previousDistance) {
-				closest = newClosest
-
-				/*
-					if the closest node found by this round of find_nodes is actually closest than the previous
-					closest node only the alpha nodes are going to be probed, if the round did not found a closer
-					node than the previous one then the next round of find_nodes will ask all the unprobed nodes found.
-				*/
-				if len(alphaClosest) >= kademlia.ALPHA {
-					alphaClosest = alphaClosest[:kademlia.ALPHA-1]
-				}
-			}
-		} else {
-			closest = newClosest
+		if len(alphaClosest) >= kademlia.ALPHA {
+			alphaClosest = alphaClosest[:kademlia.ALPHA]
 		}
 	}
 
@@ -459,7 +449,7 @@ func (ln *LocalNode) StartNodesLookupTask() {
 			logging.LogInfo("Started node lookup")
 			d := 0
 			for i := 0; i < len(toLook); i++ {
-				if util.CurrentUnixTime()-startTime >= int64(LOOKUP_ROUND_TIME_THR*len(toLook)) {
+				if util.CurrentUnixTime()-startTime >= int64(LOOKUP_TIMEOUT) {
 					logging.LogWarn("Node lookup taking too much, giving up...")
 					break
 				}

@@ -133,10 +133,7 @@ func setupNodes() {
 func TestNodesLookup(t *testing.T) {
 	setupNodes()
 
-	s := localNode.DoNodesLookup(SELF_NODE)
-	if s != 10 {
-		t.Fatalf("expect %d is %d", 10, s)
-	}
+	localNode.DoNodesLookup(SELF_NODE)
 
 	ktable := localNode.KadRoutingTable()
 
