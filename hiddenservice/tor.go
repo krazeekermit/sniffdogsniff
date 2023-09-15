@@ -18,7 +18,7 @@ import (
 	"github.com/sniffdogsniff/util"
 )
 
-const KEY_BLOB_FILE_NAME = "onionkeyblob.dat"
+const KEY_BLOB_FILE_NAME = "onionkey.dat"
 
 const (
 	TOR_CODE_SUCCESS              = 250
@@ -124,7 +124,7 @@ func readReply_PROTOCOLINFO(conn net.Conn) (string, string, error) { // authmeth
 		}
 		ltoks = strings.Split(toks[2], "=")
 		if ltoks[0] == TOR_FLAG_COOKIEFILE {
-			cookieFilePath = ltoks[1]
+			cookieFilePath = strings.Trim(ltoks[1], "\"")
 		}
 	} else {
 		return "", "", fmt.Errorf("unable to parse tor response")
@@ -147,14 +147,14 @@ func readReply_AUTHCHALLENGE(conn net.Conn) ([]byte, []byte, error) { // serverh
 
 	toks := strings.Split(respLines[0], " ")
 	if len(toks) == 4 && toks[1] == TOR_CMD_AUTHCHALLENGE {
-		ltoks := strings.Split(toks[1], "=")
+		ltoks := strings.Split(toks[2], "=")
 		if ltoks[0] == TOR_FLAG_SERVERHASH {
 			serverHash, err = hex.DecodeString(ltoks[1])
 			if err != nil {
 				return []byte{}, []byte{}, err
 			}
 		}
-		ltoks = strings.Split(toks[2], "=")
+		ltoks = strings.Split(toks[3], "=")
 		if ltoks[0] == TOR_FLAG_SERVERNONCE {
 			serverNonce, err = hex.DecodeString(ltoks[1])
 			if err != nil {
@@ -212,7 +212,7 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	if err != nil {
 		panic("Failed to create hidden service can't connect to tor daemon")
 	}
-	password := ons.TorControlPassword
+	password := fmt.Sprintf("\"%s\"", ons.TorControlPassword)
 	if ons.TorCookieAuth {
 		if writeCommand(conn, TOR_CMD_PROTOCOLINFO, "") != nil {
 			panic("can't connect to tor daemon")
@@ -226,8 +226,6 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		}
 
 		cookieData := make([]byte, 32)
-		fmt.Println(cookieFilePath)
-		// sanitize string of the path!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		fp, err := os.OpenFile(cookieFilePath, os.O_RDONLY, 0600)
 		if err != nil {
 			panic(err.Error())
@@ -255,17 +253,17 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		}
 
 		srv2ctrlHmac := hmac.New(sha256.New, []byte(TOR_HMAC_SERVER_TO_CONTROLLER_KEY))
-		eServerHash := srv2ctrlHmac.Sum(append(append(cookieData, clientNonce...), serverNonce...))
-		fmt.Println(len(eServerHash))
-		// FIXME: hmac wrong lenght
+		srv2ctrlHmac.Write(append(append(cookieData, clientNonce...), serverNonce...))
+		eServerHash := srv2ctrlHmac.Sum(nil)
 		if !bytes.Equal(serverHash, eServerHash) {
-			//panic("tor auth: wrong server hash")
+			panic("tor auth: wrong server hash")
 		}
 
 		ctrl2srvHmac := hmac.New(sha256.New, []byte(TOR_HMAC_CONTROLLER_TO_SERVER_KEY))
-		password = hex.EncodeToString(ctrl2srvHmac.Sum(append(append(cookieData, clientNonce...), serverNonce...)))
+		ctrl2srvHmac.Write(append(append(cookieData, clientNonce...), serverNonce...))
+		password = hex.EncodeToString(ctrl2srvHmac.Sum(nil))
 	}
-	if writeCommand(conn, TOR_CMD_AUTHENTICATE, fmt.Sprintf("\"%s\"", password)) != nil {
+	if writeCommand(conn, TOR_CMD_AUTHENTICATE, password) != nil {
 		panic("can't connect to tor daemon")
 	}
 	_, err = readReply(conn)
@@ -287,8 +285,6 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 			if err != nil {
 				logging.LogError("Failed to read Tor keyblob file")
 			} else {
-				// encoding back the key bytes to base64 avoids errors when sending back key to the tor control port
-				// see https://gitweb.torproject.org/torspec.git/tree/control-spec.txt at 2.1.1 (Notes on an escaping bug)
 				base64Key := base64.StdEncoding.EncodeToString(buf[:n])
 				keyArgs = fmt.Sprintf("%s:%s", TOR_ED25519_V3, base64Key)
 				logging.LogTrace("using cached Tor keyblob file key", keyArgs)
@@ -314,8 +310,6 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		if err != nil {
 			logging.LogError("Failed to write Tor keyblob file:", err.Error())
 		} else {
-			// writing the decoded base64 avoids errors when sending back key to the tor control port
-			// see https://gitweb.torproject.org/torspec.git/tree/control-spec.txt at 2.1.1 (Notes on an escaping bug)
 			key := strings.Split(privKey, ":")[1]
 			keyBytes, err := base64.StdEncoding.DecodeString(key)
 			if err != nil {
