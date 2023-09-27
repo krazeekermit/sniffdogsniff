@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/gocolly/colly v1.2.0
-	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/syndtr/goleveldb v1.0.0
 	golang.org/x/net v0.4.0
 	gopkg.in/ini.v1 v1.67.0
@@ -17,8 +16,6 @@ require (
 	github.com/antchfx/htmlquery v1.2.5 // indirect
 	github.com/antchfx/xmlquery v1.3.13 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
-	github.com/eyedeekay/goSam v0.32.54 // indirect
-	github.com/eyedeekay/i2pkeys v0.0.0-20220310055120-b97558c06ac8 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.3.1 // indirect

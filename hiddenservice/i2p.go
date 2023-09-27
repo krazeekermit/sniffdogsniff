@@ -2,13 +2,7 @@ package hiddenservice
 
 import (
 	"fmt"
-	"log"
 	"net"
-
-	// we use an external library for i2p. i2p proto is different than tor so it needs
-	// custom transports
-
-	"github.com/eyedeekay/goSam"
 )
 
 type I2PProto struct {
@@ -16,21 +10,21 @@ type I2PProto struct {
 	SamAPIPort  int
 	SamUser     string
 	SamPassword string
-
-	client *goSam.Client
 }
 
+// goSam is not working for our purposes so we need to implement it ourselves
+// not fully implemented do not use it!
 func (i2p *I2PProto) Listen() (net.Listener, error) {
-	sam, err := goSam.NewClient(fmt.Sprintf(":%d", i2p.SamAPIPort))
+	samCon, err := net.Dial("tcp", fmt.Sprintf(":%d", i2p.SamAPIPort))
 	if err != nil {
-		return nil, err
+		panic("failed to connect to the i2p daemon")
 	}
-	log.Println("Client Created")
-	return sam.Listen()
+
+	return nil, nil
 }
 
 func (i2p *I2PProto) GetAddressString() string {
-	return i2p.client.Base32()
+	return ""
 }
 
 func (i2p *I2PProto) Close() {}
