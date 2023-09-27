@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
