@@ -74,7 +74,7 @@ func (ln *LocalNode) SelfNode() *kademlia.KNode {
 
 func (ln *LocalNode) SetNodeAddress(addr string) {
 	ln.tsLock.Lock()
-	ln.ktable.SetSelfNode(kademlia.NewKNode(kademlia.NewKadId(addr), addr))
+	ln.ktable.SetSelfNode(kademlia.NewKNode(kademlia.NewKadIdFromAddrStr(addr), addr))
 	if ln.ktable.IsEmpty() {
 		for id, addr := range ln.knownNodes {
 			logging.LogTrace(addr)
@@ -116,7 +116,10 @@ func (ln *LocalNode) Ping(id kademlia.KadId, addr string) error {
 
 func (ln *LocalNode) NodeConnected(id kademlia.KadId, addr string) {
 	ln.tsLock.Lock()
-	ln.ktable.PushNode(kademlia.NewKNode(id, addr))
+	// avoids malicious nodes attacks
+	if kademlia.NewKadIdFromAddrStr(addr).Eq(id) {
+		ln.ktable.PushNode(kademlia.NewKNode(id, addr))
+	}
 	ln.tsLock.Unlock()
 }
 
@@ -363,7 +366,9 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 					return
 				} else {
 					for id, addr := range newNodes {
-						discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
+						if kademlia.NewKadIdFromAddrStr(addr).Eq(id) {
+							discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
+						}
 					}
 				}
 

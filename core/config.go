@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -166,12 +165,8 @@ func NewSdsConfig(path string) SdsConfig {
 	}
 	for _, pSec := range peersSections {
 		if pSec.HasKey(ADDRESS) && pSec.HasKey(ID) {
-			idBytez, err := hex.DecodeString(pSec.Key(ID).String())
-			if err != nil {
-				continue
-			}
-			kadId := kademlia.KadIdFromBytes(idBytez)
-			cfg.KnownPeers[kadId] = pSec.Key(ADDRESS).String()
+			addr := pSec.Key(ADDRESS).String()
+			cfg.KnownPeers[kademlia.NewKadIdFromAddrStr(addr)] = addr
 		}
 	}
 

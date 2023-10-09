@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"math/rand"
+	"net"
 	"sort"
 
 	"github.com/sniffdogsniff/util"
@@ -23,6 +24,14 @@ func NewKadId(addr string) KadId {
 	}
 
 	return KadIdFromBytes(bytez)
+}
+
+func NewKadIdFromAddrStr(addr string) KadId {
+	addrHost, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		addrHost = addr
+	}
+	return NewKadId(addrHost)
 }
 
 func NewRandKadId() KadId {
