@@ -69,7 +69,6 @@ func toB32AddrStr(b64string string) string {
 	return fmt.Sprintf("%s.b32.i2p", strings.TrimRight(strings.ToLower(base32.StdEncoding.EncodeToString(b32bytes)), "="))
 }
 
-// remember to put all constants in const!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 func readSamReply(conn net.Conn, cmd string) (map[string]string, error) {
 	recvBytes := make([]byte, 0)
 	buf := make([]byte, TXT_BUFFER_SIZE)
@@ -148,8 +147,6 @@ func (i2p *I2PProto) Addr() net.Addr {
 	return nil
 }
 
-// goSam is not working for our purposes so we need to implement it ourselves
-// not fully implemented do not use it!
 func (i2p *I2PProto) Listen() (net.Listener, error) {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", i2p.SamAPIPort))
 	if err != nil {
@@ -215,35 +212,6 @@ func (i2p *I2PProto) Listen() (net.Listener, error) {
 
 	i2p.b32addr = toB32AddrStr(dest)
 	i2p.conn = conn
-
-	// From https://geti2p.net/spec/common-structures#destination
-
-	// To implement a basic TCP-only, peer-to-peer application, the client must support the following commands.
-
-	// HELLO VERSION MIN=3.1 MAX=3.1
-	// reply : HELLO REPLY RESULT=OK VERSION=3.1
-	// Needed for all of the remaining ones
-	// DEST GENERATE SIGNATURE_TYPE=7
-	// reply PUB==destination base64 needs to be converted to base32
-	/**
-			note: from bitcoin i2pd.cpp
-			/**
-	 * Swap Standard Base64 <-> I2P Base64.
-	 * Standard Base64 uses `+` and `/` as last two characters of its alphabet.
-	 * I2P Base64 uses `-` and `~` respectively.
-	 * So it is easy to detect in which one is the input and convert to the other.
-		**/
-
-	// To generate our private key and destination
-	// NAMING LOOKUP NAME=...
-	// To convert .i2p addresses to destinations
-	// SESSION CREATE STYLE=STREAM ID=... DESTINATION=...
-	// alternative SESSION CREATE STYLE=STREAM ID=1226 DESTINATION=TRANSIENT SIGNATURE_TYPE=7
-	// Needed for STREAM CONNECT and STREAM ACCEPT
-	// STREAM CONNECT ID=... DESTINATION=...
-	// To make outgoing connections
-	// STREAM ACCEPT ID=...
-	// To accept incoming connections
 
 	return i2p, nil
 }
