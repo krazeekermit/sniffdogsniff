@@ -14,4 +14,6 @@ func (ip4 *IP4TCPProto) GetAddressString() string {
 	return ip4.BindAddress
 }
 
-func (ip4 *IP4TCPProto) Close() {}
+func (ip4 *IP4TCPProto) Close() error {
+	return nil
+}

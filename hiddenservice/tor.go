@@ -57,7 +57,6 @@ const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 
 func writeCommand(conn net.Conn, cmd, args string) error {
 	cmdStr := fmt.Sprintf("%s %s", cmd, args)
-	logging.LogTrace("tor_cmd", cmdStr)
 	n, err := conn.Write(append([]byte(cmdStr), '\n'))
 	if err != nil || n < len([]byte(cmdStr)) {
 		return fmt.Errorf("can't communicate to daemon")
@@ -325,7 +324,7 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	logging.LogInfo("Created onion service at", ons.onionId)
 }
 
-func (ons *TorProto) Close() {
+func (ons *TorProto) Close() error {
 	logging.LogInfo("Removing onion service", ons.onionId)
 	if writeCommand(ons.controlPortConn, TOR_CMD_DEL_ONION, ons.onionId) != nil {
 		logging.LogError("Failed removing onion service")
@@ -335,6 +334,7 @@ func (ons *TorProto) Close() {
 		logging.LogError("Failed removing onion service:", err.Error())
 	}
 	ons.controlPortConn.Close()
+	return nil
 }
 
 func (ons *TorProto) Listen() (net.Listener, error) {

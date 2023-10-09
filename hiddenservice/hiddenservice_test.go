@@ -84,3 +84,57 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 
 	torProto.Close()
 }
+
+func Test_I2P(t *testing.T) {
+	logging.InitLogging(logging.TRACE)
+
+	torProto := hiddenservice.I2PProto{
+		SamAPIPort:  7656,
+		SamUser:     "",
+		SamPassword: "",
+		BindPort:    3443,
+	}
+
+	l, err := torProto.Listen()
+	if err != nil {
+		panic("test failed")
+	}
+
+	go func(l net.Listener) {
+
+		conn, err := l.Accept()
+		if err != nil {
+			panic("test failed")
+		}
+		conn.Write([]byte("hello1234"))
+
+	}(l)
+
+	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:4447", nil, &net.Dialer{
+		Timeout:   60 * time.Second,
+		KeepAlive: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	fmt.Println("a", torProto.GetAddressString())
+	conn, err := dialer.Dial("tcp", torProto.GetAddressString())
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	bytez := make([]byte, 120)
+	n, err := conn.Read(bytez)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if n == 0 {
+		t.Fatal()
+	}
+
+	if string(bytez[:n]) != "hello1234" {
+		t.Fatal()
+	}
+
+	torProto.Close()
+}

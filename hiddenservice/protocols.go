@@ -8,5 +8,5 @@ type NetProtocol interface {
 	Listen() (net.Listener, error)
 
 	GetAddressString() string
-	Close()
+	Close() error
 }

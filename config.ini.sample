@@ -16,7 +16,6 @@ tor_socks5_proxy = 127.0.0.1:9050
 [node_service]
 enabled = yes
 hidden_service = tor
-# Note: sniffdogsniff only supports auto-creation of a Tor Hidden Service, I2P must be done manually
 tor_control_port = 9051
 # tor_control_auth_password = test1234
 # tor_control_auth_cookie = true

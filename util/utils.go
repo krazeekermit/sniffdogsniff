@@ -135,8 +135,16 @@ func DirExists(path string) bool {
 }
 
 /* Random id */
-func GenerateId12_Str() string {
-	buf := make([]byte, 12)
+func generateId_Str(n int) string {
+	buf := make([]byte, n)
 	rand.Read(buf)
 	return hex.EncodeToString(buf)
+}
+
+func GenerateId12_Str() string {
+	return generateId_Str(12)
+}
+
+func GenerateId3_Str() string {
+	return generateId_Str(3)
 }

@@ -290,6 +290,12 @@ func NewSdsConfig(path string) SdsConfig {
 						} else {
 							serviceProto.NeedAuth = false
 						}
+						if nodeServiceSection.HasKey(BIND_PORT) {
+							serviceProto.BindPort = nodeServiceSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
+						} else {
+							serviceProto.BindPort = DEFAULT_BIND_PORT
+						}
+						serviceProto.WorkDirPath = cfg.WorkDirPath
 						cfg.P2PServerProto = serviceProto
 					}
 				}
