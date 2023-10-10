@@ -38,6 +38,7 @@ type NodeInterface interface {
 	// used to insert new connected node into the ktable
 	// usually called by the rpc request handler
 	NodeConnected(id kademlia.KadId, addr string)
+	CheckNode(id kademlia.KadId, addr string) bool
 }
 
 type LocalNode struct {
@@ -50,11 +51,13 @@ type LocalNode struct {
 	selfNodeFilePath string
 	ktable           *kademlia.KadRoutingTable
 	knownNodes       map[kademlia.KadId]string
+	nodesBlacklist   map[kademlia.KadId]string
 }
 
 func NewLocalNode(configs SdsConfig) *LocalNode {
 	ln := LocalNode{}
 	ln.knownNodes = configs.KnownPeers
+	ln.nodesBlacklist = configs.PeersBlacklist
 	ln.selfNodeFilePath = filepath.Join(configs.WorkDirPath, SELF_PEER_FILE_NAME)
 	ln.ktable = kademlia.NewKadRoutingTable()
 	ln.ktable.Open(configs.WorkDirPath)
@@ -114,12 +117,18 @@ func (ln *LocalNode) Ping(id kademlia.KadId, addr string) error {
 	return nil
 }
 
+func (ln *LocalNode) CheckNode(id kademlia.KadId, addr string) bool {
+	for bid, baddr := range ln.nodesBlacklist {
+		if bid.Eq(id) || baddr == addr {
+			return false
+		}
+	}
+	return kademlia.NewKadIdFromAddrStr(addr).Eq(id)
+}
+
 func (ln *LocalNode) NodeConnected(id kademlia.KadId, addr string) {
 	ln.tsLock.Lock()
-	// avoids malicious nodes attacks
-	if kademlia.NewKadIdFromAddrStr(addr).Eq(id) {
-		ln.ktable.PushNode(kademlia.NewKNode(id, addr))
-	}
+	ln.ktable.PushNode(kademlia.NewKNode(id, addr))
 	ln.tsLock.Unlock()
 }
 
@@ -366,9 +375,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 					return
 				} else {
 					for id, addr := range newNodes {
-						if kademlia.NewKadIdFromAddrStr(addr).Eq(id) {
-							discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
-						}
+						discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
 					}
 				}
 
@@ -397,6 +404,11 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 			kn, ok := value.(*kademlia.KNode)
 			if !ok {
 				return true // continue
+			}
+
+			if !ln.CheckNode(kn.Id, kn.Address) {
+				// skip blacklisted or invalid node
+				return true
 			}
 
 			_, present := probed.Load(key)

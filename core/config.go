@@ -26,7 +26,8 @@ const (
 	LOG_TO_FILE                        = "log_to_file"
 	ALLOW_RESULTS_INVALIDATION         = "allow_results_invalidation"
 	SEARCH_DATABASE_MAX_RAM_CACHE_SIZE = "search_database_max_ram_cache_size"
-	PEER                               = "peer"
+	PEERS                              = "peers"
+	PEERS_BLACKLIST                    = "peers_blacklist"
 	ID                                 = "id"
 	ADDRESS                            = "address"
 	EXTERNAL_SEARCH_ENGINE             = "external_search_engine"
@@ -109,6 +110,7 @@ type SdsConfig struct {
 	AllowResultsInvalidation bool
 	WebServiceBindAddress    string
 	KnownPeers               map[kademlia.KadId]string
+	PeersBlacklist           map[kademlia.KadId]string
 	ProxySettings            proxies.ProxySettings
 	P2PServerEnabled         bool
 	P2PServerProto           hiddenservice.NetProtocol
@@ -119,6 +121,7 @@ func NewSdsConfig(path string) SdsConfig {
 	cfg := SdsConfig{}
 	iniData, err := ini.LoadSources(ini.LoadOptions{
 		AllowNonUniqueSections: true,
+		AllowShadows:           true,
 	}, path)
 
 	if err != nil {
@@ -159,14 +162,26 @@ func NewSdsConfig(path string) SdsConfig {
 	}
 
 	cfg.KnownPeers = make(map[kademlia.KadId]string)
-	peersSections, err := iniData.SectionsByName(PEER)
-	if err != nil {
-		panicNoSection(PEER)
+	if iniData.HasSection(PEERS) {
+		pSec := iniData.Section(PEERS)
+		if pSec.HasKey(ADDRESS) {
+			for _, addr := range pSec.Key(ADDRESS).ValueWithShadows() {
+				cfg.KnownPeers[kademlia.NewKadIdFromAddrStr(addr)] = addr
+			}
+		} else {
+			panicNoKey(ADDRESS)
+		}
+	} else {
+		panicNoSection(PEERS)
 	}
-	for _, pSec := range peersSections {
-		if pSec.HasKey(ADDRESS) && pSec.HasKey(ID) {
-			addr := pSec.Key(ADDRESS).String()
-			cfg.KnownPeers[kademlia.NewKadIdFromAddrStr(addr)] = addr
+
+	cfg.PeersBlacklist = make(map[kademlia.KadId]string)
+	if iniData.HasSection(PEERS_BLACKLIST) {
+		pSec := iniData.Section(PEERS_BLACKLIST)
+		if pSec.HasKey(ADDRESS) {
+			for _, addr := range pSec.Key(ADDRESS).ValueWithShadows() {
+				cfg.PeersBlacklist[kademlia.NewKadIdFromAddrStr(addr)] = addr
+			}
 		}
 	}
 

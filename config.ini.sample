@@ -25,11 +25,12 @@ enabled = yes
 # i2p_sam_password = 
 bind_address = 0.0.0.0:4111
 
-[peer]
+[peers]
 address = 127.0.0.1:4221
-
-[peer]
 address = 10.10.0.34:4222
+
+[peers_blacklist]
+address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
 
 
 # search engines

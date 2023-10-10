@@ -91,6 +91,10 @@ func (fn *fakeNode) NodeConnected(id kademlia.KadId, addr string) {
 	}
 }
 
+func (fn *fakeNode) CheckNode(id kademlia.KadId, addr string) bool {
+	return kademlia.NewKadIdFromAddrStr(addr).Eq(id)
+}
+
 var server *core.NodeServer = nil
 var node *fakeNode = nil
 

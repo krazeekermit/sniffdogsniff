@@ -63,6 +63,11 @@ func (fn *fakeNode2) FindResults(query string) []core.SearchResult {
 func (fn *fakeNode2) NodeConnected(id kademlia.KadId, addr string) {
 }
 
+func (fn *fakeNode2) CheckNode(id kademlia.KadId, addr string) bool {
+	check := kademlia.NewKadIdFromAddrStr(addr).Eq(id)
+	return check
+}
+
 func (fn *fakeNode2) FindNode(id kademlia.KadId) map[kademlia.KadId]string {
 	return fn.nearest
 }

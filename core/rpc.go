@@ -146,6 +146,9 @@ type PingReply struct {
 }
 
 func (srv *NodeServer) ping(args PingArgs, reply *PingReply) {
+	if !srv.node.CheckNode(args.PingerId, args.PingerAddress) {
+		return
+	}
 	(*reply).Error = srv.node.Ping(args.PingerId, args.PingerAddress)
 }
 
@@ -161,6 +164,10 @@ type FindNodeReply struct {
 }
 
 func (srv *NodeServer) findNode(args FindNodeArgs, reply *FindNodeReply) {
+	if !srv.node.CheckNode(args.SourceNodeId, args.SourceNodeAddress) {
+		return
+	}
+
 	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	(*reply).NewNodes = srv.node.FindNode(args.TargetNodeId)
 }
@@ -176,6 +183,10 @@ type StoreResultReply struct {
 }
 
 func (srv *NodeServer) storeResult(args StoreResultArgs, reply *StoreResultReply) {
+	if !srv.node.CheckNode(args.SourceNodeId, args.SourceNodeAddress) {
+		return
+	}
+
 	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	srv.node.StoreResult(args.Value)
 }
@@ -192,6 +203,10 @@ type FindResultsReply struct {
 }
 
 func (srv *NodeServer) findResults(args FindResultsArgs, reply *FindResultsReply) {
+	if !srv.node.CheckNode(args.SourceNodeId, args.SourceNodeAddress) {
+		return
+	}
+
 	srv.node.NodeConnected(args.SourceNodeId, args.SourceNodeAddress)
 	(*reply).Values = srv.node.FindResults(args.QueryString)
 }
