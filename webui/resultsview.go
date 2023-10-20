@@ -38,7 +38,7 @@ func getResultsForPage(results []core.SearchResult, page int) []core.SearchResul
 func matchesUrlType(urlStr, urlType string) bool {
 	url, err := url.Parse(urlStr)
 	if err != nil {
-		logging.LogTrace("URL filter -", err.Error())
+		logging.Debugf(WEBUI, "URL filter - %s", err.Error())
 		return true
 	}
 	comps := strings.Split(url.Hostname(), ".")
@@ -87,7 +87,6 @@ func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node 
 
 	//Avoid extra search actions
 	if query != rpv.query || dataType != rpv.dataType {
-		logging.LogTrace("status changed")
 		rpv.results = filterSearchResults(node.DoSearch(query), urlFilter, dataType)
 		rpv.query = query
 		rpv.dataType = dataType

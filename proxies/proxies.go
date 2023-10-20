@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+const PROXY = "proxy"
+
 const ONION_SUFFIX string = "onion"
 const I2P_SUFFIX string = "i2p"
 
@@ -53,7 +55,7 @@ func (ps ProxySettings) GetProxyAddress(ptype ProxyType) string {
 func (ps ProxySettings) NewConnection(address string) (net.Conn, error) {
 	ptype, err := ps.TypeByAddr(address)
 	if err != nil {
-		logging.LogTrace("ProxyError::", err)
+		logging.Debugf(PROXY, err.Error())
 		return nil, err
 	}
 	if ps.ForceTor {
@@ -69,7 +71,7 @@ func (ps ProxySettings) NewConnection(address string) (net.Conn, error) {
 			KeepAlive: 30 * time.Second,
 		})
 		if err != nil {
-			logging.LogError(err.Error())
+			logging.Errorf(PROXY, err.Error())
 			return nil, err
 		}
 		return dialer.Dial("tcp", address)

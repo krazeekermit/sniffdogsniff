@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/sniffdogsniff/kademlia"
-	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/util"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -321,7 +320,6 @@ func dbSize(db *leveldb.DB) int {
 func (sdb *SearchDB) Open(workDir string, maxCacheSize int, expirationThr uint64) {
 	sdb.maximumCacheSize = maxCacheSize
 	sdb.expirationThr = expirationThr
-	logging.LogTrace("DEBUG: SearchDB started with", maxCacheSize, "Bytes of cache")
 
 	sdb.searchesDB = openDB(filepath.Join(workDir, SEARCHES_DB_FILE_NAME))
 

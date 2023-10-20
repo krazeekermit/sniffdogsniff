@@ -18,6 +18,8 @@ import (
 	"github.com/sniffdogsniff/util"
 )
 
+const TOR = "tor"
+
 const KEY_BLOB_FILE_NAME = "onionkey.dat"
 
 const (
@@ -277,16 +279,16 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	if cachedKeyBlob {
 		fp, err := os.OpenFile(keyBlobFilePath, os.O_RDONLY, 0600)
 		if err != nil {
-			logging.LogError("Failed to open Tor keyblob file:", err.Error())
+			logging.Errorf(TOR, "Failed to open Tor keyblob file: %s", err.Error())
 		} else {
 			buf := make([]byte, 256)
 			n, err := fp.Read(buf)
 			if err != nil {
-				logging.LogError("Failed to read Tor keyblob file")
+				logging.Errorf(TOR, "Failed to read Tor keyblob file")
 			} else {
 				base64Key := base64.StdEncoding.EncodeToString(buf[:n])
 				keyArgs = fmt.Sprintf("%s:%s", TOR_ED25519_V3, base64Key)
-				logging.LogTrace("using cached Tor keyblob file key", keyArgs)
+				logging.Debugf(TOR, "using cached Tor keyblob file key %s", keyArgs)
 			}
 			fp.Close()
 		}
@@ -307,12 +309,12 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	if !cachedKeyBlob {
 		fp, err := os.OpenFile(keyBlobFilePath, os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
-			logging.LogError("Failed to write Tor keyblob file:", err.Error())
+			logging.Errorf(TOR, "Failed to write Tor keyblob file: %s", err.Error())
 		} else {
 			key := strings.Split(privKey, ":")[1]
 			keyBytes, err := base64.StdEncoding.DecodeString(key)
 			if err != nil {
-				logging.LogError("Tor: cannod decode private key base64 string")
+				logging.Errorf(TOR, "Tor: cannod decode private key base64 string")
 			} else {
 				fp.Write(keyBytes)
 			}
@@ -321,17 +323,17 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	}
 
 	ons.onionId = serviceId
-	logging.LogInfo("Created onion service at", ons.onionId)
+	logging.Infof(TOR, "Created onion service at %s", ons.onionId)
 }
 
 func (ons *TorProto) Close() error {
-	logging.LogInfo("Removing onion service", ons.onionId)
+	logging.Infof(TOR, "Removing onion service %s", ons.onionId)
 	if writeCommand(ons.controlPortConn, TOR_CMD_DEL_ONION, ons.onionId) != nil {
-		logging.LogError("Failed removing onion service")
+		logging.Errorf(TOR, "Failed removing onion service")
 	}
 	_, err := readReply(ons.controlPortConn)
 	if err != nil {
-		logging.LogError("Failed removing onion service:", err.Error())
+		logging.Errorf(TOR, "Failed removing onion service:", err.Error())
 	}
 	ons.controlPortConn.Close()
 	return nil
@@ -339,7 +341,6 @@ func (ons *TorProto) Close() error {
 
 func (ons *TorProto) Listen() (net.Listener, error) {
 	ons.connectAndCreateHiddenService()
-	logging.LogTrace(ons.controlPortConn)
 	return net.Listen("tcp", fmt.Sprintf("%s:%d", DEFAULT_BIND_ADDRESS, ons.BindPort))
 }
 

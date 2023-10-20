@@ -13,14 +13,14 @@ const (
 	INFO  int = 0
 	WARN  int = 1
 	ERROR int = 2
-	TRACE int = 3
+	DEBUG int = 3
 )
 
 const (
 	INFO_STR  = "info"
 	WARN_STR  = "warn"
 	ERROR_STR = "error"
-	TRACE_STR = "trace"
+	DEBUG_STR = "debug"
 )
 
 const (
@@ -44,10 +44,10 @@ func StrToLogLevel(levelStr string) int {
 		return WARN
 	case ERROR_STR:
 		return ERROR
-	case TRACE_STR:
-		return TRACE
+	case DEBUG_STR:
+		return DEBUG
 	}
-	return TRACE
+	return DEBUG
 }
 
 func SprintTrimmed(a ...any) string {
@@ -58,7 +58,7 @@ func InitLogging(level int) {
 	logLevel = level
 }
 
-func printlog(level, color, message string) {
+func printlog(level, color, sender, message string) {
 	if mutex == nil {
 		mutex = &sync.Mutex{}
 	}
@@ -73,7 +73,7 @@ func printlog(level, color, message string) {
 	}
 
 	mutex.Lock()
-	fmt.Fprintf(outStream, "[%s %s%5s%s] %s\n", time.Now().Local().Format(time.ANSIC), color, level, end, message)
+	fmt.Fprintf(outStream, "[%s %s%5s%s] (%s) %s\n", time.Now().Local().Format(time.ANSIC), color, level, end, sender, message)
 	outStream.Flush()
 	mutex.Unlock()
 }
@@ -88,26 +88,26 @@ func SetLoggingToFile(path string) {
 	outStream = bufio.NewWriter(fp)
 }
 
-func LogInfo(a ...any) {
+func Infof(sender, format string, a ...any) {
 	if logLevel >= INFO {
-		printlog(INFO_STR, ANSI_END, SprintTrimmed(a...))
+		printlog(INFO_STR, ANSI_END, sender, fmt.Sprintf(format, a...))
 	}
 }
 
-func LogWarn(a ...any) {
+func Warnf(sender, format string, a ...any) {
 	if logLevel >= WARN {
-		printlog(WARN_STR, ANSI_YELLOW, SprintTrimmed(a...))
+		printlog(WARN_STR, ANSI_YELLOW, sender, fmt.Sprintf(format, a...))
 	}
 }
 
-func LogError(a ...any) {
+func Errorf(sender, format string, a ...any) {
 	if logLevel >= ERROR {
-		printlog(ERROR_STR, ANSI_RED, SprintTrimmed(a...))
+		printlog(ERROR_STR, ANSI_RED, sender, fmt.Sprintf(format, a...))
 	}
 }
 
-func LogTrace(a ...any) {
-	if logLevel >= TRACE {
-		printlog(TRACE_STR, ANSI_CYAN, SprintTrimmed(a...))
+func Debugf(sender, format string, a ...any) {
+	if logLevel >= DEBUG {
+		printlog(DEBUG_STR, ANSI_CYAN, sender, fmt.Sprintf(format, a...))
 	}
 }

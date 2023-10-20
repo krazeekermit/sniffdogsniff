@@ -29,7 +29,7 @@ run() {
     boldecho " -> Running SniffDogSniff";
     cp $THIS_SCRIPT_DIRECTORY/config.ini.sample $BUILD_DIR/config.ini;
     echo "$BUILD_DIR/config.ini"
-    $BUILD_DIR/sniffdogsniff -c $BUILD_DIR/config.ini --log-level TRACE;
+    $BUILD_DIR/sniffdogsniff -c $BUILD_DIR/config.ini --log-level DEBUG;
 }
 
 for arg in $@

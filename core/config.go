@@ -75,7 +75,7 @@ func stringToByteSize(text string) int {
 	cleanStr := strings.Trim(text, " ")
 	size, err := strconv.Atoi(cleanStr[0 : len(cleanStr)-2])
 	if err != nil {
-		logging.LogWarn("Cannot parse db cache size")
+		logging.Warnf("config", "Cannot parse db cache size")
 		return MAX_RAM_DB_SIZE
 	}
 	if strings.HasSuffix(cleanStr, "G") { // Gigs
@@ -188,7 +188,7 @@ func NewSdsConfig(path string) SdsConfig {
 	cfg.searchEngines = make(map[string]SearchEngine)
 	enginesSections, err := iniData.SectionsByName(EXTERNAL_SEARCH_ENGINE)
 	if err != nil {
-		logging.LogWarn("Failed to parse config file: external search engines")
+		logging.Warnf("config", "Failed to parse config file: external search engines")
 	}
 	for _, sec := range enginesSections {
 		name := sec.Key(NAME).String()

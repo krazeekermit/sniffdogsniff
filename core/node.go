@@ -13,6 +13,9 @@ import (
 	"github.com/sniffdogsniff/util"
 )
 
+const NODE = "node"
+const NODES_LOOKUP = "nodes lookup"
+
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"
 
 const LOOKUP_ROUND_TIMEOUT = 20         // seconds
@@ -80,7 +83,7 @@ func (ln *LocalNode) SetNodeAddress(addr string) {
 	ln.ktable.SetSelfNode(kademlia.NewKNode(kademlia.NewKadIdFromAddrStr(addr), addr))
 	if ln.ktable.IsEmpty() {
 		for id, addr := range ln.knownNodes {
-			logging.LogTrace(addr)
+			logging.Debugf(NODE, "set address: %s", addr)
 			ln.ktable.PushNode(kademlia.NewKNode(id, addr))
 		}
 	}
@@ -327,7 +330,7 @@ func (ln *LocalNode) StartPublishTask() {
 			ticker.Reset(time.Duration(util.TIME_HOUR_UNIX) * time.Second)
 			ln.tsLock.Lock()
 			results := ln.searchDB.ResultsToPublish()
-			logging.LogInfo("Publishing", len(results), "results...")
+			logging.Infof(NODE, "Publishing %d results...", len(results))
 			ln.tsLock.Unlock()
 			ln.PublishResults(results)
 		}
@@ -371,6 +374,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 				newNodes, err := rn.FindNode(targetId, source)
 				probed.Store(kn.Id, kn)
 				if err != nil {
+					logging.Errorf(NODES_LOOKUP, err.Error())
 					failed.Store(kn.Id, kn)
 					return
 				} else {
@@ -437,7 +441,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 		}
 	}
 
-	logging.LogTrace("Discovered", nDiscovered, "closest nodes to", targetNode.Id)
+	logging.Debugf(NODES_LOOKUP, "Discovered %d closest nodes to %s", nDiscovered, targetNode.Id)
 	return nDiscovered
 }
 
@@ -463,16 +467,16 @@ func (ln *LocalNode) StartNodesLookupTask() {
 					toLook = append(toLook, kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode().Id, i), ""))
 				}
 			}
-			logging.LogInfo("Started node lookup")
+			logging.Infof(NODE, "Started node lookup")
 			d := 0
 			for i := 0; i < len(toLook); i++ {
 				if util.CurrentUnixTime()-startTime >= int64(LOOKUP_TIMEOUT) {
-					logging.LogWarn("Node lookup taking too much, giving up...")
+					logging.Warnf(NODES_LOOKUP, "Nodes lookup taking too much, giving up...")
 					break
 				}
 				d += ln.DoNodesLookup(toLook[i])
 			}
-			logging.LogInfo("Discovered", d, "new nodes")
+			logging.Infof(NODES_LOOKUP, "Discovered %d new nodes", d)
 			ticker.Reset(delay * time.Second)
 		}
 	}()

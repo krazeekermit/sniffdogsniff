@@ -13,12 +13,14 @@ import (
 	"github.com/sniffdogsniff/logging"
 )
 
+const CRAWLER = "crawler"
+
 const NO_DESCRIPTION_AVAILABLE string = "No description available"
 
 func validUrl(urlString string) bool {
 	u, err := url.Parse(urlString)
 	if err != nil {
-		logging.LogTrace("Found invalid url " + urlString)
+		logging.Debugf(CRAWLER, "Found invalid url %s", urlString)
 		return false
 	}
 	switch u.Scheme {
@@ -89,11 +91,11 @@ func (se SearchEngine) extractDescription(url string) string {
 	description := ""
 
 	c.OnError(func(_ *colly.Response, err error) {
-		logging.LogError(err.Error())
+		logging.Errorf(CRAWLER, err.Error())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		logging.LogTrace(fmt.Sprintf("Connecting to %s", r.Request.URL.String()))
+		logging.Debugf(CRAWLER, "Connecting to %s", r.Request.URL.String())
 	})
 
 	c.OnHTML("html", func(e *colly.HTMLElement) {
@@ -119,11 +121,11 @@ func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, quer
 	c.UserAgent = se.userAgent
 
 	c.OnError(func(_ *colly.Response, err error) {
-		logging.LogError(err.Error())
+		logging.Errorf(CRAWLER, err.Error())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
-		logging.LogTrace(fmt.Sprintf("Visited %s", r.Request.URL.String()))
+		logging.Debugf(CRAWLER, "Visited %s", r.Request.URL.String())
 	})
 
 	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
@@ -155,7 +157,7 @@ func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, quer
 	})
 
 	searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
-	logging.LogInfo("Receiving results from " + searchUrlString)
+	logging.Infof(CRAWLER, "Receiving results from %s", searchUrlString)
 
 	c.Visit(searchUrlString)
 	c.Wait()

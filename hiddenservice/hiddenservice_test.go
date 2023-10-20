@@ -28,7 +28,7 @@ const TOR_PASSWORD = "test1234"
 */
 
 func Test_Onion_NewKeyBlob(t *testing.T) {
-	logging.InitLogging(logging.TRACE)
+	logging.InitLogging(logging.DEBUG)
 
 	torProto := hiddenservice.TorProto{
 		TorControlPort:     9051,
@@ -86,7 +86,7 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 }
 
 func Test_I2P(t *testing.T) {
-	logging.InitLogging(logging.TRACE)
+	logging.InitLogging(logging.DEBUG)
 
 	torProto := hiddenservice.I2PProto{
 		SamAPIPort:  7656,

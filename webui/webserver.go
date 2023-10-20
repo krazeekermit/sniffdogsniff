@@ -7,6 +7,8 @@ import (
 	"github.com/sniffdogsniff/logging"
 )
 
+const WEBUI = "webui"
+
 func getVarOrDefault_GET(r *http.Request, varName, def string) string {
 	if r.URL.Query().Has(varName) {
 		return r.URL.Query().Get(varName)
@@ -42,13 +44,13 @@ func (server *SdsWebServer) insertLinkHandleFunc(w http.ResponseWriter, r *http.
 	if r.Method == http.MethodPost {
 		err := r.ParseForm()
 		if err != nil {
-			logging.LogError(err.Error())
+			logging.Errorf(WEBUI, err.Error())
 		}
 		title := r.FormValue("link_title")
 		url := r.FormValue("link_url")
 		description := r.FormValue("link_description")
 		dataType := core.StrToDataType(r.FormValue("data_type"))
-		logging.LogTrace("inserti link", dataType)
+		logging.Infof(WEBUI, "inserti link %s", dataType)
 		server.node.InsertSearchResult(core.NewSearchResult(title, url,
 			core.ResultPropertiesMap{core.RP_DESCRIPTION: description}, dataType))
 	}
@@ -69,7 +71,7 @@ func (server *SdsWebServer) ServeWebUi(address string) {
 	srvmux.HandleFunc("/insert_link", server.insertLinkHandleFunc)
 	srvmux.HandleFunc("/invalidate", server.invalidateLinkHandleFunc)
 
-	logging.LogInfo("Web Server is listening on", address)
+	logging.Infof(WEBUI, "Web Server is listening on %s", address)
 	http.ListenAndServe(address, srvmux)
 
 }

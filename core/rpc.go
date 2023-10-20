@@ -18,6 +18,8 @@ import (
 const BUFFER_SIZE = 256
 const MAX_THREAD_POOL_SIZE = 1
 
+const NODE_SERVER = "nodeserver"
+
 const (
 	FCODE_HANDSHAKE    = 100
 	FCODE_FIND_NODE    = 101
@@ -226,10 +228,10 @@ func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
 	listener, err := proto.Listen()
 
 	if err != nil {
-		logging.LogError(err.Error())
+		logging.Errorf(NODE_SERVER, err.Error())
 		return
 	}
-	logging.LogInfo("NodeServer is listening on", proto.GetAddressString())
+	logging.Infof(NODE_SERVER, "NodeServer is listening on %s", proto.GetAddressString())
 
 	go srv.acceptConns(listener)
 }
@@ -238,7 +240,7 @@ func (srv *NodeServer) acceptConns(listener net.Listener) {
 	defer listener.Close()
 	for {
 		conn, err := listener.Accept()
-		logging.LogTrace("New connection from", conn.RemoteAddr().String())
+		logging.Debugf(NODE_SERVER, "New connection from %s", conn.RemoteAddr().String())
 		if err != nil {
 			continue
 		}
@@ -260,7 +262,7 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 
 		recvBytez, _, err := receiveAndDecompress(conn)
 		if err != nil {
-			logging.LogError(err.Error())
+			logging.Errorf(NODE_SERVER, err.Error())
 			conn.Close()
 			return
 		}
@@ -280,20 +282,20 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 		}
 
 		if msgpack.Unmarshal(recvBytez[:RPC_REQ_BYTESIZE], &request) != nil {
-			logging.LogTrace("Malformed rpc request")
+			logging.Debugf(NODE_SERVER, "Malformed rpc request")
 			errCode = ERRCODE_MARSHAL
 			goto send_resp
 		}
 		argsBytes = recvBytez[RPC_REQ_BYTESIZE:]
 
-		logging.LogTrace("Function request", request.FuncCode, len(recvBytez))
+		logging.Debugf(NODE_SERVER, "Function request %d size %d", request.FuncCode, len(recvBytez))
 
 		switch request.FuncCode {
 		case FCODE_HANDSHAKE:
 			var args PingArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
-				logging.LogTrace(err.Error())
+				logging.Debugf(NODE_SERVER, err.Error())
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
@@ -304,7 +306,7 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 			var args FindNodeArgs
 			err := msgpack.Unmarshal(argsBytes, &args)
 			if err != nil {
-				logging.LogTrace(err.Error())
+				logging.Debugf(NODE_SERVER, err.Error())
 				errCode = ERRCODE_TYPE_ARGUMENT
 				goto send_resp
 			}
@@ -344,16 +346,16 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 
 		responseBytes, err := msgpack.Marshal(response)
 		if err != nil {
-			logging.LogTrace(err.Error())
+			logging.Debugf(NODE_SERVER, err.Error())
 		}
 		replyBytes, err := msgpack.Marshal(returned)
 		if err != nil {
-			logging.LogTrace(err.Error())
+			logging.Debugf(NODE_SERVER, err.Error())
 		}
 
 		err = compressAndSend(append(responseBytes, replyBytes...), conn)
 		if err != nil {
-			logging.LogError(err.Error())
+			logging.Debugf(NODE_SERVER, err.Error())
 		}
 		conn.Close()
 	}

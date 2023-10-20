@@ -15,6 +15,8 @@ import (
 	"github.com/sniffdogsniff/util"
 )
 
+const I2P = "i2p"
+
 const I2P_PRIV_KEY_FILE_NAME = "i2pkey.dat"
 
 const (
@@ -58,7 +60,7 @@ func swapBase64(i2pB64 string) string {
 func toB32AddrStr(b64string string) string {
 	b64bytes, err := base64.StdEncoding.DecodeString(swapBase64(b64string))
 	if err != nil {
-		logging.LogError("error decoding b64 address")
+		logging.Errorf(I2P, "error decoding b64 address")
 	}
 	alen := binary.BigEndian.Uint16(b64bytes[385:387])
 	b32bytes := make([]byte, 0)

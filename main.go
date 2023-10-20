@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 
 	"github.com/sniffdogsniff/core"
@@ -14,10 +15,14 @@ import (
 	"github.com/sniffdogsniff/webui"
 )
 
+const MAIN = "main"
+
+const SDS_VER = "0.2_beta"
+
 const PID_FILE_NAME = "sds.pid"
 
 func showHelp() {
-	fmt.Println("SniffDogSniff v0.1")
+	fmt.Println("SniffDogSniff", SDS_VER)
 	fmt.Println("\t-c or --config\tSpecify config file location")
 	os.Exit(0)
 }
@@ -49,7 +54,7 @@ func createPidFile(cfg core.SdsConfig) (string, error) {
 
 	if util.FileExists(pidFilePath) {
 		return "",
-			errors.New("failed to create pid file. Another instance of SniffDogSniff is already running.")
+			errors.New("failed to create pid file, another instance of SniffDogSniff is already running")
 	}
 
 	fp, err := os.OpenFile(pidFilePath, os.O_CREATE|os.O_WRONLY, 0600)
@@ -79,7 +84,7 @@ func shutdownHook(configs core.SdsConfig, node *core.LocalNode, pidFilePath stri
 				node.Shutdown()
 				configs.P2PServerProto.Close()
 				deletePidFile(pidFilePath)
-				logging.LogInfo("Shutting down...")
+				logging.Infof(MAIN, "Shutting down...")
 				os.Exit(0)
 			}
 		}
@@ -91,6 +96,8 @@ func main() {
 	logging.InitLogging(logging.StrToLogLevel(logLevelStr))
 
 	cfg := core.NewSdsConfig(cfgFilePath)
+
+	logging.Infof(MAIN, "SniffDogSniff %s running on %s", SDS_VER, runtime.GOOS)
 
 	isDaemon := os.Getenv("SDS_IS_DAEMON") == "true"
 	if daemon && !isDaemon {
@@ -106,7 +113,7 @@ func main() {
 		if err != nil {
 			panic("failed to start process daemon")
 		}
-		logging.LogInfo("SniffDogSniff daemon successfully started on pid", dPid)
+		logging.Infof(MAIN, "SniffDogSniff daemon successfully started on pid %d", dPid)
 		os.Exit(0)
 	}
 
@@ -117,7 +124,7 @@ func main() {
 
 	pidFilePath, err := createPidFile(cfg)
 	if err != nil {
-		logging.LogError(err.Error())
+		logging.Errorf(MAIN, err.Error())
 		os.Exit(1)
 	}
 
@@ -130,7 +137,7 @@ func main() {
 	node.StartNodesLookupTask()
 	node.StartPublishTask()
 
-	logging.LogInfo("SniffDogSniff started press CTRL-C to stop")
+	logging.Infof(MAIN, "SniffDogSniff started press CTRL-C to stop")
 	shutdownHook(cfg, node, pidFilePath)
 
 	webServer := webui.InitSdsWebServer(node)
