@@ -29,11 +29,11 @@ type ProxySettings struct {
 }
 
 func (ps ProxySettings) TypeByAddr(address string) (ProxyType, error) {
-	addr, err := net.ResolveTCPAddr("tcp", address)
+	addrHost, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return NONE_PROXY_TYPE, err
 	}
-	split := strings.Split(addr.IP.String(), ".")
+	split := strings.Split(addrHost, ".")
 	suffix := split[len(split)-1]
 	if suffix == ONION_SUFFIX {
 		return TOR_SOCKS_5_PROXY_TYPE, nil
@@ -71,7 +71,7 @@ func (ps ProxySettings) NewConnection(address string) (net.Conn, error) {
 			KeepAlive: 30 * time.Second,
 		})
 		if err != nil {
-			logging.Errorf(PROXY, err.Error())
+			logging.Errorf(PROXY, "%s: %s", address, err.Error())
 			return nil, err
 		}
 		return dialer.Dial("tcp", address)
