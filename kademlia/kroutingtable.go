@@ -1,7 +1,7 @@
 package kademlia
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -132,46 +132,96 @@ func (ktable *KadRoutingTable) GetKClosestTo(id KadId) []*KNode {
 	return ktable.GetNClosestTo(id, K)
 }
 
-func (ktable *KadRoutingTable) ToBytes() []byte {
+func (ktable *KadRoutingTable) Write(buffer *bufio.Writer) error {
 	//selfNode [kad_id(20bytes)][address(n-bytes)]
 	//ktableHeader [height(1byte)][nentries(1byte)]
 	//knode_row [replacement(1byte)][kad_id(20 bytes)][lastseen(8bytes)][stales(1byte)][address(n-bytes)]
 
-	buffer := bytes.NewBuffer(nil)
 	//self node
-	buffer.Write(ktable.selfNode.Id.ToBytes())
-	buffer.WriteByte(byte(len(ktable.selfNode.Address)))
-	buffer.Write([]byte(ktable.selfNode.Address))
+	_, err := buffer.Write(ktable.selfNode.Id.ToBytes())
+	if err != nil {
+		return err
+	}
+	err = buffer.WriteByte(byte(len(ktable.selfNode.Address)))
+	if err != nil {
+		return err
+	}
+	_, err = buffer.Write([]byte(ktable.selfNode.Address))
+	if err != nil {
+		return err
+	}
 	//kbuckets
 	for _, bucket := range ktable.kbuckets {
-		buffer.WriteByte(byte(bucket.height))
-		buffer.WriteByte(byte(len(bucket.nodes) + len(bucket.replacementNodes)))
+		err = buffer.WriteByte(byte(bucket.height))
+		if err != nil {
+			return err
+		}
+		err = buffer.WriteByte(byte(len(bucket.nodes) + len(bucket.replacementNodes)))
+		if err != nil {
+			return err
+		}
 		for _, node := range bucket.nodes {
-			buffer.WriteByte(0)
-			buffer.Write(node.Id.ToBytes())
-			buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
-			buffer.WriteByte(byte(node.Stales))
-			buffer.WriteByte(byte(len(node.Address)))
-			buffer.Write([]byte(node.Address))
+			err = buffer.WriteByte(0)
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write(node.Id.ToBytes())
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
+			if err != nil {
+				return err
+			}
+			err = buffer.WriteByte(byte(node.Stales))
+			if err != nil {
+				return err
+			}
+			err = buffer.WriteByte(byte(len(node.Address)))
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write([]byte(node.Address))
+			if err != nil {
+				return err
+			}
 		}
 		for _, node := range bucket.replacementNodes {
-			buffer.WriteByte(1)
-			buffer.Write(node.Id.ToBytes())
-			buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
-			buffer.WriteByte(byte(node.Stales))
-			buffer.WriteByte(byte(len(node.Address)))
-			buffer.Write([]byte(node.Address))
+			err = buffer.WriteByte(1)
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write(node.Id.ToBytes())
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write(binary.LittleEndian.AppendUint64([]byte{}, node.LastSeen))
+			if err != nil {
+				return err
+			}
+			err = buffer.WriteByte(byte(node.Stales))
+			if err != nil {
+				return err
+			}
+			err = buffer.WriteByte(byte(len(node.Address)))
+			if err != nil {
+				return err
+			}
+			_, err = buffer.Write([]byte(node.Address))
+			if err != nil {
+				return err
+			}
 		}
+
 	}
 
-	return buffer.Bytes()
+	return nil
 }
 
-func (ktable *KadRoutingTable) FromBytes(bytez []byte) error {
+func (ktable *KadRoutingTable) Read(buffer *bufio.Reader) error {
 	//ktableHeader [height(1byte)][nentries(1byte)]
 	//knode_row [replacement(1byte)][kad_id(20 bytes)][lastseen(8bytes)][stales(1byte)][address(n-bytes)]
 
-	buffer := bytes.NewBuffer(bytez)
 	//self node
 	kadIdBytez := make([]byte, 20)
 	n, err := buffer.Read(kadIdBytez)
@@ -268,21 +318,10 @@ func (ktable *KadRoutingTable) Open(workDirPath string) error {
 		if err != nil {
 			return err
 		}
-		bytez := make([]byte, 0)
-		for {
-			buf := make([]byte, 2048)
-			n, err := fp.Read(buf)
-			if err != nil {
-				fp.Close()
-				return err
-			}
-			bytez = append(bytez, buf[:n]...)
-			if n < 2048 {
-				break
-			}
-		}
-		ktable.FromBytes(bytez)
-		fp.Close()
+
+		defer fp.Close()
+		return ktable.Read(bufio.NewReader(fp))
+
 	}
 	return nil
 }
@@ -292,7 +331,6 @@ func (ktable *KadRoutingTable) Flush() error {
 	if err != nil {
 		return err
 	}
-	fp.Write(ktable.ToBytes())
-	fp.Close()
-	return nil
+	defer fp.Close()
+	return ktable.Write(bufio.NewWriter(fp))
 }

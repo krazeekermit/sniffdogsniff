@@ -1,7 +1,4 @@
 #envinronment files
-.idea*
-venv*
-__pycache__*
 *.db
 *.lock
 *.db/

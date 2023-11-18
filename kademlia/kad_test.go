@@ -1,6 +1,8 @@
 package kademlia_test
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"testing"
@@ -647,7 +649,17 @@ func TestKTable_ToBytesFromBytes(t *testing.T) {
 
 	ktable2 := kademlia.NewKadRoutingTable()
 
-	err := ktable2.FromBytes(ktable.ToBytes())
+	buf := bytes.NewBuffer(nil)
+	wBuf := bufio.NewWriter(buf)
+	err := ktable.Write(wBuf)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	wBuf.Flush()
+	if len(buf.Bytes()) == 0 {
+		t.Fatalf("busize %d", len(buf.Bytes()))
+	}
+	err = ktable2.Read(bufio.NewReader(buf))
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
