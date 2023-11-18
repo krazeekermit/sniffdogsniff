@@ -138,15 +138,23 @@ func setupNodes() {
 func TestNodesLookup(t *testing.T) {
 	setupNodes()
 
-	localNode.DoNodesLookup(SELF_NODE)
+	localNode.DoNodesLookup(SELF_NODE, false)
 
 	ktable := localNode.KadRoutingTable()
+
+	// bucketNodes := ktable.GetKBuckets()
+	// for i, kb := range bucketNodes {
+	// 	for _, n := range kb.GetNodes() {
+	// 		fmt.Printf("-> bucket %d, node %s\n", i, n.Address)
+	// 	}
+	// }
 
 	for ib, nodes := range NODES_MAP {
 		bucketNodes := ktable.GetKBuckets()[ib].GetNodes()
 		if len(bucketNodes) != len(nodes) {
 			t.Fatalf("bucket %d, size %d != expected %d", ib, len(bucketNodes), len(nodes))
 		}
+
 		for in, kn := range bucketNodes {
 			if !bucketNodes[in].Id.Eq(kn.Id) {
 				t.Fatalf("bucket %d, node %d", ib, in)

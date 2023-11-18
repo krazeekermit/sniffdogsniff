@@ -166,41 +166,51 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	ln.tsLock.Unlock()
 
 	var wg sync.WaitGroup
-	var failed, emptyProbed, results sync.Map
+	failed := kademlia.NewKNodesMap()
+	emptyProbed := kademlia.NewKNodesMap()
+
+	resultsLock := sync.Mutex{}
+	results := make(map[Hash256]SearchResult)
 
 	wgCount := 0
 	for _, ikn := range nodes {
-		_, present := failed.Load(ikn.Id)
+		_, present := failed.Get(ikn.Id)
 		if present {
 			// if it is a failed node avoid to contact it again
 			continue
 		}
+		// if node is self node not contact it and store results inside of it
 		if ikn.Id.Eq(ln.SelfNode().Id) {
+			resultsLock.Lock()
 			for _, v := range ln.FindResults(query) {
-				results.LoadOrStore(v.ResultHash, v)
+				results[v.ResultHash] = v
 			}
+			resultsLock.Unlock()
 			continue
 		}
 
 		wg.Add(1)
 		wgCount++
-		go func(kn, source *kademlia.KNode, query string, failed, emptyProbed, results *sync.Map) {
+		go func(kn, source *kademlia.KNode, query string, failed, emptyProbed *kademlia.KNodesMap,
+			results *map[Hash256]SearchResult, resultsLock *sync.Mutex) {
 			defer wg.Done()
 
 			rn := NewNodeClient(kn.Address, ln.proxySettings)
 			vals, err := rn.FindResults(query, source)
 			if err != nil {
-				failed.Store(ikn.Id, kn)
+				failed.Put(kn)
 				return
 			}
 			if len(vals) > 0 {
+				resultsLock.Lock()
 				for _, v := range vals {
-					results.LoadOrStore(v.ResultHash, v)
+					(*results)[v.ResultHash] = v
 				}
+				resultsLock.Unlock()
 			} else {
-				emptyProbed.LoadOrStore(kn.Id, kn)
+				emptyProbed.Put(kn)
 			}
-		}(ikn, ln.ktable.SelfNode(), query, &failed, &emptyProbed, &results)
+		}(ikn, ln.ktable.SelfNode(), query, failed, emptyProbed, &results, &resultsLock)
 
 		if wgCount >= kademlia.ALPHA {
 			wgCount = 0
@@ -208,25 +218,17 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 		}
 	}
 
-	rSlice := make([]SearchResult, 0)
-	results.Range(func(key, value any) bool {
-		sr, ok := value.(SearchResult)
-		if ok {
-			rSlice = append(rSlice, sr)
-		}
-		return true
-	})
-
 	ln.tsLock.Lock()
-	failed.Range(func(key, value any) bool {
-		kn, ok := value.(*kademlia.KNode)
-		if !ok {
-			return true
-		}
+	for _, k := range failed.Keys() {
+		kn, _ := failed.Get(k)
 		ln.ktable.RemoveNode(kn)
-		return true
-	})
+	}
 	ln.tsLock.Unlock()
+
+	rSlice := make([]SearchResult, 0)
+	for _, sr := range results {
+		rSlice = append(rSlice, sr)
+	}
 
 	if len(rSlice) == 0 {
 		/*
@@ -239,16 +241,13 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	}
 
 	// re stores the values on nodes that are supposed to have the value but does not have it
-	emptyProbed.Range(func(key, value any) bool {
-		kn, ok := value.(*kademlia.KNode)
-		if ok {
-			rn := NewNodeClient(kn.Address, ln.proxySettings)
-			for _, sr := range rSlice {
-				rn.StoreResult(sr, ln.SelfNode())
-			}
+	for _, kid := range emptyProbed.Keys() {
+		kn, _ := emptyProbed.Get(kid)
+		rn := NewNodeClient(kn.Address, ln.proxySettings)
+		for _, sr := range rSlice {
+			rn.StoreResult(sr, ln.SelfNode())
 		}
-		return true
-	})
+	}
 
 	return rSlice
 }
@@ -258,7 +257,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 */
 
 func (ln *LocalNode) PublishResults(results []SearchResult) {
-	var failed sync.Map
+	failed := kademlia.NewKNodesMap()
 	var wg sync.WaitGroup
 
 	toInsertSelf := make([]SearchResult, 0)
@@ -277,7 +276,7 @@ func (ln *LocalNode) PublishResults(results []SearchResult) {
 
 		wgCount := 0
 		for _, ikn := range nodes {
-			_, present := failed.Load(ikn.Id)
+			_, present := failed.Get(ikn.Id)
 			if present {
 				// if it is a failed node avoid to contact it again
 				continue
@@ -289,15 +288,15 @@ func (ln *LocalNode) PublishResults(results []SearchResult) {
 
 			wg.Add(1)
 			wgCount++
-			go func(kn, source *kademlia.KNode, value SearchResult, failed *sync.Map) {
+			go func(kn, source *kademlia.KNode, value SearchResult, failed *kademlia.KNodesMap) {
 				defer wg.Done()
 
 				rn := NewNodeClient(kn.Address, ln.proxySettings)
 				err := rn.StoreResult(sr, source)
 				if err != nil {
-					failed.Store(kn.Id, kn)
+					failed.Put(kn)
 				}
-			}(ikn, ln.ktable.SelfNode(), sr, &failed)
+			}(ikn, ln.ktable.SelfNode(), sr, failed)
 
 			if wgCount >= kademlia.ALPHA {
 				wgCount = 0
@@ -312,14 +311,10 @@ func (ln *LocalNode) PublishResults(results []SearchResult) {
 		ln.searchDB.InsertResult(sr)
 	}
 
-	failed.Range(func(key, value any) bool {
-		kn, ok := value.(*kademlia.KNode)
-		if !ok {
-			return true
-		}
+	for _, kid := range failed.Keys() {
+		kn, _ := failed.Get(kid)
 		ln.ktable.RemoveNode(kn)
-		return true
-	})
+	}
 	ln.tsLock.Unlock()
 }
 
@@ -341,7 +336,7 @@ func (ln *LocalNode) StartPublishTask() {
 	Node Lookup
 */
 
-func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
+func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode, checkNode bool) int {
 	ln.tsLock.Lock()
 	alphaClosest := ln.ktable.GetNClosestTo(targetNode.Id, kademlia.ALPHA)
 	ln.tsLock.Unlock()
@@ -354,10 +349,12 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 	startTime := util.CurrentUnixTime()
 
 	var wg sync.WaitGroup
-	var discovered, probed, failed sync.Map
+	discovered := kademlia.NewKNodesMap()
+	probed := kademlia.NewKNodesMap()
+	failed := kademlia.NewKNodesMap()
 
 	self := ln.SelfNode()
-	probed.Store(self.Id, self.Address)
+	probed.Put(self)
 
 	for {
 		for _, ikn := range alphaClosest {
@@ -367,23 +364,23 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 
 			wg.Add(1)
 			go func(kn, source *kademlia.KNode, targetId kademlia.KadId,
-				proxySettings proxies.ProxySettings, discovered, probed, failed *sync.Map) {
+				proxySettings proxies.ProxySettings, discovered, probed, failed *kademlia.KNodesMap) {
 
 				defer wg.Done()
 				rn := NewNodeClient(kn.Address, proxySettings)
 				newNodes, err := rn.FindNode(targetId, source)
-				probed.Store(kn.Id, kn)
+				probed.Put(kn)
 				if err != nil {
 					logging.Errorf(NODES_LOOKUP, err.Error())
-					failed.Store(kn.Id, kn)
+					failed.Put(kn)
 					return
 				} else {
 					for id, addr := range newNodes {
-						discovered.LoadOrStore(id, kademlia.NewKNode(id, addr))
+						discovered.Put(kademlia.NewKNode(id, addr))
 					}
 				}
 
-			}(ikn, ln.ktable.SelfNode(), targetNode.Id, ln.proxySettings, &discovered, &probed, &failed)
+			}(ikn, ln.ktable.SelfNode(), targetNode.Id, ln.proxySettings, discovered, probed, failed)
 		}
 
 		// Usage of wait group to speed up the process
@@ -392,7 +389,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 		/* Insert Nodes into the ktable */
 		ln.tsLock.Lock()
 		for _, ikn := range alphaClosest {
-			_, present := failed.Load(ikn.Id)
+			_, present := failed.Get(ikn.Id)
 			if present {
 				ln.ktable.RemoveNode(ikn)
 			} else {
@@ -404,26 +401,23 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode) int {
 		alphaClosest = make([]*kademlia.KNode, 0)
 
 		/* insert the new nodes and populates the not-yet-probed nodes list*/
-		discovered.Range(func(key, value any) bool {
-			kn, ok := value.(*kademlia.KNode)
-			if !ok {
-				return true // continue
+		for _, k := range discovered.Keys() {
+			kn, _ := discovered.Get(k)
+
+			if checkNode {
+				if !ln.CheckNode(kn.Id, kn.Address) {
+					continue
+				}
 			}
 
-			if !ln.CheckNode(kn.Id, kn.Address) {
-				// skip blacklisted or invalid node
-				return true
-			}
-
-			_, present := probed.Load(key)
+			_, present := probed.Get(k)
 			if !present { // if not present in failed means that it has not already been probed
 				nDiscovered++
 				//inserts the new node
 				ln.ktable.PushNode(kn)
 				alphaClosest = append(alphaClosest, kn)
 			}
-			return true
-		})
+		}
 		ln.tsLock.Unlock()
 
 		if util.CurrentUnixTime()-startTime >= LOOKUP_ROUND_TIMEOUT {
@@ -474,7 +468,7 @@ func (ln *LocalNode) StartNodesLookupTask() {
 					logging.Warnf(NODES_LOOKUP, "Nodes lookup taking too much, giving up...")
 					break
 				}
-				d += ln.DoNodesLookup(toLook[i])
+				d += ln.DoNodesLookup(toLook[i], true)
 			}
 			logging.Infof(NODES_LOOKUP, "Discovered %d new nodes", d)
 			ticker.Reset(delay * time.Second)

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"sync"
 
 	"github.com/sniffdogsniff/util"
 )
@@ -132,6 +133,10 @@ func (a KadId) StrBts() string {
 	return fmt.Sprintf("0b%032b%032b%032b%032b%032b", a[4], a[3], a[2], a[1], a[0])
 }
 
+/*
+	KNode
+*/
+
 type KNode struct {
 	Id       KadId
 	LastSeen uint64
@@ -150,6 +155,45 @@ func NewKNode(id KadId, addr string) *KNode {
 
 func (kn *KNode) SeenNow() {
 	kn.LastSeen = uint64(util.CurrentUnixTime())
+}
+
+/*
+	KNodesMap :: a mutex map access for safe node lookup
+*/
+
+type KNodesMap struct {
+	lock sync.Mutex
+	m    map[KadId]*KNode
+}
+
+func NewKNodesMap() *KNodesMap {
+	return &KNodesMap{
+		lock: sync.Mutex{},
+		m:    make(map[KadId]*KNode),
+	}
+}
+
+func (km *KNodesMap) Put(kn *KNode) {
+	km.lock.Lock()
+	km.m[kn.Id] = kn
+	km.lock.Unlock()
+}
+
+func (km *KNodesMap) Get(kid KadId) (*KNode, bool) {
+	km.lock.Lock()
+	nkn, ok := km.m[kid]
+	km.lock.Unlock()
+	return nkn, ok
+}
+
+func (km *KNodesMap) Keys() []KadId {
+	km.lock.Lock()
+	keys := make([]KadId, 0)
+	for kid, _ := range km.m {
+		keys = append(keys, kid)
+	}
+	km.lock.Unlock()
+	return keys
 }
 
 /*
