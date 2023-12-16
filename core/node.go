@@ -9,7 +9,6 @@ import (
 
 	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
-	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 )
 
@@ -45,7 +44,6 @@ type NodeInterface interface {
 }
 
 type LocalNode struct {
-	proxySettings    proxies.ProxySettings
 	canInvalidate    bool
 	tsLock           *sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB         SearchDB
@@ -66,7 +64,6 @@ func NewLocalNode(configs SdsConfig) *LocalNode {
 	ln.ktable.Open(configs.WorkDirPath)
 
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize, 3600*24)
-	ln.proxySettings = configs.ProxySettings
 	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = &sync.Mutex{}
 	ln.searchEngines = configs.searchEngines
@@ -195,7 +192,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 			results *map[Hash256]SearchResult, resultsLock *sync.Mutex) {
 			defer wg.Done()
 
-			rn := NewNodeClient(kn.Address, ln.proxySettings)
+			rn := NewNodeClient(kn.Address)
 			vals, err := rn.FindResults(query, source)
 			if err != nil {
 				failed.Put(kn)
@@ -243,7 +240,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 	// re stores the values on nodes that are supposed to have the value but does not have it
 	for _, kid := range emptyProbed.Keys() {
 		kn, _ := emptyProbed.Get(kid)
-		rn := NewNodeClient(kn.Address, ln.proxySettings)
+		rn := NewNodeClient(kn.Address)
 		for _, sr := range rSlice {
 			rn.StoreResult(sr, ln.SelfNode())
 		}
@@ -291,7 +288,7 @@ func (ln *LocalNode) PublishResults(results []SearchResult) {
 			go func(kn, source *kademlia.KNode, value SearchResult, failed *kademlia.KNodesMap) {
 				defer wg.Done()
 
-				rn := NewNodeClient(kn.Address, ln.proxySettings)
+				rn := NewNodeClient(kn.Address)
 				err := rn.StoreResult(sr, source)
 				if err != nil {
 					failed.Put(kn)
@@ -363,11 +360,10 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode, checkNode bool) i
 			}
 
 			wg.Add(1)
-			go func(kn, source *kademlia.KNode, targetId kademlia.KadId,
-				proxySettings proxies.ProxySettings, discovered, probed, failed *kademlia.KNodesMap) {
+			go func(kn, source *kademlia.KNode, targetId kademlia.KadId, discovered, probed, failed *kademlia.KNodesMap) {
 
 				defer wg.Done()
-				rn := NewNodeClient(kn.Address, proxySettings)
+				rn := NewNodeClient(kn.Address)
 				newNodes, err := rn.FindNode(targetId, source)
 				probed.Put(kn)
 				if err != nil {
@@ -380,7 +376,7 @@ func (ln *LocalNode) DoNodesLookup(targetNode *kademlia.KNode, checkNode bool) i
 					}
 				}
 
-			}(ikn, ln.ktable.SelfNode(), targetNode.Id, ln.proxySettings, discovered, probed, failed)
+			}(ikn, ln.ktable.SelfNode(), targetNode.Id, discovered, probed, failed)
 		}
 
 		// Usage of wait group to speed up the process

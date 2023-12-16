@@ -5,9 +5,7 @@ import (
 	"testing"
 
 	"github.com/sniffdogsniff/core"
-	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/kademlia"
-	"github.com/sniffdogsniff/proxies"
 	"github.com/sniffdogsniff/util"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -107,7 +105,7 @@ func setupFakeNodeServer() {
 
 	if server == nil {
 		server = core.NewNodeServer(node)
-		server.Serve(&hiddenservice.IP4TCPProto{BindAddress: FAKENODE_ADDRESS})
+		server.ListenTCP(FAKENODE_ADDRESS)
 	}
 
 }
@@ -130,14 +128,14 @@ func _testRpc_Ping(client core.NodeClient, t *testing.T) {
 func TestRpc_Ping(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000")
 	_testRpc_Ping(client, t)
 }
 
 func TestRpc_Ping_1000(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000")
 	for i := 0; i < 1000; i++ {
 		_testRpc_Ping(client, t)
 	}
@@ -146,7 +144,7 @@ func TestRpc_Ping_1000(t *testing.T) {
 func TestRpc_FindNode(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000")
 
 	peers, err := client.FindNode(PEER1_ID, SELF_NODE)
 	if err != nil {
@@ -175,7 +173,7 @@ func TestRpc_FindNode(t *testing.T) {
 func TestRpc_FindResults(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000")
 
 	results, err := client.FindResults("weapon of mass destruction", SELF_NODE)
 	if err != nil {
@@ -200,7 +198,7 @@ func TestRpc_FindResults(t *testing.T) {
 func TestRpc_GetMetadataForSync(t *testing.T) {
 	setupFakeNodeServer()
 
-	client := core.NewNodeClient(":3000", proxies.ProxySettings{})
+	client := core.NewNodeClient(":3000")
 
 	err := client.StoreResult(RESULT1, SELF_NODE)
 	if err != nil {

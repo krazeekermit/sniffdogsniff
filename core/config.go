@@ -5,10 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
+	"github.com/sniffdogsniff/proxies/i2p"
+	"github.com/sniffdogsniff/proxies/tor"
 	"gopkg.in/ini.v1"
 )
 
@@ -111,9 +112,14 @@ type SdsConfig struct {
 	WebServiceBindAddress    string
 	KnownPeers               map[kademlia.KadId]string
 	PeersBlacklist           map[kademlia.KadId]string
-	ProxySettings            proxies.ProxySettings
+	TorContext               tor.TorCtx
+	ForceTor                 bool
+	TorSocks5Address         string
+	I2pContext               i2p.I2PCtx
 	P2PServerEnabled         bool
-	P2PServerProto           hiddenservice.NetProtocol
+	P2PServerBindAddress     string
+	P2PBindPort              int
+	P2pHiddenService         proxies.ProxyType
 	searchEngines            map[string]SearchEngine
 }
 
@@ -159,6 +165,62 @@ func NewSdsConfig(path string) SdsConfig {
 		}
 	} else {
 		cfg.AllowResultsInvalidation = false
+	}
+
+	if defaultSection.HasKey(FORCE_TOR_PROXY) {
+		cfg.ForceTor, err = defaultSection.Key(FORCE_TOR_PROXY).Bool()
+		if err != nil {
+			cfg.ForceTor = false
+		}
+	} else {
+		cfg.ForceTor = false
+	}
+	if defaultSection.HasKey(TOR_SOCKS5_PROXY) {
+		cfg.TorSocks5Address = defaultSection.Key(TOR_SOCKS5_PROXY).String()
+	} else {
+		cfg.TorSocks5Address = "127.0.0.1:9050"
+	}
+	if defaultSection.HasKey(I2P_SOCKS5_PROXY) {
+		cfg.TorSocks5Address = defaultSection.Key(I2P_SOCKS5_PROXY).String()
+	} else {
+		cfg.TorSocks5Address = "127.0.0.1:4447"
+	}
+	if defaultSection.HasKey(TOR_CONTROL_PORT) {
+		cfg.TorContext.TorControlPort, err = defaultSection.Key(TOR_CONTROL_PORT).Int()
+		if err != nil {
+			cfg.TorContext.TorControlPort = 9051
+		}
+		if defaultSection.HasKey(TOR_CONTROL_AUTH_COOKIE) {
+			cfg.TorContext.TorCookieAuth = defaultSection.Key(TOR_CONTROL_AUTH_COOKIE).MustBool(false)
+		} else if defaultSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
+			cfg.TorContext.TorControlPassword = defaultSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+			cfg.TorContext.TorCookieAuth = false
+		} else {
+			cfg.TorContext.TorCookieAuth = true
+		}
+	}
+	if defaultSection.HasKey(I2P_SAM_PORT) {
+
+		cfg.I2pContext.SamAPIPort, err = defaultSection.Key(I2P_SAM_PORT).Int()
+		if err != nil {
+			cfg.I2pContext.SamAPIPort = 7656
+		}
+		if defaultSection.HasKey(I2P_SAM_USER) {
+			cfg.I2pContext.NeedAuth = true
+			cfg.I2pContext.SamUser = defaultSection.Key(I2P_SAM_USER).String()
+			if defaultSection.HasKey(I2P_SAM_PASSWORD) {
+				cfg.I2pContext.SamPassword = defaultSection.Key(I2P_SAM_PASSWORD).String()
+			} else {
+				panicNoKey(I2P_SAM_PASSWORD)
+			}
+		} else {
+			cfg.I2pContext.NeedAuth = false
+		}
+		if defaultSection.HasKey(BIND_PORT) {
+			cfg.I2pContext.BindPort = defaultSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
+		} else {
+			cfg.I2pContext.BindPort = DEFAULT_BIND_PORT
+		}
 	}
 
 	cfg.KnownPeers = make(map[kademlia.KadId]string)
@@ -219,30 +281,6 @@ func NewSdsConfig(path string) SdsConfig {
 		panicNoSection(WEB_UI)
 	}
 
-	if iniData.HasSection(PROXY_SETTINGS) {
-		proxySettingsSection := iniData.Section(PROXY_SETTINGS)
-		if proxySettingsSection.HasKey(FORCE_TOR_PROXY) {
-			cfg.ProxySettings.ForceTor, err = proxySettingsSection.Key(FORCE_TOR_PROXY).Bool()
-			if err != nil {
-				cfg.ProxySettings.ForceTor = false
-			}
-		} else {
-			cfg.ProxySettings.ForceTor = false
-		}
-		if proxySettingsSection.HasKey(TOR_SOCKS5_PROXY) {
-			cfg.ProxySettings.TorSocks5Addr = proxySettingsSection.Key(TOR_SOCKS5_PROXY).String()
-		} else {
-			cfg.ProxySettings.TorSocks5Addr = "127.0.0.1:9050"
-		}
-		if proxySettingsSection.HasKey(I2P_SOCKS5_PROXY) {
-			cfg.ProxySettings.I2pSocks5Addr = proxySettingsSection.Key(I2P_SOCKS5_PROXY).String()
-		} else {
-			cfg.ProxySettings.I2pSocks5Addr = "127.0.0.1:4447"
-		}
-	} else {
-		panicNoSection(PROXY_SETTINGS)
-	}
-
 	if iniData.HasSection(NODE_SERVICE) {
 		nodeServiceSection := iniData.Section(NODE_SERVICE)
 		if nodeServiceSection.HasKey(ENABLED) {
@@ -255,68 +293,20 @@ func NewSdsConfig(path string) SdsConfig {
 		}
 		if cfg.P2PServerEnabled {
 			if nodeServiceSection.HasKey(HIDDEN_SERVICE) {
-				hiddenService := nodeServiceSection.Key(HIDDEN_SERVICE).String()
-				if hiddenService == TOR {
-					serviceProto := &hiddenservice.TorProto{}
-
-					if nodeServiceSection.HasKey(TOR_CONTROL_PORT) {
-						serviceProto.TorControlPort, err = nodeServiceSection.Key(TOR_CONTROL_PORT).Int()
-						if err != nil {
-							serviceProto.TorControlPort = 9051
-						}
-						if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_COOKIE) {
-							serviceProto.TorCookieAuth = nodeServiceSection.Key(TOR_CONTROL_AUTH_COOKIE).MustBool(false)
-						} else if nodeServiceSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
-							serviceProto.TorControlPassword = nodeServiceSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
-							serviceProto.TorCookieAuth = false
-						} else {
-							serviceProto.TorCookieAuth = true
-						}
-					}
-					if nodeServiceSection.HasKey(BIND_PORT) {
-						serviceProto.BindPort = nodeServiceSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
-					} else {
-						serviceProto.BindPort = DEFAULT_BIND_PORT
-					}
-					serviceProto.WorkDirPath = cfg.WorkDirPath
-					cfg.P2PServerProto = serviceProto
-				} else if hiddenService == I2P {
-
-					if nodeServiceSection.HasKey(I2P_SAM_PORT) {
-						serviceProto := &hiddenservice.I2PProto{}
-
-						serviceProto.SamAPIPort, err = nodeServiceSection.Key(I2P_SAM_PORT).Int()
-						if err != nil {
-							serviceProto.SamAPIPort = 7656
-						}
-						if nodeServiceSection.HasKey(I2P_SAM_USER) {
-							serviceProto.NeedAuth = true
-							serviceProto.SamUser = nodeServiceSection.Key(I2P_SAM_USER).String()
-							if nodeServiceSection.HasKey(I2P_SAM_PASSWORD) {
-								serviceProto.SamPassword = nodeServiceSection.Key(I2P_SAM_PASSWORD).String()
-							} else {
-								panicNoKey(I2P_SAM_PASSWORD)
-							}
-						} else {
-							serviceProto.NeedAuth = false
-						}
-						if nodeServiceSection.HasKey(BIND_PORT) {
-							serviceProto.BindPort = nodeServiceSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
-						} else {
-							serviceProto.BindPort = DEFAULT_BIND_PORT
-						}
-						serviceProto.WorkDirPath = cfg.WorkDirPath
-						cfg.P2PServerProto = serviceProto
-					}
-				}
+				cfg.P2pHiddenService =
+					proxies.StringToProxyTypeInt(nodeServiceSection.Key(HIDDEN_SERVICE).String())
 			} else {
-				serviceProto := &hiddenservice.IP4TCPProto{}
+				cfg.P2pHiddenService = proxies.NONE_PROXY_TYPE
+			}
+
+			if cfg.P2pHiddenService == proxies.NONE_PROXY_TYPE {
 				if nodeServiceSection.HasKey(BIND_ADDRESS) {
-					serviceProto.BindAddress = nodeServiceSection.Key(BIND_ADDRESS).String()
+					cfg.P2PServerBindAddress = nodeServiceSection.Key(BIND_ADDRESS).String()
 				} else {
-					serviceProto.BindAddress = "127.0.0.1:4222"
+					cfg.P2PServerBindAddress = "127.0.0.1:4222"
 				}
-				cfg.P2PServerProto = serviceProto
+			} else if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
+				cfg.P2PBindPort = nodeServiceSection.Key(BIND_PORT).MustInt(4222)
 			}
 		}
 	} else {

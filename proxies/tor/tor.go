@@ -1,4 +1,4 @@
-package hiddenservice
+package tor
 
 import (
 	"bytes"
@@ -198,47 +198,54 @@ func readReply_ADD_ONION(conn net.Conn) (string, string, error) {
 	return serviceId, privKey, nil
 }
 
-type TorProto struct {
+type TorCtx struct {
 	TorControlPort     int
 	TorControlPassword string
 	TorCookieAuth      bool
 	BindPort           int
 	WorkDirPath        string
-	onionId            string
-	controlPortConn    net.Conn
 }
 
-func (ons *TorProto) connectAndCreateHiddenService() {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ons.TorControlPort))
+type TorControlSession struct {
+	onionId         string
+	controlPortConn net.Conn
+}
+
+func NewTorControlSession() *TorControlSession {
+	return &TorControlSession{}
+}
+
+func (s *TorControlSession) CreateOnionService(ctx TorCtx, bindPort int, workDir string) (string, error) {
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ctx.TorControlPort))
 	if err != nil {
-		panic("Failed to create hidden service can't connect to tor daemon")
+		return "", fmt.Errorf("failed to create hidden service can't connect to tor daemon")
 	}
-	password := fmt.Sprintf("\"%s\"", ons.TorControlPassword)
-	if ons.TorCookieAuth {
+	password := fmt.Sprintf("\"%s\"", ctx.TorControlPassword)
+	if ctx.TorCookieAuth {
 		if writeCommand(conn, TOR_CMD_PROTOCOLINFO, "") != nil {
-			panic("can't connect to tor daemon")
+			return "", fmt.Errorf("can't connect to tor daemon")
 		}
 		methods, cookieFilePath, err := readReply_PROTOCOLINFO(conn)
 		if err != nil {
-			panic(err.Error())
+			return "", fmt.Errorf(err.Error())
 		}
 		if methods != TOR_METHOD_COOKIE {
-			panic(fmt.Sprintf("not using the cookie ath for tor using %s", methods))
+			return "", fmt.Errorf(fmt.Sprintf("not using the cookie ath for tor using %s", methods))
 		}
 
 		cookieData := make([]byte, 32)
 		fp, err := os.OpenFile(cookieFilePath, os.O_RDONLY, 0600)
 		if err != nil {
-			panic(err.Error())
+			return "", fmt.Errorf(err.Error())
 		}
 		n, err := fp.Read(cookieData)
 		if err != nil {
 			fp.Close()
-			panic(err.Error())
+			return "", fmt.Errorf(err.Error())
 		}
 		if n != 32 {
 			fp.Close()
-			panic("tor cookie file must be 32bytes long")
+			return "", fmt.Errorf("tor cookie file must be 32bytes long")
 		}
 		fp.Close()
 
@@ -246,18 +253,18 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		rand.Read(clientNonce)
 
 		if writeCommand(conn, TOR_CMD_AUTHCHALLENGE, fmt.Sprintf("%s %s", TOR_ARG_SAFECOOKIE, hex.EncodeToString(clientNonce))) != nil {
-			panic("can't connect to tor daemon")
+			return "", fmt.Errorf("can't connect to tor daemon")
 		}
 		serverHash, serverNonce, err := readReply_AUTHCHALLENGE(conn)
 		if err != nil {
-			panic(err.Error())
+			return "", fmt.Errorf(err.Error())
 		}
 
 		srv2ctrlHmac := hmac.New(sha256.New, []byte(TOR_HMAC_SERVER_TO_CONTROLLER_KEY))
 		srv2ctrlHmac.Write(append(append(cookieData, clientNonce...), serverNonce...))
 		eServerHash := srv2ctrlHmac.Sum(nil)
 		if !bytes.Equal(serverHash, eServerHash) {
-			panic("tor auth: wrong server hash")
+			return "", fmt.Errorf("tor auth: wrong server hash")
 		}
 
 		ctrl2srvHmac := hmac.New(sha256.New, []byte(TOR_HMAC_CONTROLLER_TO_SERVER_KEY))
@@ -265,14 +272,14 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		password = hex.EncodeToString(ctrl2srvHmac.Sum(nil))
 	}
 	if writeCommand(conn, TOR_CMD_AUTHENTICATE, password) != nil {
-		panic("can't connect to tor daemon")
+		return "", fmt.Errorf("can't connect to tor daemon")
 	}
 	_, err = readReply(conn)
 	if err != nil {
-		panic(err.Error())
+		return "", fmt.Errorf(err.Error())
 	}
 
-	keyBlobFilePath := filepath.Join(ons.WorkDirPath, KEY_BLOB_FILE_NAME)
+	keyBlobFilePath := filepath.Join(workDir, KEY_BLOB_FILE_NAME)
 
 	keyArgs := fmt.Sprintf("%s:%s", TOR_NEW_KEYBLOB, TOR_ED25519_V3)
 	cachedKeyBlob := util.FileExists(keyBlobFilePath)
@@ -294,7 +301,7 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		}
 	}
 	if writeCommand(conn, TOR_CMD_ADD_ONION, fmt.Sprintf("%s %s=%d,%s:%d", keyArgs, TOR_FLAG_PORT,
-		ons.BindPort, DEFAULT_BIND_ADDRESS, ons.BindPort)) != nil {
+		bindPort, DEFAULT_BIND_ADDRESS, bindPort)) != nil {
 		panic("can't connect to tor daemon")
 	}
 
@@ -304,7 +311,7 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 	}
 
 	// successfully created onion service
-	ons.controlPortConn = conn
+	s.controlPortConn = conn
 
 	if !cachedKeyBlob {
 		fp, err := os.OpenFile(keyBlobFilePath, os.O_CREATE|os.O_WRONLY, 0600)
@@ -322,28 +329,20 @@ func (ons *TorProto) connectAndCreateHiddenService() {
 		fp.Close()
 	}
 
-	ons.onionId = serviceId
-	logging.Infof(TOR, "Created onion service at %s", ons.onionId)
+	s.onionId = serviceId
+	logging.Infof(TOR, "Created onion service at %s", s.onionId)
+	return fmt.Sprintf("%s.onion:%d", s.onionId, bindPort), nil
 }
 
-func (ons *TorProto) Close() error {
-	logging.Infof(TOR, "Removing onion service %s", ons.onionId)
-	if writeCommand(ons.controlPortConn, TOR_CMD_DEL_ONION, ons.onionId) != nil {
+func (s *TorControlSession) DeleteOnion() error {
+	logging.Infof(TOR, "Removing onion service %s", s.onionId)
+	if writeCommand(s.controlPortConn, TOR_CMD_DEL_ONION, s.onionId) != nil {
 		logging.Errorf(TOR, "Failed removing onion service")
 	}
-	_, err := readReply(ons.controlPortConn)
+	_, err := readReply(s.controlPortConn)
 	if err != nil {
-		logging.Errorf(TOR, "Failed removing onion service:", err.Error())
+		logging.Errorf(TOR, "Failed removing onion service: %s", err.Error())
 	}
-	ons.controlPortConn.Close()
+	s.controlPortConn.Close()
 	return nil
-}
-
-func (ons *TorProto) Listen() (net.Listener, error) {
-	ons.connectAndCreateHiddenService()
-	return net.Listen("tcp", fmt.Sprintf("%s:%d", DEFAULT_BIND_ADDRESS, ons.BindPort))
-}
-
-func (ons *TorProto) GetAddressString() string {
-	return fmt.Sprintf("%s.onion:%d", ons.onionId, ons.BindPort)
 }

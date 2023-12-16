@@ -11,6 +11,9 @@ import (
 
 	"github.com/sniffdogsniff/core"
 	"github.com/sniffdogsniff/logging"
+	"github.com/sniffdogsniff/proxies"
+	"github.com/sniffdogsniff/proxies/i2p"
+	"github.com/sniffdogsniff/proxies/tor"
 	"github.com/sniffdogsniff/util"
 	"github.com/sniffdogsniff/webui"
 )
@@ -73,7 +76,8 @@ func deletePidFile(pidFilePath string) {
 	}
 }
 
-func shutdownHook(configs core.SdsConfig, node *core.LocalNode, pidFilePath string) {
+func shutdownHook(node *core.LocalNode, pidFilePath string, cfg core.SdsConfig,
+	samSession *i2p.I2PSamSession, torControl *tor.TorControlSession) {
 	sigchnl := make(chan os.Signal, 1)
 	signal.Notify(sigchnl)
 
@@ -82,7 +86,11 @@ func shutdownHook(configs core.SdsConfig, node *core.LocalNode, pidFilePath stri
 			s := <-sigchnl
 			if s == syscall.SIGINT {
 				node.Shutdown()
-				configs.P2PServerProto.Close()
+				if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
+					torControl.DeleteOnion()
+				} else if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
+					// samSession.CloseSession()
+				}
 				deletePidFile(pidFilePath)
 				logging.Infof(MAIN, "Shutting down...")
 				os.Exit(0)
@@ -130,15 +138,37 @@ func main() {
 
 	node := core.NewLocalNode(cfg)
 
-	p2pServer := core.NewNodeServer(node)
-	p2pServer.Serve(cfg.P2PServerProto)
+	var torSession *tor.TorControlSession = nil
+	var i2pSamSession *i2p.I2PSamSession = nil
 
-	node.SetNodeAddress(cfg.P2PServerProto.GetAddressString())
+	p2pServer := core.NewNodeServer(node)
+	if cfg.P2pHiddenService == proxies.NONE_PROXY_TYPE {
+		p2pServer.ListenTCP(cfg.P2PServerBindAddress)
+		node.SetNodeAddress(cfg.P2PServerBindAddress)
+	} else if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
+		torSession = tor.NewTorControlSession()
+		onionAddr, err := torSession.CreateOnionService(cfg.TorContext, cfg.P2PBindPort, cfg.WorkDirPath)
+		if err != nil {
+			panic(err.Error())
+		}
+		p2pServer.ListenTCP(fmt.Sprintf("127.0.0.1:%d", cfg.P2PBindPort))
+		node.SetNodeAddress(onionAddr)
+	} else if cfg.P2pHiddenService == proxies.I2P_PROXY_TYPE {
+		session, err := i2p.NewI2PSamSession(cfg.I2pContext, cfg.WorkDirPath, cfg.P2PBindPort)
+		if err != nil {
+			panic(err.Error())
+		}
+		i2pSamSession = session
+		p2pServer.ListenI2P(i2pSamSession.Listener(cfg.P2PBindPort), i2pSamSession.Base32Addr)
+	}
+
+	proxies.InitProxySettings(cfg.I2pContext, i2pSamSession, cfg.TorSocks5Address, cfg.ForceTor)
+
 	node.StartNodesLookupTask()
 	node.StartPublishTask()
 
 	logging.Infof(MAIN, "SniffDogSniff started press CTRL-C to stop")
-	shutdownHook(cfg, node, pidFilePath)
+	shutdownHook(node, pidFilePath, cfg, i2pSamSession, torSession)
 
 	webServer := webui.InitSdsWebServer(node)
 	webServer.ServeWebUi(cfg.WebServiceBindAddress)

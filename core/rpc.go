@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/kademlia"
 	"github.com/sniffdogsniff/logging"
 	"github.com/sniffdogsniff/proxies"
+	"github.com/sniffdogsniff/proxies/i2p"
 	"github.com/sniffdogsniff/util"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -213,7 +213,7 @@ func (srv *NodeServer) findResults(args FindResultsArgs, reply *FindResultsReply
 	(*reply).Values = srv.node.FindResults(args.QueryString)
 }
 
-func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
+func (srv *NodeServer) Init() {
 	/*
 	 * Initialize the request handlig function, to avoid infinite thread spawning
 	 * the server works with a queued thread pool: the handler waits until one or more
@@ -224,15 +224,25 @@ func (srv *NodeServer) Serve(proto hiddenservice.NetProtocol) {
 	for tn := 0; tn < MAX_THREAD_POOL_SIZE; tn++ {
 		go srv.handleAndDispatchRequests()
 	}
+}
 
-	listener, err := proto.Listen()
-
+func (srv *NodeServer) ListenTCP(addr string) {
+	srv.Init()
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		logging.Errorf(NODE_SERVER, err.Error())
-		return
 	}
-	logging.Infof(NODE_SERVER, "NodeServer is listening on %s", proto.GetAddressString())
+	logging.Infof(NODE_SERVER, "NodeServer is listening on %s", addr)
+	srv.accept(listener)
+}
 
+func (srv *NodeServer) ListenI2P(listener i2p.I2pListener, addr string) {
+	srv.Init()
+	logging.Infof(NODE_SERVER, "NodeServer is listening on %s", addr)
+	srv.accept(listener)
+}
+
+func (srv *NodeServer) accept(listener net.Listener) {
 	go srv.acceptConns(listener)
 }
 
@@ -362,14 +372,12 @@ func (srv *NodeServer) handleAndDispatchRequests() {
 }
 
 type NodeClient struct {
-	addr          string
-	proxySettings proxies.ProxySettings
+	addr string
 }
 
-func NewNodeClient(addr string, proxySettings proxies.ProxySettings) NodeClient {
+func NewNodeClient(addr string) NodeClient {
 	return NodeClient{
-		addr:          addr,
-		proxySettings: proxySettings,
+		addr: addr,
 	}
 }
 
@@ -424,7 +432,7 @@ func (rn *NodeClient) FindResults(query string, source *kademlia.KNode) ([]Searc
 }
 
 func (rn *NodeClient) callRemoteFunction(funCode byte, args interface{}, reply interface{}) error {
-	conn, err := rn.proxySettings.NewConnection(rn.addr)
+	conn, err := proxies.NewConnection(rn.addr)
 	if err != nil {
 		return err
 	}

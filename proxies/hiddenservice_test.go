@@ -1,4 +1,4 @@
-package hiddenservice_test
+package proxies_test
 
 import (
 	"fmt"
@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/logging"
+	"github.com/sniffdogsniff/proxies/i2p"
+	"github.com/sniffdogsniff/proxies/tor"
 	"github.com/sniffdogsniff/util"
 	"golang.org/x/net/proxy"
 )
@@ -30,16 +31,21 @@ const TOR_PASSWORD = "test1234"
 func Test_Onion_NewKeyBlob(t *testing.T) {
 	logging.InitLogging(logging.DEBUG)
 
-	torProto := hiddenservice.TorProto{
+	torControl := tor.NewTorControlSession()
+	onionAddr, err := torControl.CreateOnionService(tor.TorCtx{
 		TorControlPort:     9051,
 		TorControlPassword: TOR_PASSWORD,
 		WorkDirPath:        "./",
 		BindPort:           5009,
+	}, 1234, "")
+
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
 
-	l, err := torProto.Listen()
+	l, err := net.Listen("tcp", "127.0.0.1:1234")
 	if err != nil {
-		panic("test failed")
+		t.Fatalf(err.Error())
 	}
 
 	go func(l net.Listener) {
@@ -59,8 +65,8 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println("a", torProto.GetAddressString())
-	conn, err := dialer.Dial("tcp", torProto.GetAddressString())
+	fmt.Println("a", onionAddr)
+	conn, err := dialer.Dial("tcp", onionAddr)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -78,31 +84,35 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 		t.Fatal()
 	}
 
-	if !util.FileExists(hiddenservice.KEY_BLOB_FILE_NAME) {
+	if !util.FileExists(tor.KEY_BLOB_FILE_NAME) {
 		t.Fatal()
 	}
 
-	torProto.Close()
+	torControl.DeleteOnion()
 }
 
 func Test_I2P(t *testing.T) {
 	logging.InitLogging(logging.DEBUG)
-
-	torProto := hiddenservice.I2PProto{
+	ctx := i2p.I2PCtx{
 		SamAPIPort:  7656,
 		SamUser:     "",
 		SamPassword: "",
-		BindPort:    3443,
 	}
 
-	l, err := torProto.Listen()
+	samSession, err := i2p.NewI2PSamSession(ctx, "", 1234)
 	if err != nil {
-		panic("test failed")
+		t.Fatalf(err.Error())
+	}
+
+	l, err := net.Listen("tcp", "127.0.0.1:1234")
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
 
 	go func(l net.Listener) {
 
 		conn, err := l.Accept()
+		fmt.Println("Accept!!!!!!!!!!!!!")
 		if err != nil {
 			panic("test failed")
 		}
@@ -110,15 +120,13 @@ func Test_I2P(t *testing.T) {
 
 	}(l)
 
-	dialer, err := proxy.SOCKS5("tcp", "127.0.0.1:4447", nil, &net.Dialer{
-		Timeout:   60 * time.Second,
-		KeepAlive: 30 * time.Second,
-	})
+	fmt.Println("a", samSession.Base32Addr)
+	clientSam, err := i2p.NewI2PSamSession_Transient(ctx)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println("a", torProto.GetAddressString())
-	conn, err := dialer.Dial("tcp", torProto.GetAddressString())
+
+	conn, err := clientSam.I2PDial(samSession.Base32Addr)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -135,6 +143,4 @@ func Test_I2P(t *testing.T) {
 	if string(bytez[:n]) != "hello1234" {
 		t.Fatal()
 	}
-
-	torProto.Close()
 }

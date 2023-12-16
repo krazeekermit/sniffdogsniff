@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/sniffdogsniff/core"
-	"github.com/sniffdogsniff/hiddenservice"
 	"github.com/sniffdogsniff/kademlia"
 )
 
@@ -127,12 +126,12 @@ func setupNodes() {
 	remoteNodes[4] = fkn5
 	remoteNodes[5] = fkn6
 
-	core.NewNodeServer(fkn1).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_1.Address})
-	core.NewNodeServer(fkn2).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_2.Address})
-	core.NewNodeServer(fkn3).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_3.Address})
-	core.NewNodeServer(fkn4).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_4.Address})
-	core.NewNodeServer(fkn5).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_5.Address})
-	core.NewNodeServer(fkn6).Serve(&hiddenservice.IP4TCPProto{BindAddress: NODE_6.Address})
+	core.NewNodeServer(fkn1).ListenTCP(NODE_1.Address)
+	core.NewNodeServer(fkn2).ListenTCP(NODE_2.Address)
+	core.NewNodeServer(fkn3).ListenTCP(NODE_3.Address)
+	core.NewNodeServer(fkn4).ListenTCP(NODE_4.Address)
+	core.NewNodeServer(fkn5).ListenTCP(NODE_5.Address)
+	core.NewNodeServer(fkn6).ListenTCP(NODE_6.Address)
 }
 
 func TestNodesLookup(t *testing.T) {
