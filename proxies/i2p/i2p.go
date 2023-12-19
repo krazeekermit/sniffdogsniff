@@ -52,7 +52,6 @@ const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 
 func writeCommand(conn net.Conn, cmd, args string) error {
 	cmdStr := fmt.Sprintf("%s %s", cmd, args)
-	fmt.Printf("debug cmd:: %s\n", cmdStr)
 	n, err := conn.Write(append([]byte(cmdStr), '\n'))
 	if err != nil || n < len([]byte(cmdStr)) {
 		return fmt.Errorf("can't communicate to daemon")
@@ -108,8 +107,6 @@ func readSamReply(conn net.Conn, cmd string) (map[string]string, error) {
 		}
 	}
 	replyStr := strings.TrimRight(string(recvBytes), "\n")
-	fmt.Println("[SAM REPLY]", replyStr)
-
 	toks := strings.Split(replyStr, " ")
 	if toks[0] != cmd {
 		return nil, fmt.Errorf("wrong response command")
@@ -128,7 +125,6 @@ type I2PCtx struct {
 	SamAPIPort  int
 	SamUser     string
 	SamPassword string
-	BindPort    int
 	WorkDirPath string
 }
 
@@ -193,10 +189,10 @@ func NewI2PSamSession_Transient(ctx I2PCtx) (*I2PSamSession, error) {
 	return s, nil
 }
 
-func NewI2PSamSession(ctx I2PCtx, workDir string, port int) (*I2PSamSession, error) {
+func NewI2PSamSession(ctx I2PCtx, workDir string) (*I2PSamSession, error) {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ctx.SamAPIPort))
 	if err != nil {
-		panic("failed to connect to the i2p daemon")
+		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}
 
 	sendHelloCmd(ctx, conn)
@@ -208,32 +204,32 @@ func NewI2PSamSession(ctx I2PCtx, workDir string, port int) (*I2PSamSession, err
 		fp, err := os.OpenFile(i2pKeyFilePath, os.O_RDONLY, 0600)
 		if err != nil {
 			fp.Close()
-			panic("i2p failed to red keyblob file")
+			return nil, fmt.Errorf("i2p failed to red keyblob file")
 		}
 		end, err := fp.Seek(0, os.SEEK_END)
 		if err != nil {
 			fp.Close()
-			panic("i2p failed to red keyblob file")
+			return nil, fmt.Errorf("i2p failed to red keyblob file")
 		}
 		_, err = fp.Seek(0, os.SEEK_SET)
 		if err != nil {
 			fp.Close()
-			panic("i2p failed to red keyblob file")
+			return nil, fmt.Errorf("i2p failed to red keyblob file")
 		}
 		d := make([]byte, end)
 		fp.Read(d)
-		dest = string(d)
+		dest = swapBase64(base64.StdEncoding.EncodeToString(d))
 		fp.Close()
 	} else {
 		writeCommand(conn, SAM_CMD_DEST, SAM_CMD_DEST_ARGS)
 		destReply, err := readSamReply(conn, SAM_CMD_DEST)
 		if err != nil {
-			panic(err.Error())
+			return nil, fmt.Errorf(err.Error())
 		}
 
 		d, present := destReply[PRIV_ARG]
 		if !present {
-			panic("no pub key i2p error")
+			return nil, fmt.Errorf("no pub key i2p error")
 		}
 		dest = d
 
@@ -242,7 +238,12 @@ func NewI2PSamSession(ctx I2PCtx, workDir string, port int) (*I2PSamSession, err
 			fp.Close()
 			panic(err.Error())
 		}
-		fp.WriteString(dest)
+		b64, err := base64.StdEncoding.DecodeString(swapBase64(dest))
+		if err != nil {
+			fp.Close()
+			return nil, fmt.Errorf(err.Error())
+		}
+		fp.Write(b64)
 		fp.Close()
 	}
 
@@ -253,20 +254,20 @@ func NewI2PSamSession(ctx I2PCtx, workDir string, port int) (*I2PSamSession, err
 		conn:       conn,
 	}
 
-	writeCommand(conn, SAM_CMD_SESSION, fmt.Sprint(
-		fmt.Sprintf(SAM_CMD_SESSION_CREATE_ARGS, s.id, dest), // " ",
-		//fmt.Sprintf(SAM_CMD_FROM_TO_PORT_ARGS, port, port),
-	))
+	writeCommand(conn, SAM_CMD_SESSION, fmt.Sprintf(SAM_CMD_SESSION_CREATE_ARGS, s.id, dest))
 	resp, err := readSamReply(conn, SAM_CMD_SESSION)
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println(resp)
 	if resp[RESULT_ARG] != I2P_REPLY_OK {
 		panic("error creating i2p session")
 	}
 
 	return s, nil
+}
+
+func (s *I2PSamSession) Id() string {
+	return s.id
 }
 
 func (s *I2PSamSession) I2PDial(b32addr string) (net.Conn, error) {
@@ -276,16 +277,6 @@ func (s *I2PSamSession) I2PDial(b32addr string) (net.Conn, error) {
 	}
 
 	sendHelloCmd(s.ctx, conn)
-
-	// host, _, err := net.SplitHostPort(b32addr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// port, err := strconv.Atoi(portStr)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	writeCommand(conn, SAM_CMD_NAMING, fmt.Sprintf(SAM_CMD_NAMING_ARGS, b32addr))
 	resp, err := readSamReply(conn, SAM_CMD_NAMING)
@@ -300,10 +291,7 @@ func (s *I2PSamSession) I2PDial(b32addr string) (net.Conn, error) {
 		return nil, fmt.Errorf("error i2p naming lookup")
 	}
 
-	writeCommand(conn, SAM_CMD_STREAM, fmt.Sprint(
-		fmt.Sprintf(SAM_CMD_STREAM_CONNECT_ARGS, s.id, destRaw), // " ",
-		//fmt.Sprintf(SAM_CMD_FROM_TO_PORT_ARGS, port, port),
-	))
+	writeCommand(conn, SAM_CMD_STREAM, fmt.Sprintf(SAM_CMD_STREAM_CONNECT_ARGS, s.id, destRaw))
 	reply, err := readSamReply(conn, SAM_CMD_STREAM)
 	if err != nil {
 		return nil, err
@@ -313,13 +301,16 @@ func (s *I2PSamSession) I2PDial(b32addr string) (net.Conn, error) {
 	return conn, nil
 }
 
-func (s *I2PSamSession) Listener(port int) I2pListener {
+func (s *I2PSamSession) CloseSession() error {
+	return s.conn.Close()
+}
+
+func (s *I2PSamSession) Listener() I2pListener {
 	return I2pListener{
 		ctx: s.ctx,
 		id:  s.id,
 		addr: I2pAddr{
-			b32:  s.Base32Addr,
-			port: port,
+			b32: s.Base32Addr,
 		},
 	}
 }

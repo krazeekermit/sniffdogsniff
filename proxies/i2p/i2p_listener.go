@@ -9,24 +9,30 @@ type I2pListener struct {
 	ctx  I2PCtx
 	id   string
 	addr I2pAddr
-	conn net.Conn
 }
 
 func (l I2pListener) Accept() (net.Conn, error) {
 	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", l.ctx.SamAPIPort))
 	if err != nil {
-		panic("failed to connect to the i2p daemon")
+		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}
 
 	sendHelloCmd(l.ctx, conn)
 
 	writeCommand(conn, SAM_CMD_STREAM, fmt.Sprintf(SAM_CMD_STREAM_ACCEPT_ARGS, l.id))
-	reply, err := readSamReply(l.conn, SAM_CMD_SESSION)
+	_, err = readSamReply(conn, SAM_CMD_STREAM)
 	if err != nil {
 		return nil, err
 	}
-	if len(reply) > 0 {
-		return nil, fmt.Errorf("i2p: error accepting socket connection")
+	buf := make([]byte, TXT_BUFFER_SIZE)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		if n < TXT_BUFFER_SIZE {
+			break
+		}
 	}
 	return conn, nil
 }
@@ -36,8 +42,5 @@ func (l I2pListener) Addr() net.Addr {
 }
 
 func (l I2pListener) Close() error {
-	if l.conn != nil {
-		return l.conn.Close()
-	}
 	return nil
 }

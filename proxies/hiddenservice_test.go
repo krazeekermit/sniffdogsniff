@@ -35,8 +35,6 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 	onionAddr, err := torControl.CreateOnionService(tor.TorCtx{
 		TorControlPort:     9051,
 		TorControlPassword: TOR_PASSWORD,
-		WorkDirPath:        "./",
-		BindPort:           5009,
 	}, 1234, "")
 
 	if err != nil {
@@ -99,12 +97,12 @@ func Test_I2P(t *testing.T) {
 		SamPassword: "",
 	}
 
-	samSession, err := i2p.NewI2PSamSession(ctx, "", 1234)
+	samSession, err := i2p.NewI2PSamSession(ctx, "")
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
 
-	l, err := net.Listen("tcp", "127.0.0.1:1234")
+	l := samSession.Listener()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -112,7 +110,6 @@ func Test_I2P(t *testing.T) {
 	go func(l net.Listener) {
 
 		conn, err := l.Accept()
-		fmt.Println("Accept!!!!!!!!!!!!!")
 		if err != nil {
 			panic("test failed")
 		}
@@ -120,13 +117,11 @@ func Test_I2P(t *testing.T) {
 
 	}(l)
 
+	fmt.Println("id", samSession.Id())
 	fmt.Println("a", samSession.Base32Addr)
-	clientSam, err := i2p.NewI2PSamSession_Transient(ctx)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
 
-	conn, err := clientSam.I2PDial(samSession.Base32Addr)
+	clienS, _ := i2p.NewI2PSamSession_Transient(ctx)
+	conn, err := clienS.I2PDial(samSession.Base32Addr)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -141,6 +136,6 @@ func Test_I2P(t *testing.T) {
 	}
 
 	if string(bytez[:n]) != "hello1234" {
-		t.Fatal()
+		t.Fatalf("expected %s but is %s", "hello1234", bytez[:n])
 	}
 }

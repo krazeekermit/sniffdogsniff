@@ -216,11 +216,6 @@ func NewSdsConfig(path string) SdsConfig {
 		} else {
 			cfg.I2pContext.NeedAuth = false
 		}
-		if defaultSection.HasKey(BIND_PORT) {
-			cfg.I2pContext.BindPort = defaultSection.Key(BIND_PORT).MustInt(DEFAULT_BIND_PORT)
-		} else {
-			cfg.I2pContext.BindPort = DEFAULT_BIND_PORT
-		}
 	}
 
 	cfg.KnownPeers = make(map[kademlia.KadId]string)

@@ -202,8 +202,6 @@ type TorCtx struct {
 	TorControlPort     int
 	TorControlPassword string
 	TorCookieAuth      bool
-	BindPort           int
-	WorkDirPath        string
 }
 
 type TorControlSession struct {

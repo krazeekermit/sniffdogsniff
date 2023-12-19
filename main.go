@@ -85,14 +85,20 @@ func shutdownHook(node *core.LocalNode, pidFilePath string, cfg core.SdsConfig,
 		for {
 			s := <-sigchnl
 			if s == syscall.SIGINT {
+				logging.Infof(MAIN, "Shutting down...")
 				node.Shutdown()
 				if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
-					torControl.DeleteOnion()
-				} else if cfg.P2pHiddenService == proxies.TOR_PROXY_TYPE {
-					// samSession.CloseSession()
+					err := torControl.DeleteOnion()
+					if err != nil {
+						logging.Errorf(MAIN, err.Error())
+					}
+				} else if cfg.P2pHiddenService == proxies.I2P_PROXY_TYPE {
+					err := samSession.CloseSession()
+					if err != nil {
+						logging.Errorf(MAIN, err.Error())
+					}
 				}
 				deletePidFile(pidFilePath)
-				logging.Infof(MAIN, "Shutting down...")
 				os.Exit(0)
 			}
 		}
@@ -154,12 +160,12 @@ func main() {
 		p2pServer.ListenTCP(fmt.Sprintf("127.0.0.1:%d", cfg.P2PBindPort))
 		node.SetNodeAddress(onionAddr)
 	} else if cfg.P2pHiddenService == proxies.I2P_PROXY_TYPE {
-		session, err := i2p.NewI2PSamSession(cfg.I2pContext, cfg.WorkDirPath, cfg.P2PBindPort)
+		session, err := i2p.NewI2PSamSession(cfg.I2pContext, cfg.WorkDirPath)
 		if err != nil {
 			panic(err.Error())
 		}
 		i2pSamSession = session
-		p2pServer.ListenI2P(i2pSamSession.Listener(cfg.P2PBindPort), i2pSamSession.Base32Addr)
+		p2pServer.ListenI2P(i2pSamSession.Listener(), i2pSamSession.Base32Addr)
 	}
 
 	proxies.InitProxySettings(cfg.I2pContext, i2pSamSession, cfg.TorSocks5Address, cfg.ForceTor)
