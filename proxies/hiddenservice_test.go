@@ -33,7 +33,7 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 
 	torControl := tor.NewTorControlSession()
 	onionAddr, err := torControl.CreateOnionService(tor.TorCtx{
-		TorControlPort:     9051,
+		TorControlAddr:     "127.0.0.1:9051",
 		TorControlPassword: TOR_PASSWORD,
 	}, 1234, "")
 
@@ -92,7 +92,7 @@ func Test_Onion_NewKeyBlob(t *testing.T) {
 func Test_I2P(t *testing.T) {
 	logging.InitLogging(logging.DEBUG)
 	ctx := i2p.I2PCtx{
-		SamAPIPort:  7656,
+		SamAddr:     "127.0.0.1:7656",
 		SamUser:     "",
 		SamPassword: "",
 	}

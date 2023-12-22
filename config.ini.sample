@@ -7,14 +7,13 @@ allow_results_invalidation = no
 
 # Tor or I2p proxies
 # force_tor_proxy = yes
-# i2p_socks5_proxy = addr:port
 tor_socks5_proxy = 127.0.0.1:9050
-# tor_control_port = 9051
-# tor_control_auth_password = test1234
+# tor_control_addr = 127.0.0.1:9051
+# tor_control_password = test1234
 # tor_control_auth_cookie = true
-# i2p_sam_port = 7656
-# i2p_sam_user = 
-# i2p_sam_password = 
+# i2p_sam_addr = 127.0.0.1:7656
+# i2p_sam_user = user
+# i2p_sam_password = test1234
 
 [web_ui]
 bind_address = 0.0.0.0:8081

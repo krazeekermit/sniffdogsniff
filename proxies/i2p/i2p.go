@@ -122,7 +122,7 @@ func readSamReply(conn net.Conn, cmd string) (map[string]string, error) {
 
 type I2PCtx struct {
 	NeedAuth    bool
-	SamAPIPort  int
+	SamAddr     string
 	SamUser     string
 	SamPassword string
 	WorkDirPath string
@@ -165,7 +165,7 @@ type I2PSamSession struct {
 }
 
 func NewI2PSamSession_Transient(ctx I2PCtx) (*I2PSamSession, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ctx.SamAPIPort))
+	conn, err := net.Dial("tcp", ctx.SamAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}
@@ -190,7 +190,7 @@ func NewI2PSamSession_Transient(ctx I2PCtx) (*I2PSamSession, error) {
 }
 
 func NewI2PSamSession(ctx I2PCtx, workDir string) (*I2PSamSession, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ctx.SamAPIPort))
+	conn, err := net.Dial("tcp", ctx.SamAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}
@@ -271,7 +271,7 @@ func (s *I2PSamSession) Id() string {
 }
 
 func (s *I2PSamSession) I2PDial(b32addr string) (net.Conn, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", s.ctx.SamAPIPort))
+	conn, err := net.Dial("tcp", s.ctx.SamAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}

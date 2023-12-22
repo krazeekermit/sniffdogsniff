@@ -199,7 +199,7 @@ func readReply_ADD_ONION(conn net.Conn) (string, string, error) {
 }
 
 type TorCtx struct {
-	TorControlPort     int
+	TorControlAddr     string
 	TorControlPassword string
 	TorCookieAuth      bool
 }
@@ -214,7 +214,7 @@ func NewTorControlSession() *TorControlSession {
 }
 
 func (s *TorControlSession) CreateOnionService(ctx TorCtx, bindPort int, workDir string) (string, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", ctx.TorControlPort))
+	conn, err := net.Dial("tcp", ctx.TorControlAddr)
 	if err != nil {
 		return "", fmt.Errorf("failed to create hidden service can't connect to tor daemon")
 	}

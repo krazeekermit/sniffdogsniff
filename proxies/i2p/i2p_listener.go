@@ -12,7 +12,7 @@ type I2pListener struct {
 }
 
 func (l I2pListener) Accept() (net.Conn, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", l.ctx.SamAPIPort))
+	conn, err := net.Dial("tcp", l.ctx.SamAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to the i2p daemon")
 	}

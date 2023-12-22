@@ -54,11 +54,11 @@ const (
 	ENABLED                            = "enabled"
 	HIDDEN_SERVICE                     = "hidden_service"
 	TOR                                = "tor"
-	TOR_CONTROL_PORT                   = "tor_control_port"
-	TOR_CONTROL_AUTH_PASSWORD          = "tor_control_auth_password"
+	TOR_CONTROL_ADDR                   = "tor_control_addr"
+	TOR_CONTROL_PASSWORD               = "tor_control_password"
 	TOR_CONTROL_AUTH_COOKIE            = "tor_control_auth_cookie"
 	I2P                                = "i2p"
-	I2P_SAM_PORT                       = "i2p_sam_port"
+	I2P_SAM_ADDR                       = "i2p_sam_addr"
 	I2P_SAM_USER                       = "i2p_sam_user"
 	I2P_SAM_PASSWORD                   = "i2p_sam_password"
 	BIND_PORT                          = "bind_port"
@@ -185,26 +185,19 @@ func NewSdsConfig(path string) SdsConfig {
 	} else {
 		cfg.TorSocks5Address = "127.0.0.1:4447"
 	}
-	if defaultSection.HasKey(TOR_CONTROL_PORT) {
-		cfg.TorContext.TorControlPort, err = defaultSection.Key(TOR_CONTROL_PORT).Int()
-		if err != nil {
-			cfg.TorContext.TorControlPort = 9051
-		}
+	if defaultSection.HasKey(TOR_CONTROL_ADDR) {
+		cfg.TorContext.TorControlAddr = defaultSection.Key(TOR_CONTROL_ADDR).String()
 		if defaultSection.HasKey(TOR_CONTROL_AUTH_COOKIE) {
 			cfg.TorContext.TorCookieAuth = defaultSection.Key(TOR_CONTROL_AUTH_COOKIE).MustBool(false)
-		} else if defaultSection.HasKey(TOR_CONTROL_AUTH_PASSWORD) {
-			cfg.TorContext.TorControlPassword = defaultSection.Key(TOR_CONTROL_AUTH_PASSWORD).String()
+		} else if defaultSection.HasKey(TOR_CONTROL_PASSWORD) {
+			cfg.TorContext.TorControlPassword = defaultSection.Key(TOR_CONTROL_PASSWORD).String()
 			cfg.TorContext.TorCookieAuth = false
 		} else {
 			cfg.TorContext.TorCookieAuth = true
 		}
 	}
-	if defaultSection.HasKey(I2P_SAM_PORT) {
-
-		cfg.I2pContext.SamAPIPort, err = defaultSection.Key(I2P_SAM_PORT).Int()
-		if err != nil {
-			cfg.I2pContext.SamAPIPort = 7656
-		}
+	if defaultSection.HasKey(I2P_SAM_ADDR) {
+		cfg.I2pContext.SamAddr = defaultSection.Key(I2P_SAM_ADDR).String()
 		if defaultSection.HasKey(I2P_SAM_USER) {
 			cfg.I2pContext.NeedAuth = true
 			cfg.I2pContext.SamUser = defaultSection.Key(I2P_SAM_USER).String()
