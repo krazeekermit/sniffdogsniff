@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -28,10 +29,22 @@ func ToQueryTokens(s string) []string {
 	list := make([]string, 0)
 
 	for _, w := range strings.Split(s, " ") {
-		w = strings.TrimLeft(w, ":;,.#(")
-		w = strings.TrimRight(w, ":;,.#)")
-		if skip(w) {
-			continue
+		url, err := url.ParseRequestURI(w)
+		if err != nil {
+			w = strings.TrimLeft(w, ":;,.#(")
+			w = strings.TrimRight(w, ":;,.#)")
+			if skip(w) {
+				continue
+			}
+		} else {
+			w = url.Host
+			dotCount := strings.Count(w, ".")
+			if dotCount > 1 {
+				//keeps the most significant part of the url if the url is foo.bar.com it keeps bar.com
+				for i := 0; i < dotCount-1; i++ {
+					w = w[strings.Index(w, ".")+1:]
+				}
+			}
 		}
 		list = append(list, w)
 	}
@@ -55,7 +68,7 @@ func evalQueryMetric(query []string) []kademlia.KadId {
 
 	uniqueWords := make([]string, 0)
 	for _, w := range query {
-		if len(uniqueWords) >= 4 {
+		if len(uniqueWords) >= 5 {
 			break
 		}
 		duplicate := false

@@ -47,8 +47,8 @@ func B64UrlsafeStringToHash(b64 string) Hash256 {
 const SEARCHES_DB_FILE_NAME = "searches.db"
 const METASS_DB_FILE_NAME = "searches_meta.db"
 
-const SEARCH_RESULT_BYTE_SIZE = 768 // bytes
-const RESULT_META_BYTE_SIZE = 43    // bytes
+const SEARCH_RESULT_BYTE_SIZE = 1024 // bytes
+const RESULT_META_BYTE_SIZE = 43     // bytes
 
 type ResultDataType uint8
 
@@ -81,7 +81,7 @@ SearchResult Structure
 [[HASH (32)][KadIds (80)][TIMESTAMP (8)][TITLE][URL][PROPERTIES]] = 768 bytes
 */
 func NewSearchResult(title, url string, properties ResultPropertiesMap, dataType ResultDataType) SearchResult {
-	const FIXED_LENGHT = 32 + 1 + 80 + 8 + 1 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1, datatype=1
+	const FIXED_LENGHT = 32 + 1 + 100 + 8 + 1 + 1 + 1 + 1 // Hash=32, time=8, len(title)=1, len(url)=1, len(desc)=1, datatype=1
 	// SHRINK TITLE AND PROPERTIES TO FIT 768 byte max size
 
 	propertiesLen := 0
@@ -118,9 +118,9 @@ func NewSearchResult(title, url string, properties ResultPropertiesMap, dataType
 	var metrics []kademlia.KadId
 	description, ok := properties[RP_DESCRIPTION]
 	if ok {
-		metrics = EvalQueryMetrics(fmt.Sprintf("%s %s", title, description))
+		metrics = EvalQueryMetrics(fmt.Sprintf("%s %s %s", url, title, description))
 	} else {
-		metrics = EvalQueryMetrics(title)
+		metrics = EvalQueryMetrics(fmt.Sprintf("%s %s", url, title))
 	}
 
 	rs := SearchResult{

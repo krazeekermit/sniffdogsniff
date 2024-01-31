@@ -16,14 +16,14 @@ var testMetrics = []kademlia.KadId{
 }
 
 func Test_ToQueryTokens(t *testing.T) {
-	s := "A weapon of mass destruction (WMD) is a chemical,      biological, radiological or nuclear."
+	s := "A weapon of mass destruction (WMD) is a chemical,      biological, radiological or nuclear.      http://en.weapons.nuclear.com/w/d/uranium.html"
 
 	split := core.ToQueryTokens(strings.ToLower(s))
-	if len(split) > 8 {
-		t.Fatal()
+	if len(split) > 9 {
+		t.Fatalf("expected %d but %d", 9, len(split))
 	}
 
-	for i, w := range []string{"weapon", "mass", "destruction", "wmd", "chemical", "biological", "radiological", "nuclear"} {
+	for i, w := range []string{"weapon", "mass", "destruction", "wmd", "chemical", "biological", "radiological", "nuclear", "nuclear.com"} {
 		if split[i] != w {
 			t.Fatalf("at eord %d: %s != %s", i, w, split[i])
 		}
