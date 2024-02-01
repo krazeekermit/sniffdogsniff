@@ -143,6 +143,7 @@ func main() {
 	}
 
 	node := core.NewLocalNode(cfg)
+	go node.Crawler.RunTask()
 
 	var torSession *tor.TorControlSession = nil
 	var i2pSamSession *i2p.I2PSamSession = nil

@@ -69,6 +69,76 @@ func extractUrlJson(jsonStr, property string) string {
 	return url
 }
 
+func extractMetadata(userAgent, url string) (string, string, error) {
+	c := colly.NewCollector()
+	//c.UserAgent = userAgent
+
+	description := ""
+	title := ""
+	var gerr error
+
+	c.OnError(func(_ *colly.Response, err error) {
+		gerr = err
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		logging.Debugf(CRAWLER, "Connecting to %s", r.Request.URL.String())
+	})
+
+	c.OnHTML("title", func(h *colly.HTMLElement) {
+		title = h.Text
+	})
+
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		description = e.ChildAttr("meta[name=\"description\"]", "content")
+		if description == "" {
+			description = e.ChildText("h1")
+		}
+	})
+
+	c.Visit(url)
+	c.Wait()
+
+	if description == "" {
+		description = NO_DESCRIPTION_AVAILABLE
+	}
+	return title, normalizeString(description), gerr
+}
+
+type UrlQueue struct {
+	indexes []string
+	mutex   *sync.Mutex
+}
+
+func NewUrlQueue() UrlQueue {
+	return UrlQueue{
+		indexes: make([]string, 0),
+		mutex:   &sync.Mutex{},
+	}
+}
+
+func (d *UrlQueue) push(i string) {
+	d.mutex.Lock()
+	d.indexes = append(d.indexes, i)
+	d.mutex.Unlock()
+}
+
+func (d *UrlQueue) popFirst() string {
+	d.mutex.Lock()
+	conn := d.indexes[0]
+	d.indexes = d.indexes[1:]
+	d.mutex.Unlock()
+	return conn
+}
+
+func (d *UrlQueue) isEmpty() bool {
+	return len(d.indexes) == 0
+}
+
+func (d *UrlQueue) count() int {
+	return len(d.indexes)
+}
+
 type SearchEngine struct {
 	name                    string
 	userAgent               string
@@ -114,64 +184,87 @@ func (se SearchEngine) extractDescription(url string) string {
 	return normalizeString(description)
 }
 
-func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, query string) {
-	// searchResults := make([]SearchResult, 0)
-
-	// c := colly.NewCollector()
-	// c.UserAgent = se.userAgent
-
-	// c.OnError(func(_ *colly.Response, err error) {
-	// 	logging.Errorf(CRAWLER, err.Error())
-	// })
-
-	// c.OnResponse(func(r *colly.Response) {
-	// 	logging.Debugf(CRAWLER, "Visited %s", r.Request.URL.String())
-	// })
-
-	// c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
-	// 	e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
-	// 		urlData := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
-
-	// 		url := ""
-	// 		if se.resultUrlIsJson {
-	// 			url = extractUrlJson(urlData, se.resultUrlJsonProperty)
-	// 		} else {
-	// 			url = urlData
-	// 		}
-
-	// 		title := ""
-	// 		if se.resultTitleProperty == "text" {
-	// 			title = elContainer.ChildText(se.resultTitleElement)
-	// 		} else {
-	// 			title = elContainer.ChildAttr(se.resultTitleElement, se.resultTitleProperty)
-	// 		}
-
-	// 		if validUrl(url) {
-	// 			desc := se.extractDescription(url)
-	// 			result := NewSearchResult(title, url,
-	// 				ResultPropertiesMap{RP_DESCRIPTION: desc}, se.providedDataType)
-	// 			result.ReHash()
-	// 			searchResults = append(searchResults, result)
-	// 		}
-	// 	})
-	// })
-
-	// searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
-	// logging.Infof(CRAWLER, "Receiving results from %s", searchUrlString)
-
-	// c.Visit(searchUrlString)
-	// c.Wait()
-
-	// ch <- searchResults
+type Crawler struct {
+	cond     *sync.Cond
+	takeover bool
+	engines  map[string]SearchEngine
+	callback func(SearchResult)
+	queue    UrlQueue
 }
 
-func DoParallelSearchOnExtEngines(engines map[string]SearchEngine, query string) []SearchResult {
+func NewCrawler(engines map[string]SearchEngine) *Crawler {
+	return &Crawler{
+		cond:     sync.NewCond(&sync.Mutex{}),
+		engines:  engines,
+		callback: nil,
+		queue:    NewUrlQueue(),
+	}
+}
+
+func (crawler *Crawler) SetUpdateCallback(callback func(SearchResult)) {
+	crawler.callback = callback
+}
+
+func (crawler *Crawler) RunTask() {
+	c := colly.NewCollector()
+	c.OnError(func(_ *colly.Response, err error) {
+		logging.Errorf(CRAWLER, err.Error())
+	})
+
+	c.OnResponse(func(r *colly.Response) {
+		logging.Debugf(CRAWLER, "Connecting %s", r.Request.URL.String())
+	})
+
+	c.OnHTML("body", func(e *colly.HTMLElement) {
+		e.ForEach("a", func(_ int, h *colly.HTMLElement) {
+			href := h.Attr("href")
+			title, desc, err := extractMetadata("", href)
+			if err != nil {
+				return
+			}
+
+			logging.Infof(CRAWLER, "New result found %s: %s", title, href)
+
+			result := NewSearchResult(title, href,
+				ResultPropertiesMap{RP_DESCRIPTION: desc}, LINK_DATA_TYPE)
+			result.ReHash()
+			crawler.callback(result)
+
+			crawler.queue.push(href)
+		})
+	})
+
+	for {
+		crawler.cond.L.Lock()
+		for crawler.queue.isEmpty() || crawler.takeover {
+			crawler.cond.Wait()
+		}
+
+		logging.Infof(CRAWLER, "Seeded with %d results", crawler.queue.count())
+
+		for i := 0; i < 5; i++ {
+			c.Visit(crawler.queue.popFirst())
+		}
+		crawler.cond.L.Unlock()
+
+		c.Wait()
+	}
+}
+
+func (crawler *Crawler) Seed(seeds ...string) {
+	for i := 0; i < len(seeds); i++ {
+		crawler.queue.push(seeds[i])
+	}
+}
+
+func (crawler *Crawler) DoSearch(query string) []SearchResult {
+	crawler.cond.L.Lock()
 
 	searchResults := make(map[Hash256]SearchResult)
 	var lock sync.Mutex
 
 	c := colly.NewCollector()
-	for _, se := range engines {
+	for _, se := range crawler.engines {
 		logging.Debugf("SEARCH ENGINE", se.name)
 		c.UserAgent = se.userAgent
 
@@ -228,8 +321,12 @@ func DoParallelSearchOnExtEngines(engines map[string]SearchEngine, query string)
 
 	results := make([]SearchResult, 0)
 	for _, sr := range searchResults {
+		crawler.queue.push(sr.Url)
 		results = append(results, sr)
 	}
+
+	crawler.cond.Broadcast()
+	crawler.cond.L.Unlock()
 
 	return results
 

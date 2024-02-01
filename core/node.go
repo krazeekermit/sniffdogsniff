@@ -47,7 +47,7 @@ type LocalNode struct {
 	canInvalidate    bool
 	tsLock           *sync.Mutex // tread safe access from different threads, the NodeServer the WebUi, the SyncWithPeers()
 	searchDB         SearchDB
-	searchEngines    map[string]SearchEngine
+	Crawler          *Crawler
 	minResultsThr    int
 	selfNodeFilePath string
 	ktable           *kademlia.KadRoutingTable
@@ -56,7 +56,7 @@ type LocalNode struct {
 }
 
 func NewLocalNode(configs SdsConfig) *LocalNode {
-	ln := LocalNode{}
+	ln := &LocalNode{}
 	ln.knownNodes = configs.KnownPeers
 	ln.nodesBlacklist = configs.PeersBlacklist
 	ln.selfNodeFilePath = filepath.Join(configs.WorkDirPath, SELF_PEER_FILE_NAME)
@@ -66,9 +66,10 @@ func NewLocalNode(configs SdsConfig) *LocalNode {
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize, 3600*24)
 	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = &sync.Mutex{}
-	ln.searchEngines = configs.searchEngines
+	ln.Crawler = NewCrawler(configs.searchEngines)
+	ln.Crawler.SetUpdateCallback(ln.InsertSearchResult)
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
-	return &ln
+	return ln
 }
 
 func (ln *LocalNode) SelfNode() *kademlia.KNode {
@@ -232,7 +233,7 @@ func (ln *LocalNode) DoSearch(query string) []SearchResult {
 			If no values were found in any nodes then rely on the centralized external
 			search engines. The found results are stored in the network.
 		*/
-		rSlice = append(rSlice, DoParallelSearchOnExtEngines(ln.searchEngines, query)...)
+		rSlice = append(rSlice, ln.Crawler.DoSearch(query)...)
 		ln.PublishResults(rSlice)
 		return rSlice
 	}
