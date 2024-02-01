@@ -1,12 +1,10 @@
 package logging
 
 import (
-	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -33,8 +31,6 @@ const (
 
 var logLevel int
 var noAnsi bool = false
-var mutex *sync.Mutex
-var outStream *bufio.Writer
 
 func StrToLogLevel(levelStr string) int {
 	switch strings.ToLower(levelStr) {
@@ -55,27 +51,19 @@ func SprintTrimmed(a ...any) string {
 }
 
 func InitLogging(level int) {
+	log.SetFlags(log.Ldate | log.Ltime)
 	logLevel = level
 }
 
 func printlog(level, color, sender, message string) {
-	if mutex == nil {
-		mutex = &sync.Mutex{}
-	}
-	if outStream == nil {
-		outStream = bufio.NewWriter(os.Stdout)
-	}
-
 	end := ANSI_END
 	if noAnsi {
 		color = ""
 		end = ""
 	}
 
-	mutex.Lock()
-	fmt.Fprintf(outStream, "[%s %s%5s%s] (%s) %s\n", time.Now().Local().Format(time.ANSIC), color, level, end, sender, message)
-	outStream.Flush()
-	mutex.Unlock()
+	log.Printf("%s%5s%s [%s] %s\n", color, level, end, sender, message)
+
 }
 
 func SetLoggingToFile(path string) {
@@ -84,8 +72,8 @@ func SetLoggingToFile(path string) {
 		panic("failed to create log file")
 	}
 
+	log.SetOutput(fp)
 	noAnsi = true
-	outStream = bufio.NewWriter(fp)
 }
 
 func Infof(sender, format string, a ...any) {

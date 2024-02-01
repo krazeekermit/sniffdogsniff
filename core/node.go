@@ -13,7 +13,7 @@ import (
 )
 
 const NODE = "node"
-const NODES_LOOKUP = "nodes lookup"
+const NODES_LOOKUP = "lookup"
 
 const FIRST_SYNC_LOCK_FILE_NAME = "firstsync.lock"
 
@@ -458,7 +458,7 @@ func (ln *LocalNode) StartNodesLookupTask() {
 					toLook = append(toLook, kademlia.NewKNode(kademlia.GenKadIdFarNBitsFrom(ln.SelfNode().Id, i), ""))
 				}
 			}
-			logging.Infof(NODE, "Started node lookup")
+			logging.Infof(NODES_LOOKUP, "Started node lookup")
 			d := 0
 			for i := 0; i < len(toLook); i++ {
 				if util.CurrentUnixTime()-startTime >= int64(LOOKUP_TIMEOUT) {
