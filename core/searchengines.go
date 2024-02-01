@@ -115,73 +115,122 @@ func (se SearchEngine) extractDescription(url string) string {
 }
 
 func (se SearchEngine) DoSearch(ch chan []SearchResult, wg *sync.WaitGroup, query string) {
-	searchResults := make([]SearchResult, 0)
+	// searchResults := make([]SearchResult, 0)
 
-	c := colly.NewCollector()
-	c.UserAgent = se.userAgent
+	// c := colly.NewCollector()
+	// c.UserAgent = se.userAgent
 
-	c.OnError(func(_ *colly.Response, err error) {
-		logging.Errorf(CRAWLER, err.Error())
-	})
+	// c.OnError(func(_ *colly.Response, err error) {
+	// 	logging.Errorf(CRAWLER, err.Error())
+	// })
 
-	c.OnResponse(func(r *colly.Response) {
-		logging.Debugf(CRAWLER, "Visited %s", r.Request.URL.String())
-	})
+	// c.OnResponse(func(r *colly.Response) {
+	// 	logging.Debugf(CRAWLER, "Visited %s", r.Request.URL.String())
+	// })
 
-	c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
-		e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
-			urlData := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+	// c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
+	// 	e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
+	// 		urlData := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
 
-			url := ""
-			if se.resultUrlIsJson {
-				url = extractUrlJson(urlData, se.resultUrlJsonProperty)
-			} else {
-				url = urlData
-			}
+	// 		url := ""
+	// 		if se.resultUrlIsJson {
+	// 			url = extractUrlJson(urlData, se.resultUrlJsonProperty)
+	// 		} else {
+	// 			url = urlData
+	// 		}
 
-			title := ""
-			if se.resultTitleProperty == "text" {
-				title = elContainer.ChildText(se.resultTitleElement)
-			} else {
-				title = elContainer.ChildAttr(se.resultTitleElement, se.resultTitleProperty)
-			}
+	// 		title := ""
+	// 		if se.resultTitleProperty == "text" {
+	// 			title = elContainer.ChildText(se.resultTitleElement)
+	// 		} else {
+	// 			title = elContainer.ChildAttr(se.resultTitleElement, se.resultTitleProperty)
+	// 		}
 
-			if validUrl(url) {
-				desc := se.extractDescription(url)
-				result := NewSearchResult(title, url,
-					ResultPropertiesMap{RP_DESCRIPTION: desc}, se.providedDataType)
-				result.ReHash()
-				searchResults = append(searchResults, result)
-			}
-		})
-	})
+	// 		if validUrl(url) {
+	// 			desc := se.extractDescription(url)
+	// 			result := NewSearchResult(title, url,
+	// 				ResultPropertiesMap{RP_DESCRIPTION: desc}, se.providedDataType)
+	// 			result.ReHash()
+	// 			searchResults = append(searchResults, result)
+	// 		}
+	// 	})
+	// })
 
-	searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
-	logging.Infof(CRAWLER, "Receiving results from %s", searchUrlString)
+	// searchUrlString := fmt.Sprintf(se.searchQueryUrl, query)
+	// logging.Infof(CRAWLER, "Receiving results from %s", searchUrlString)
 
-	c.Visit(searchUrlString)
-	c.Wait()
+	// c.Visit(searchUrlString)
+	// c.Wait()
 
-	ch <- searchResults
+	// ch <- searchResults
 }
 
 func DoParallelSearchOnExtEngines(engines map[string]SearchEngine, query string) []SearchResult {
-	ch := make(chan []SearchResult)
 
-	var wg sync.WaitGroup
+	searchResults := make(map[Hash256]SearchResult)
+	var lock sync.Mutex
 
+	c := colly.NewCollector()
 	for _, se := range engines {
-		go se.DoSearch(ch, &wg, query)
+		logging.Debugf("SEARCH ENGINE", se.name)
+		c.UserAgent = se.userAgent
+
+		c.OnError(func(_ *colly.Response, err error) {
+			logging.Errorf(CRAWLER, err.Error())
+		})
+
+		c.OnResponse(func(r *colly.Response) {
+			logging.Debugf(CRAWLER, "Visited %s", r.Request.URL.String())
+		})
+
+		c.OnHTML(se.resultsContainerElement, func(e *colly.HTMLElement) {
+			_results := make([]SearchResult, 0)
+			e.ForEach(se.resultContainerElement, func(_ int, elContainer *colly.HTMLElement) {
+				urlData := elContainer.ChildAttr(se.resultUrlElement, se.resultUrlProperty)
+
+				url := ""
+				if se.resultUrlIsJson {
+					url = extractUrlJson(urlData, se.resultUrlJsonProperty)
+				} else {
+					url = urlData
+				}
+
+				title := ""
+				if se.resultTitleProperty == "text" {
+					title = elContainer.ChildText(se.resultTitleElement)
+				} else {
+					title = elContainer.ChildAttr(se.resultTitleElement, se.resultTitleProperty)
+				}
+
+				if validUrl(url) {
+					desc := se.extractDescription(url)
+					result := NewSearchResult(title, url,
+						ResultPropertiesMap{RP_DESCRIPTION: desc}, se.providedDataType)
+					result.ReHash()
+
+					_results = append(_results, result)
+				}
+			})
+			lock.Lock()
+			for i := 0; i < len(_results); i++ {
+				sr := _results[i]
+				searchResults[sr.ResultHash] = sr
+			}
+			lock.Unlock()
+		})
+
+		searchUrlString := fmt.Sprintf(se.searchQueryUrl, url.QueryEscape(query))
+		logging.Infof(CRAWLER, "Receiving results from %s", searchUrlString)
+
+		c.Visit(searchUrlString)
 	}
+	c.Wait()
 
 	results := make([]SearchResult, 0)
-
-	for i := 0; i < len(engines); i++ {
-		select {
-		case srs := <-ch:
-			results = append(results, srs...)
-		}
+	for _, sr := range searchResults {
+		results = append(results, sr)
 	}
 
 	return results
+
 }

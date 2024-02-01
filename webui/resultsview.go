@@ -79,6 +79,9 @@ func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node 
 	urlFilter := getVarOrDefault_GET(r, "link_filter", RULE_ALL)
 
 	dataType := getVarOrDefault_GET(r, "data_type", rpv.dataType)
+	if dataType == "" {
+		dataType = "links"
+	}
 
 	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
 	if err != nil {
@@ -86,8 +89,10 @@ func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node 
 	}
 
 	//Avoid extra search actions
+	obt := node.DoSearch(query)
+	logging.Debugf(WEBUI, "Found results %d", len(obt))
 	if query != rpv.query || dataType != rpv.dataType {
-		rpv.results = filterSearchResults(node.DoSearch(query), urlFilter, dataType)
+		rpv.results = filterSearchResults(obt, urlFilter, dataType)
 		rpv.query = query
 		rpv.dataType = dataType
 		pageNum = 0

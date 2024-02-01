@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"text/template"
+
+	"github.com/sniffdogsniff/logging"
 )
 
 //go:embed static/*
@@ -59,7 +61,7 @@ func renderTemplate(w http.ResponseWriter, templateName string, v any) {
 func readTemplate(templateName string) string {
 	data, err := embeddedFs.ReadFile(filepath.Join("templates/", templateName))
 	if err != nil {
-		panic("Template error Reading...")
+		logging.Errorf(WEBUI, "Error template rendering %s", err.Error())
 	}
 	return string(data)
 }
