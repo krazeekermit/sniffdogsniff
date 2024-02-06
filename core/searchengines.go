@@ -13,6 +13,8 @@ import (
 	"github.com/sniffdogsniff/logging"
 )
 
+const MAX_CONCURRENT_CRAWLERS = 5
+
 const CRAWLER = "crawler"
 
 const NO_DESCRIPTION_AVAILABLE string = "No description available"
@@ -107,27 +109,21 @@ func extractMetadata(userAgent, url string) (string, string, error) {
 
 type UrlQueue struct {
 	indexes []string
-	mutex   *sync.Mutex
 }
 
 func NewUrlQueue() UrlQueue {
 	return UrlQueue{
 		indexes: make([]string, 0),
-		mutex:   &sync.Mutex{},
 	}
 }
 
 func (d *UrlQueue) push(i string) {
-	d.mutex.Lock()
 	d.indexes = append(d.indexes, i)
-	d.mutex.Unlock()
 }
 
 func (d *UrlQueue) popFirst() string {
-	d.mutex.Lock()
 	conn := d.indexes[0]
 	d.indexes = d.indexes[1:]
-	d.mutex.Unlock()
 	return conn
 }
 
@@ -185,19 +181,23 @@ func (se SearchEngine) extractDescription(url string) string {
 }
 
 type Crawler struct {
-	cond     *sync.Cond
-	takeover bool
-	engines  map[string]SearchEngine
-	callback func(SearchResult)
-	queue    UrlQueue
+	cond        *sync.Cond
+	takeover    bool
+	engines     map[string]SearchEngine
+	callback    func(SearchResult)
+	queue       UrlQueue
+	probed      map[Hash256]SearchResult
+	probedMutex *sync.Mutex
 }
 
 func NewCrawler(engines map[string]SearchEngine) *Crawler {
 	return &Crawler{
-		cond:     sync.NewCond(&sync.Mutex{}),
-		engines:  engines,
-		callback: nil,
-		queue:    NewUrlQueue(),
+		cond:        sync.NewCond(&sync.Mutex{}),
+		engines:     engines,
+		callback:    nil,
+		queue:       NewUrlQueue(),
+		probed:      map[Hash256]SearchResult{},
+		probedMutex: &sync.Mutex{},
 	}
 }
 
@@ -207,8 +207,8 @@ func (crawler *Crawler) SetUpdateCallback(callback func(SearchResult)) {
 
 func (crawler *Crawler) RunTask() {
 	c := colly.NewCollector()
-	c.OnError(func(_ *colly.Response, err error) {
-		logging.Errorf(CRAWLER, err.Error())
+	c.OnError(func(r *colly.Response, err error) {
+		logging.Errorf(CRAWLER, "%s: %s", r.Request.URL.String(), err.Error())
 	})
 
 	c.OnResponse(func(r *colly.Response) {
@@ -226,11 +226,15 @@ func (crawler *Crawler) RunTask() {
 			logging.Infof(CRAWLER, "New result found %s: %s", title, href)
 
 			result := NewSearchResult(title, href,
-				ResultPropertiesMap{RP_DESCRIPTION: desc}, LINK_DATA_TYPE)
+				ResultPropertiesMap{RP_DESCRIPTION: normalizeString(desc)}, LINK_DATA_TYPE)
 			result.ReHash()
-			crawler.callback(result)
 
-			crawler.queue.push(href)
+			crawler.probedMutex.Lock()
+			if _, ok := crawler.probed[result.ResultHash]; !ok {
+				crawler.probed[result.ResultHash] = result
+				crawler.queue.push(href)
+			}
+			crawler.probedMutex.Unlock()
 		})
 	})
 
@@ -242,10 +246,15 @@ func (crawler *Crawler) RunTask() {
 
 		logging.Infof(CRAWLER, "Seeded with %d results", crawler.queue.count())
 
-		for i := 0; i < 5; i++ {
-			c.Visit(crawler.queue.popFirst())
+		roundSeeds := make([]string, MAX_CONCURRENT_CRAWLERS)
+		for i := 0; i < MAX_CONCURRENT_CRAWLERS; i++ {
+			roundSeeds[i] = crawler.queue.popFirst()
 		}
 		crawler.cond.L.Unlock()
+
+		for i := 0; i < MAX_CONCURRENT_CRAWLERS; i++ {
+			c.Visit(roundSeeds[i])
+		}
 
 		c.Wait()
 	}
@@ -257,8 +266,18 @@ func (crawler *Crawler) Seed(seeds ...string) {
 	}
 }
 
+func (crawler *Crawler) ResultsToPublish() []SearchResult {
+	results := make([]SearchResult, 0)
+	for _, sr := range crawler.probed {
+		results = append(results, sr)
+	}
+	return results
+}
+
 func (crawler *Crawler) DoSearch(query string) []SearchResult {
 	crawler.cond.L.Lock()
+	crawler.takeover = true
+	crawler.cond.L.Unlock()
 
 	searchResults := make(map[Hash256]SearchResult)
 	var lock sync.Mutex
@@ -325,6 +344,8 @@ func (crawler *Crawler) DoSearch(query string) []SearchResult {
 		results = append(results, sr)
 	}
 
+	crawler.cond.L.Lock()
+	crawler.takeover = false
 	crawler.cond.Broadcast()
 	crawler.cond.L.Unlock()
 

@@ -323,8 +323,11 @@ func (ln *LocalNode) StartPublishTask() {
 			ticker.Reset(time.Duration(util.TIME_HOUR_UNIX) * time.Second)
 			ln.tsLock.Lock()
 			results := ln.searchDB.ResultsToPublish()
-			logging.Infof(NODE, "Publishing %d results...", len(results))
 			ln.tsLock.Unlock()
+
+			results = append(results, ln.Crawler.ResultsToPublish()...)
+
+			logging.Infof(NODE, "Publishing %d results...", len(results))
 			ln.PublishResults(results)
 		}
 	}()
