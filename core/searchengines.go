@@ -1,9 +1,12 @@
 package core
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -11,11 +14,13 @@ import (
 
 	"github.com/gocolly/colly"
 	"github.com/sniffdogsniff/logging"
+	"github.com/sniffdogsniff/util"
 )
 
 const MAX_CONCURRENT_CRAWLERS = 5
 
 const CRAWLER = "crawler"
+const CRAWLER_URLS_FILE = "crawler_urls.dat"
 
 const NO_DESCRIPTION_AVAILABLE string = "No description available"
 
@@ -127,6 +132,10 @@ func (d *UrlQueue) popFirst() string {
 	return conn
 }
 
+func (d *UrlQueue) getArray() []string {
+	return d.indexes
+}
+
 func (d *UrlQueue) isEmpty() bool {
 	return len(d.indexes) == 0
 }
@@ -181,6 +190,7 @@ func (se SearchEngine) extractDescription(url string) string {
 }
 
 type Crawler struct {
+	cacheFile   string
 	cond        *sync.Cond
 	takeover    bool
 	engines     map[string]SearchEngine
@@ -190,8 +200,9 @@ type Crawler struct {
 	probedMutex *sync.Mutex
 }
 
-func NewCrawler(engines map[string]SearchEngine) *Crawler {
-	return &Crawler{
+func NewCrawler(engines map[string]SearchEngine, workDir string) *Crawler {
+	crawler := &Crawler{
+		cacheFile:   path.Join(workDir, CRAWLER_URLS_FILE),
 		cond:        sync.NewCond(&sync.Mutex{}),
 		engines:     engines,
 		callback:    nil,
@@ -199,6 +210,27 @@ func NewCrawler(engines map[string]SearchEngine) *Crawler {
 		probed:      map[Hash256]SearchResult{},
 		probedMutex: &sync.Mutex{},
 	}
+
+	if util.FileExists(crawler.cacheFile) {
+		fp, err := os.OpenFile(crawler.cacheFile, os.O_RDONLY, 0600)
+
+		if err != nil {
+			logging.Errorf(CRAWLER, err.Error())
+		}
+
+		defer fp.Close()
+
+		fScan := bufio.NewScanner(fp)
+
+		fScan.Split(bufio.ScanLines)
+
+		for fScan.Scan() {
+			crawler.queue.push(strings.Trim(fScan.Text(), "\r\n"))
+		}
+	} else {
+		logging.Warnf(CRAWLER, "chache file doas not exists")
+	}
+	return crawler
 }
 
 func (crawler *Crawler) SetUpdateCallback(callback func(SearchResult)) {
@@ -264,6 +296,31 @@ func (crawler *Crawler) Seed(seeds ...string) {
 	for i := 0; i < len(seeds); i++ {
 		crawler.queue.push(seeds[i])
 	}
+}
+
+/*
+	Crawler cache file
+	uint32_t results size, uint32_t not probed url size
+	[SearchResult] * results size
+
+
+*/
+
+func (crawler *Crawler) FlushCache() {
+	fp, err := os.OpenFile(crawler.cacheFile, os.O_CREATE|os.O_WRONLY, 0600)
+
+	if err != nil {
+		logging.Errorf(CRAWLER, err.Error())
+		return
+	}
+
+	defer fp.Close()
+
+	urls := crawler.queue.getArray()
+	for i := 0; i < len(urls); i++ {
+		fmt.Fprintf(fp, "%s\n", urls[i])
+	}
+
 }
 
 func (crawler *Crawler) ResultsToPublish() []SearchResult {

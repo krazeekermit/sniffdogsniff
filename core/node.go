@@ -66,7 +66,7 @@ func NewLocalNode(configs SdsConfig) *LocalNode {
 	ln.searchDB.Open(configs.WorkDirPath, configs.searchDBMaxCacheSize, 3600*24)
 	ln.canInvalidate = configs.AllowResultsInvalidation
 	ln.tsLock = &sync.Mutex{}
-	ln.Crawler = NewCrawler(configs.searchEngines)
+	ln.Crawler = NewCrawler(configs.searchEngines, configs.WorkDirPath)
 	ln.Crawler.SetUpdateCallback(ln.InsertSearchResult)
 	ln.minResultsThr = 10 // 10 placeholder number will be defined in SdsConfigs
 	return ln
@@ -480,4 +480,5 @@ func (ln *LocalNode) Shutdown() {
 	ln.searchDB.Flush()
 	ln.ktable.Flush()
 	ln.searchDB.Close()
+	ln.Crawler.FlushCache()
 }
