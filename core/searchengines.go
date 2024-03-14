@@ -55,7 +55,7 @@ func normalizeString(text string) string {
 	if endIndex > 1 {
 		text = text[0:endIndex]
 	}
-	return text
+	return strings.Trim(text, "\r\n\t")
 }
 
 func extractUrlJson(jsonStr, property string) string {
@@ -244,11 +244,18 @@ func (crawler *Crawler) RunTask() {
 	})
 
 	c.OnResponse(func(r *colly.Response) {
+
 		logging.Debugf(CRAWLER, "Connecting %s", r.Request.URL.String())
 	})
 
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		e.ForEach("a", func(_ int, h *colly.HTMLElement) {
+			crawler.cond.L.Lock()
+			for crawler.takeover {
+				crawler.cond.Wait()
+			}
+			crawler.cond.L.Unlock()
+
 			href := h.Attr("href")
 			title, desc, err := extractMetadata("", href)
 			if err != nil {
@@ -257,7 +264,7 @@ func (crawler *Crawler) RunTask() {
 
 			logging.Infof(CRAWLER, "New result found %s: %s", title, href)
 
-			result := NewSearchResult(title, href,
+			result := NewSearchResult(normalizeString(title), href,
 				ResultPropertiesMap{RP_DESCRIPTION: normalizeString(desc)}, LINK_DATA_TYPE)
 			result.ReHash()
 

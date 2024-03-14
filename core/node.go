@@ -477,8 +477,9 @@ func (ln *LocalNode) StartNodesLookupTask() {
 }
 
 func (ln *LocalNode) Shutdown() {
+	ln.searchDB.InsertResults(ln.Crawler.ResultsToPublish())
 	ln.searchDB.Flush()
-	ln.ktable.Flush()
 	ln.searchDB.Close()
 	ln.Crawler.FlushCache()
+	ln.ktable.Flush()
 }
