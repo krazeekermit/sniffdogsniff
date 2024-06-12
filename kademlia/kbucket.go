@@ -109,17 +109,31 @@ func (a KadId) LessThan(b KadId) bool {
 }
 
 // evaluates the bucket height for the id -> 2^height < id < 2^height+1
-func (a KadId) EvalHeight() int {
-	for s := 0; s < KAD_ID_LEN; s++ {
-		i := KAD_ID_LEN - 1 - s
-		num := a[i/32]
-		if num == 0 {
-			s += 31
-			continue
-		}
+// func (a KadId) EvalHeight() int {
+// 	for s := 0; s < KAD_ID_LEN; s++ {
+// 		i := KAD_ID_LEN - 1 - s
+// 		num := a[i/32]
+// 		if num == 0 {
+// 			s += 31
+// 			continue
+// 		}
 
-		if (num & (0x7fffffff >> (s % 32))) != num {
-			return i
+// 		if (num & (0x7fffffff >> (s % 32))) != num {
+// 			return i
+// 		}
+// 	}
+// 	return 0
+// }
+
+func (a KadId) EvalHeight() int {
+	for s := 4; s >= 0; s-- {
+		num := a[s]
+		if num != 0 {
+			for i := 0; i < 32; i++ {
+				if (num & (0xffffffff >> i)) != num {
+					return (s * 32) + (32 - i)
+				}
+			}
 		}
 	}
 	return 0
