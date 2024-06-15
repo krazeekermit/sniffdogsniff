@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/sniffdogsniff/core"
@@ -18,22 +17,7 @@ const (
 	RULE_CLEARNET string = "clearnet"
 )
 
-const MAX_RESULTS_PER_PAGE int = 12
-
 const RESULTS_TEMPLATE_FILE_NAME = "results_%s.html"
-
-func getResultsForPage(results []core.SearchResult, page int) []core.SearchResult {
-	if len(results) <= MAX_RESULTS_PER_PAGE {
-		return results
-	} else {
-		firstIdx := MAX_RESULTS_PER_PAGE * page
-		lastIdx := firstIdx + MAX_RESULTS_PER_PAGE
-		if lastIdx > (len(results) - 1) {
-			lastIdx = (len(results) - 1)
-		}
-		return results[firstIdx:lastIdx]
-	}
-}
 
 func matchesUrlType(urlStr, urlType string) bool {
 	url, err := url.Parse(urlStr)
@@ -83,32 +67,21 @@ func (rpv *resultsPageView) handle(w http.ResponseWriter, r *http.Request, node 
 		dataType = "links"
 	}
 
-	pageNum, err := strconv.Atoi(getVarOrDefault_GET(r, "page", "0"))
-	if err != nil {
-		pageNum = 0
-	}
-
 	//Avoid extra search actions
-	obt := node.DoSearch(query)
-	logging.Debugf(WEBUI, "Found results %d", len(obt))
-	if query != rpv.query || dataType != rpv.dataType {
-		rpv.results = filterSearchResults(obt, urlFilter, dataType)
+	if query != rpv.query {
+		rpv.results = node.DoSearch(query)
 		rpv.query = query
-		rpv.dataType = dataType
-		pageNum = 0
+		logging.Debugf(WEBUI, "Found results %d", len(rpv.results))
 	}
 
-	npages := len(rpv.results) / MAX_RESULTS_PER_PAGE
+	if rpv.dataType != dataType {
+		rpv.dataType = dataType
+	}
+
 	renderTemplate2(w, fmt.Sprintf(RESULTS_TEMPLATE_FILE_NAME, dataType), argsMap{
-		"results":       getResultsForPage(rpv.results, pageNum),
-		"n_pages":       npages,
-		"q":             rpv.query,
-		"link_filter":   urlFilter,
-		"data_type":     dataType,
-		"page_num":      pageNum,
-		"has_next_page": pageNum+1 < npages,
-		"next_page":     pageNum + 1,
-		"has_prev_page": pageNum > 0,
-		"prev_page":     pageNum - 1,
+		"results":     filterSearchResults(rpv.results, urlFilter, dataType),
+		"q":           rpv.query,
+		"link_filter": urlFilter,
+		"data_type":   dataType,
 	})
 }

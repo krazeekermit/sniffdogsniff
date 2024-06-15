@@ -64,20 +64,5 @@
         </div> -->
         <h1>Not working for now</h1>
       </main>
-      <nav aria-label="Page navigation example">
-        <form action="/search" method="get">
-        <input type="hidden" name="q" value="{{ .q }}"/>
-        <input type="hidden" name="link_filter" value="{{ .link_filter }}"/>
-        <input type="hidden" name="data_type" value="{{ .data_type }}"/>
-          <ul class="pagination justify-content-center">
-
-            <li class="page-item{{ if .has_prev_page }}{{else}} disabled{{end}}"><button type="submit" name="page" value="{{ .prev_page }}" class="page-link"><<</button></li>
-              {{range $page := loop .n_pages }}
-                  <li class="page-item{{ if eq $page $.page_num }} active{{end}}"><input type="submit" name="page" value="{{ $page }}" class="page-link"/></li>
-              {{- end }}
-              <li class="page-item{{ if .has_next_page }}{{else}} disabled{{end}}"><button type="submit" name="page" value="{{ .next_page }}" class="page-link">>></button></li>
-          </ul>
-        </form>
-      </nav>
 </body>
 </html>
