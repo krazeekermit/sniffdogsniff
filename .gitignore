@@ -1,10 +1,14 @@
 #envinronment files
 *.db
 *.lock
-*.db/
 *.pid
 *.log
 *.dat
+*.user*
+CMakeCache.txt
+sniffdogsniffd
+cmake_install.cmake
 
 #build dir
 build/
+CMakeFiles/

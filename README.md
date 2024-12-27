@@ -1,7 +1,11 @@
-![SniffDogSniff logo](webui/static/sds_header.png "Logo")
+![SniffDogSniff logo](sds_header.png "Logo")
 
 # SniffDogSniff
 Sniff Dog Sniff is a customizable, decentralized search engine
+
+## Warning: We decided to swith from GoLang to C++
+## The current C++ version is incomplete 
+## Please use the last stable GoLang Release tag
 
 ### How to use
 * Building and running (see [Build and Install](docs/build.md))

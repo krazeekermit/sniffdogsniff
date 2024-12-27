@@ -1,0 +1,8 @@
+target_sources(sniffdogsniffd
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/rpc_common.h
+        ${CMAKE_CURRENT_LIST_DIR}/sdsrpcserver.h
+        ${CMAKE_CURRENT_LIST_DIR}/sdsrpcserver.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sdsrpcclient.h
+        ${CMAKE_CURRENT_LIST_DIR}/sdsrpcclient.cpp
+)

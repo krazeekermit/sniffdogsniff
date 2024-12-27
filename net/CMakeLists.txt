@@ -1,0 +1,9 @@
+target_sources(sniffdogsniffd
+    PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/socks5.h
+    ${CMAKE_CURRENT_LIST_DIR}/socks5.c
+    ${CMAKE_CURRENT_LIST_DIR}/libsam3.h
+    ${CMAKE_CURRENT_LIST_DIR}/libsam3.c
+    ${CMAKE_CURRENT_LIST_DIR}/tor.h
+    ${CMAKE_CURRENT_LIST_DIR}/tor.c
+)

@@ -1,40 +1,37 @@
 work_dir_path = ./
 # log_to_file = no
 # log_file_name = sds.log
-search_database_max_ram_cache_size = 512M
+db_cache_size = 512000
 min_search_results_threshold = 50
 allow_results_invalidation = no 
 
-# Tor or I2p proxies
-# force_tor_proxy = yes
-tor_socks5_proxy = 127.0.0.1:9050
-# tor_control_addr = 127.0.0.1:9051
+## Tor and I2P 
+force_tor_proxy = yes
+tor_socks5_addr = 127.0.0.1
+tor_socks5_port = 9050
+
+# tor_control_addr = 127.0.0.1
+# tor_control_port = 9051
 # tor_control_password = test1234
 # tor_control_auth_cookie = true
-# i2p_sam_addr = 127.0.0.1:7656
+# i2p_sam_addr = 127.0.0.1
+# i2p_sam_port = 7656
 # i2p_sam_user = user
 # i2p_sam_password = test1234
 
-[web_ui]
-bind_address = 0.0.0.0:8081
+web_ui_bind_addr = 127.0.0.1:8081 # Web Ui bind address and port
 
-[node_service]
-enabled = yes
-# to configure hidden services see Tor or I2p proxies
-# hidden_service = tor
-
-# bind_port option should be used only when hidden_service is tor
-# for i2p service port is not needed
-# bind_port = 4222
-
-# If hidden service = none or unspecified use the bind_address option
-bind_address = 0.0.0.0:4111
+## To configure hidden services 
+# p2p_hidden_service = tor # or i2p or none
+# for i2p service p2p_bind_port is not needed
+p2p_bind_addr = 127.0.0.1
+p2p_bind_port = 4222
 
 [peers]
 address = 127.0.0.1:4221
 address = 10.10.0.34:4222
 
-[peers_blacklist]
+[blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
 
 
@@ -51,38 +48,4 @@ result_url_property = href
 result_title_element = div.title
 result_title_property = text
 
-[external_search_engine]
-name = StartPage
-user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://www.startpage.com/sp/search?q=%s
-results_container_element = div.mainline-results
-result_container_element = div.w-gl__result-second-line-container
-result_url_element = a.result-link
-result_url_property = href
-result_title_element = h3
-result_title_property = text
 
-[external_search_engine]
-name = Bing
-user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://www.bing.com/search?q=%s&count=35
-results_container_element = ol
-result_container_element = li.b_algo
-result_url_element = "h2 > a"
-result_url_property = href
-result_title_element = a
-result_title_property = text
-
-[external_search_engine]
-name = Bing
-user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://www.bing.com/images/async?q=%s&first=155&count=35
-results_container_element = ul.dgControl_list
-result_container_element = li
-result_url_element = a.iusc
-result_url_property = m
-result_url_is_json = yes
-result_url_json_property = murl
-result_title_element = "li > a"
-result_title_property = text
-provided_data_type = images
