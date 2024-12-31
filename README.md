@@ -12,7 +12,7 @@ Sniff Dog Sniff is a customizable, decentralized search engine
 
 * To simply run a local instance of the sniffdogsniff run:
 ```bash
-sniffdogsniff --config config.ini
+sniffdogsniffd --config-file config.ini
 ```
 * Start searching
 To access the WebUi open a browser and go to 127.0.0.1:8081

@@ -23,6 +23,7 @@ add_subdirectory(rpc)
 add_subdirectory(kademlia)
 add_subdirectory(crawler)
 add_subdirectory(net)
+add_subdirectory(webserver)
 
 include(GNUInstallDirs)
 install(TARGETS sniffdogsniffd

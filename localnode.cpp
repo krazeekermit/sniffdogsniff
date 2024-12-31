@@ -69,6 +69,11 @@ int LocalNode::findResults(std::vector<SearchEntry> &results, const char *query)
     return results.size();
 }
 
+int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
+{
+
+}
+
 //************************************************************************************//
 int LocalNode::doNodesLookup(KadNode &target, bool check)
 {

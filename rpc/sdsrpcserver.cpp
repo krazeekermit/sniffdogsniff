@@ -91,8 +91,8 @@ void *SdsRpcServer::handleRequest(void *srvp)
         while (srv->clientsQueue.empty()) {
             pthread_cond_wait(&srv->cond, &srv->mutex);
         }
-        srv->clientsQueue.pop_front();
         client_fd = srv->clientsQueue.front();
+        srv->clientsQueue.pop_front();
         pthread_mutex_unlock(&srv->mutex);
 
         memset(&req, 0, sizeof(req));

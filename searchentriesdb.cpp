@@ -224,6 +224,16 @@ KadId *SearchEntry::getMetrics() const
     return (KadId*) metrics;
 }
 
+std::string SearchEntry::getTitle() const
+{
+    return title;
+}
+
+std::string SearchEntry::getUrl() const
+{
+    return url;
+}
+
 std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 {
     int i;

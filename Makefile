@@ -318,6 +318,30 @@ net/libsam3.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/net/libsam3.c.s
 .PHONY : net/libsam3.c.s
 
+net/netutil.o: net/netutil.c.o
+.PHONY : net/netutil.o
+
+# target to build an object file
+net/netutil.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/net/netutil.c.o
+.PHONY : net/netutil.c.o
+
+net/netutil.i: net/netutil.c.i
+.PHONY : net/netutil.i
+
+# target to preprocess a source file
+net/netutil.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/net/netutil.c.i
+.PHONY : net/netutil.c.i
+
+net/netutil.s: net/netutil.c.s
+.PHONY : net/netutil.s
+
+# target to generate assembly for a file
+net/netutil.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/net/netutil.c.s
+.PHONY : net/netutil.c.s
+
 net/socks5.o: net/socks5.c.o
 .PHONY : net/socks5.o
 
@@ -486,6 +510,102 @@ searchentriesdb.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/searchentriesdb.cpp.s
 .PHONY : searchentriesdb.cpp.s
 
+webserver/Jinja2CppLight.o: webserver/Jinja2CppLight.cpp.o
+.PHONY : webserver/Jinja2CppLight.o
+
+# target to build an object file
+webserver/Jinja2CppLight.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/Jinja2CppLight.cpp.o
+.PHONY : webserver/Jinja2CppLight.cpp.o
+
+webserver/Jinja2CppLight.i: webserver/Jinja2CppLight.cpp.i
+.PHONY : webserver/Jinja2CppLight.i
+
+# target to preprocess a source file
+webserver/Jinja2CppLight.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/Jinja2CppLight.cpp.i
+.PHONY : webserver/Jinja2CppLight.cpp.i
+
+webserver/Jinja2CppLight.s: webserver/Jinja2CppLight.cpp.s
+.PHONY : webserver/Jinja2CppLight.s
+
+# target to generate assembly for a file
+webserver/Jinja2CppLight.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/Jinja2CppLight.cpp.s
+.PHONY : webserver/Jinja2CppLight.cpp.s
+
+webserver/httpserver.o: webserver/httpserver.cpp.o
+.PHONY : webserver/httpserver.o
+
+# target to build an object file
+webserver/httpserver.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/httpserver.cpp.o
+.PHONY : webserver/httpserver.cpp.o
+
+webserver/httpserver.i: webserver/httpserver.cpp.i
+.PHONY : webserver/httpserver.i
+
+# target to preprocess a source file
+webserver/httpserver.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/httpserver.cpp.i
+.PHONY : webserver/httpserver.cpp.i
+
+webserver/httpserver.s: webserver/httpserver.cpp.s
+.PHONY : webserver/httpserver.s
+
+# target to generate assembly for a file
+webserver/httpserver.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/httpserver.cpp.s
+.PHONY : webserver/httpserver.cpp.s
+
+webserver/sdswebuiserver.o: webserver/sdswebuiserver.cpp.o
+.PHONY : webserver/sdswebuiserver.o
+
+# target to build an object file
+webserver/sdswebuiserver.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/sdswebuiserver.cpp.o
+.PHONY : webserver/sdswebuiserver.cpp.o
+
+webserver/sdswebuiserver.i: webserver/sdswebuiserver.cpp.i
+.PHONY : webserver/sdswebuiserver.i
+
+# target to preprocess a source file
+webserver/sdswebuiserver.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/sdswebuiserver.cpp.i
+.PHONY : webserver/sdswebuiserver.cpp.i
+
+webserver/sdswebuiserver.s: webserver/sdswebuiserver.cpp.s
+.PHONY : webserver/sdswebuiserver.s
+
+# target to generate assembly for a file
+webserver/sdswebuiserver.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/sdswebuiserver.cpp.s
+.PHONY : webserver/sdswebuiserver.cpp.s
+
+webserver/stringhelper.o: webserver/stringhelper.cpp.o
+.PHONY : webserver/stringhelper.o
+
+# target to build an object file
+webserver/stringhelper.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/stringhelper.cpp.o
+.PHONY : webserver/stringhelper.cpp.o
+
+webserver/stringhelper.i: webserver/stringhelper.cpp.i
+.PHONY : webserver/stringhelper.i
+
+# target to preprocess a source file
+webserver/stringhelper.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/stringhelper.cpp.i
+.PHONY : webserver/stringhelper.cpp.i
+
+webserver/stringhelper.s: webserver/stringhelper.cpp.s
+.PHONY : webserver/stringhelper.s
+
+# target to generate assembly for a file
+webserver/stringhelper.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/webserver/stringhelper.cpp.s
+.PHONY : webserver/stringhelper.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -517,6 +637,9 @@ help:
 	@echo "... net/libsam3.o"
 	@echo "... net/libsam3.i"
 	@echo "... net/libsam3.s"
+	@echo "... net/netutil.o"
+	@echo "... net/netutil.i"
+	@echo "... net/netutil.s"
 	@echo "... net/socks5.o"
 	@echo "... net/socks5.i"
 	@echo "... net/socks5.s"
@@ -538,6 +661,18 @@ help:
 	@echo "... searchentriesdb.o"
 	@echo "... searchentriesdb.i"
 	@echo "... searchentriesdb.s"
+	@echo "... webserver/Jinja2CppLight.o"
+	@echo "... webserver/Jinja2CppLight.i"
+	@echo "... webserver/Jinja2CppLight.s"
+	@echo "... webserver/httpserver.o"
+	@echo "... webserver/httpserver.i"
+	@echo "... webserver/httpserver.s"
+	@echo "... webserver/sdswebuiserver.o"
+	@echo "... webserver/sdswebuiserver.i"
+	@echo "... webserver/sdswebuiserver.s"
+	@echo "... webserver/stringhelper.o"
+	@echo "... webserver/stringhelper.i"
+	@echo "... webserver/stringhelper.s"
 .PHONY : help
 
 

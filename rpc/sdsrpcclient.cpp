@@ -4,6 +4,7 @@
 
 #include "net/socks5.h"
 #include "net/libsam3.h"
+#include "net/netutil.h"
 #include "logging.hpp"
 
 #include <arpa/inet.h>
@@ -78,22 +79,18 @@ int SdsRpcClient::newConnection()
     int port = 0;
     int fd = -1;
 
-    char *sxp = nullptr;
-    char naBuf[512];
-    strncpy(naBuf, this->nodeAddress.c_str(), this->nodeAddress.length());
-    char *addr = strtok_r(naBuf, ":", &sxp);
-
-    if (sxp)
-        port = atoi(sxp);
-
-    char *suffix = strrchr(addr, '.');
-    if (suffix && (strcmp(suffix, ".onion") == 0 || this->config.force_tor_proxy)) {
+    char suffix[64];
+    char addr[256];
+    if (net_urlparse(addr, suffix, &port, this->nodeAddress.c_str())) {
+        return -1;
+    }
+    if (strcmp(suffix, ".onion") == 0 || this->config.force_tor_proxy) {
         fd = socks5_connect(this->config.tor_socks5_addr, this->config.tor_socks5_port, addr, port);
         if (fd < 1) {
             logdebug(<< "error connecting to socks5 socket: " << socks5_strerror(fd));
             return -1;
         }
-    } else if (suffix && strcmp(suffix, ".i2p") == 0) {
+    } else if (strcmp(suffix, ".i2p") == 0) {
         Sam3Session ses;
         if (sam3NameLookup(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, addr)) {
             logdebug(<< "i2p naming lookup fail:" << ses.error);

@@ -10,6 +10,8 @@
 #include "net/tor.h"
 #include "net/libsam3.h"
 
+#include "webserver/sdswebuiserver.h"
+
 #include <getopt.h>
 
 #include <vector>
@@ -128,11 +130,14 @@ int main(int argc, char **argv)
     //start node tasks..........
 
     //start webui
+    SdsWebUiServer hsrv(node, "./res");
 
-    loginfo(<< "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port);
-    if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
+    hsrv.startListening("127.0.0.1", 8081);
 
-    }
+//    loginfo(<< "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port);
+//    if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
+
+//    }
 
     return 0;
 }

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html"
+      xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="UTF-8">
+    <title>SniffDigSniff - Search</title>
+    <link rel="stylesheet" href="style.css"/>
+    <link rel="icon" type="image/x-icon" href="favicon.png">
+</head>
+<body class="text-center">
+    <nav class="navbar navbar-light bg-light">
+      <a class="navbar-brand" href="/insert_link">Insert link</a>
+    </nav>
+    <div class="container">
+        <div class="py-5 text-center">
+        <img class="d-block mx-auto mb-4" src="sds_header.png" alt="">
+        </div>
+        <form action="/search" method="get">
+            <div class="input-group">
+              <input type="search" class="form-control" placeholder="Search" aria-label="Search" aria-describedby="search-addon" name="q" value="Search something..." style="width:50%"/>
+              <div class="input-group-append">
+                <button class="btn btn-primary" type="submit">Search</button>
+              </div>
+            </div>
+            <!-- content type radios -->
+            <div>
+              <label>Search on:</label>
+            </div>
+            <div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="link_filter" id="inlineRadio1" value="all" checked>
+                <label class="form-check-label" for="inlineRadio1">All links</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="link_filter" id="inlineRadio2" value="clearnet">
+                <label class="form-check-label" for="inlineRadio2">Clear web links</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="link_filter" id="inlineRadio3" value="onion">
+                <label class="form-check-label" for="inlineRadio3">Onion links</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="link_filter" id="inlineRadio4" value="i2p">
+                <label class="form-check-label" for="inlineRadio4">I2P links</label>
+              </div>
+            </div>
+            <input type="hidden" name="data_type" value="links"/>
+        </form>
+</body>
+</html>

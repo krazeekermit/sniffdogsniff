@@ -42,6 +42,8 @@ public:
     friend std::ostream &operator<< (std::ostream &os, SearchEntry const &se);
 
     SearchEntryHash256 getHash() const;
+    std::string getTitle() const;
+    std::string getUrl() const;
 
     bool unpack(msgpack11::MsgPack &obj);
     void pack(msgpack11::MsgPack &obj);

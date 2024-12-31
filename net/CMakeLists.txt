@@ -1,5 +1,7 @@
 target_sources(sniffdogsniffd
     PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/netutil.h
+    ${CMAKE_CURRENT_LIST_DIR}/netutil.c
     ${CMAKE_CURRENT_LIST_DIR}/socks5.h
     ${CMAKE_CURRENT_LIST_DIR}/socks5.c
     ${CMAKE_CURRENT_LIST_DIR}/libsam3.h
