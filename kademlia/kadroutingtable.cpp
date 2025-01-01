@@ -45,11 +45,16 @@ bool KadRoutingTable::pushNode(KadNode &kn)
 
 bool KadRoutingTable::removeNode(KadNode &kn)
 {
-    if (this->selfNode == kn)
+    return this->removeNode(kn.getId());
+}
+
+bool KadRoutingTable::removeNode(const KadId &id)
+{
+    if (this->selfNode.getId() == id)
         return false;
 
-    KadId distance = this->selfNode.getId() - kn.getId();
-    return this->buckets[distance.height()]->removeNode(kn);
+    KadId distance = this->selfNode.getId() - id;
+    return this->buckets[distance.height()]->removeNode(id);
 }
 
 int KadRoutingTable::getKClosestTo(std::vector<KadNode> &nodes, const KadId &id)

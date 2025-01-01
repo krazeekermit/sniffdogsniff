@@ -78,6 +78,7 @@ public:
 
     bool pushNode(KadNode &kn);
     bool removeNode(KadNode &kn);
+    bool removeNode(const KadId &id);
 
     friend std::ostream &operator<<(std::ostream &os, const KadBucket &kb2);
 

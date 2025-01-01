@@ -19,6 +19,7 @@ public:
 
     bool pushNode(KadNode &kn);
     bool removeNode(KadNode &kn);
+    bool removeNode(const KadId &id);
 
     int getKClosestTo(std::vector<KadNode> &nodes, const KadId &id);
     int getClosestTo(std::vector<KadNode> &nodes, const KadId &id, int count);

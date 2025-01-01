@@ -3,6 +3,8 @@
 
 #include "kadbucket.h"
 
+#include "net/netutil.h"
+
 /*
     KadId
 */
@@ -71,9 +73,16 @@ KadNode::KadNode(const char *address_)
 KadNode::KadNode(std::string address_)
     : address(address_), lastSeen(0), stales(0)
 {
+    char addrBuf[1024];
+    strncpy(addrBuf, address_.c_str(), address_.size());
+    char addr[1024];
+    /*
+        Avoid creation of infinite nodes with the same address but different ports
+    */
+    net_urlparse(addrBuf, addr, nullptr, nullptr);
     SHA_CTX ctx;
     SHA1_Init(&ctx);
-    SHA1_Update(&ctx, address.c_str(), address.size());
+    SHA1_Update(&ctx, addr, strlen(addr));
     SHA1_Final(this->id.id, &ctx);
 }
 
@@ -197,13 +206,21 @@ bool KadBucket::pushNode(KadNode &kn)
 
 bool KadBucket::removeNode(KadNode &kn)
 {
-    auto ikn = std::find(this->nodes.begin(), this->nodes.end(), kn);
+    return this->removeNode(kn.getId());
+}
+
+bool KadBucket::removeNode(const KadId &id)
+{
+    auto ikn = std::find_if(this->nodes.begin(), this->nodes.end(), [id] (const KadNode &kn1) {
+        return kn1.getId() == id;
+    });
+
     if (ikn != this->nodes.end()) {
         if (this->replacementNodes.size()) {
-            this->nodes.erase(std::remove(this->nodes.begin(), this->nodes.end(), kn), this->nodes.end());
+            this->nodes.erase(std::remove(this->nodes.begin(), this->nodes.end(), *ikn), this->nodes.end());
             KadNode first = *this->replacementNodes.erase(this->replacementNodes.begin());
             this->nodes.push_back(first);
-            reorder();
+            this->reorder();
         } else {
             ikn->incrementStales();
         }
@@ -232,15 +249,6 @@ void KadBucket::reorder()
     std::sort(this->nodes.begin(), this->nodes.end());
     std::sort(this->replacementNodes.begin(), this->replacementNodes.end());
 }
-
-//static KadNode *getNode_(std::vector<KadNode*> &v, KadNode *kn) {
-//    for (auto it = v.begin(); it != v.end(); it++) {
-//        if ((**it) == (*kn)) {
-//            return *it;
-//        }
-//    }
-//    return nullptr;
-//}
 
 //KadNode *KadBucket::getNode(KadNode *kn)
 //{

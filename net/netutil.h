@@ -18,9 +18,11 @@ inline int net_urlparse(char *addr, char *suffix, int *port, const char *url)
     else
         return -1;
 
-    *port = atoi(urlpp);
+    if (port)
+        *port = atoi(urlpp);
+
     const char *supp = strrchr(url, '.');
-    if (supp)
+    if (supp && suffix)
         strcpy(suffix, supp);
 
     return 0;

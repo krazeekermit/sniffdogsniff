@@ -4,9 +4,9 @@ SdsTask::SdsTask(std::function<void ()> task_, time_t delay_, bool detach_)
     : task(task_), delay(delay_), run(1), detach(detach_)
 {
     if (this->detach)
-        pthread_create(&this->tthread, nullptr, &SdsTask::threadTask, this);
+        pthread_create(&this->tthread, nullptr, &SdsTask::runTask, this);
     else
-        SdsTask::threadTask(this);
+        SdsTask::runTask(this);
 }
 
 SdsTask::~SdsTask()
@@ -21,7 +21,7 @@ void SdsTask::stop()
     this->run = 0;
 }
 
-void *SdsTask::threadTask(void *p)
+void *SdsTask::runTask(void *p)
 {
     SdsTask *timer = static_cast<SdsTask*>(p);
     clock_t startTime = clock();

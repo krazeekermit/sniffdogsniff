@@ -15,7 +15,7 @@ public:
     void stop();
 
 protected:
-    static void *threadTask(void *p);
+    static void *runTask(void *p);
 
 private:
     pthread_t tthread;

@@ -15,6 +15,11 @@ LocalNode::LocalNode(SdsConfig &cfgs)
 {
     pthread_mutex_init(&this->mutex, nullptr);
     this->ktable = new KadRoutingTable();
+    for (auto it = this->configs.known_peers.begin(); it != this->configs.known_peers.end(); it++) {
+        KadNode kn(*it);
+        this->ktable->pushNode(kn);
+    }
+
     this->searchesDB = new SearchEntriesDB();
 }
 
@@ -89,8 +94,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     int i;
     KadId metrics[METRICS_LEN];
     std::set<KadId> probed = {};
-    std::set<KadNode> empty = {};
-    std::set<KadNode> failed;
+    std::set<KadId> failed;
     std::vector<KadNode> nodes;
     std::set<KadNode> targetNodes;
     SearchEntry::evaluateMetrics(metrics, query);
@@ -106,13 +110,14 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
         }
     }
 
-    std::map<KadNode, std::future<std::pair<int, std::vector<SearchEntry>>>> futures;
+    std::map<KadId, std::future<std::pair<int, std::vector<SearchEntry>>>> futures;
     for (auto ikn = targetNodes.begin(); ikn != targetNodes.end(); ikn++) {
-//        if (std::find(failed.begin(), failed.end(), [] ()) != failed.end()) {
-//            continue;
-//        }
+        KadId id = ikn->getId();
+        if (std::find(failed.begin(), failed.end(), id) != failed.end()) {
+            continue;
+        }
 
-        futures[*ikn] = std::move(std::async(std::launch::async, [ikn, query] () {
+        futures[id] = std::move(std::async(std::launch::async, [ikn, query] () {
             SdsRpcClient client(ikn->getAddress());
             std::vector<SearchEntry> newResults;
             int res = client.findResults(newResults, query);
@@ -124,8 +129,6 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
                 std::pair<int, std::vector<SearchEntry>> r = fit->second.get();
                 if (r.first != 0) {
                     failed.insert(fit->first);
-                } else if (r.second.empty()) {
-                    empty.insert(fit->first);
                 } else {
                     results.insert(results.end(), r.second.begin(), r.second.end());
                 }
@@ -135,8 +138,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     }
 
     for (auto it = failed.begin(); it != failed.end(); it++) {
-        KadNode kn = *it;
-        this->ktable->removeNode(kn);
+        this->ktable->removeNode(*it);
     }
 
     //do search ...... on external search engines replace with crawler
@@ -254,29 +256,15 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
 {
     int i;
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
-//failed := kademlia.NewKNodesMap()
-    std::set<KadNode> failed;
+    std::set<KadId> failed;
     std::set<KadNode> targetNodes;
-//	var wg sync.WaitGroup
-    std::vector<std::future<std::pair<KadNode, int>>> futures;
+    std::map<KadId, std::future<int>> futures;
 
-//	toInsertSelf := make([]SearchResult, 0)
-
-//	for _, sr := range results {
     for (auto rit = results.begin(); rit != results.end(); rit++) {
-//		qn := len(sr.QueryMetrics)
         int qn = METRICS_LEN;
 
         targetNodes.clear();
-//		nodes := make(map[kademlia.KadId]*kademlia.KNode, 0)
-//		ln.tsLock.Lock()
-        //		for i := 0; i < qn; i++ {
         for (i = 0; i < qn; i++) {
-            //			for _, ikn := range ln.ktable.GetNClosestTo(sr.QueryMetrics[i], kademlia.K/qn) {
-            //				nodes[ikn.Id] = ikn
-            //			}
-            //		}
-
             std::vector<KadNode> nodes;
             this->ktable->getClosestTo(nodes, rit->getMetrics()[i], KAD_BUCKET_MAX / qn);
             for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
@@ -292,44 +280,18 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
 
         futures.clear();
         for (auto itn = targetNodes.begin(); itn != targetNodes.end(); itn++) {
-            if (failed.find(*itn) != failed.end()) {
-                //			_, present := failed.Get(ikn.Id)
-                //			if present {
-                //				// if it is a failed node avoid to contact it again
-                //				continue
-                //			}
-                //			if ikn.Id.Eq(ln.SelfNode().Id) {
-                //				toInsertSelf = append(toInsertSelf, sr)
-                //				continue
-                //			}
+            if (failed.find(itn->getId()) != failed.end()) {
 
-                //			wg.Add(1)
-                //			wgCount++
-                //			go func(kn, source *kademlia.KNode, value SearchResult, failed *kademlia.KNodesMap) {
-                //				defer wg.Done()
-
-                //				rn := NewNodeClient(kn.Address)
-                //				err := rn.StoreResult(sr, source)
-                //				if err != nil {
-                //					failed.Put(kn)
-                //				}
-                //			}(ikn, ln.ktable.SelfNode(), sr, failed)
-                futures.push_back(std::move(std::async(std::launch::async, [itn, rit]() {
+                futures[itn->getId()] = std::move(std::async(std::launch::async, [itn, rit]() {
                     SdsRpcClient client(itn->getAddress());
-                    int ret = client.storeResult(*rit);
-                    return std::make_pair(*itn, ret);
-                })));
-
-                //			if wgCount >= kademlia.ALPHA {
-                //				wgCount = 0
-                //				wg.Wait()
-                //			}
+                    return client.storeResult(*rit);
+                }));
 
                 if (futures.size() >= 3) {
                     for (auto fit = futures.begin(); fit != futures.end(); fit++) {
-                        std::pair<KadNode, int> r = fit->get();
-                        if (r.second != 0)
-                            failed.insert(r.first);
+                        int ret = fit->second.get();
+                        if (ret != 0)
+                            failed.insert(fit->first);
                     }
                     futures.clear();
                 }
@@ -337,19 +299,7 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
         }
     }
 
-//	ln.tsLock.Lock()
-//	for _, sr := range toInsertSelf {
-//		ln.searchDB.InsertResult(sr)
-//	}
-
     for (auto it = failed.begin(); it != failed.end(); it++) {
-        KadNode kn = *it;
-        this->ktable->removeNode(kn);
+        this->ktable->removeNode(*it);
     }
-
-//	for _, kid := range failed.Keys() {
-//		kn, _ := failed.Get(kid)
-//		ln.ktable.RemoveNode(kn)
-//	}
-//	ln.tsLock.Unlock()
 }
