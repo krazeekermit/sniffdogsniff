@@ -50,6 +50,8 @@ public:
 
     KadId *getMetrics() const;
 
+    static int evaluateMetrics(KadId metrics[METRICS_LEN], const char *query);
+
 private:
     SearchEntryHash256 hash;
     KadId metrics[METRICS_LEN];
@@ -76,7 +78,7 @@ public:
     void open(const char *db_path);
 
     void insertResult(const SearchEntry &se);
-    void getEntriesForBroadcast(std::vector<SearchEntry> &list);
+    int getEntriesForBroadcast(std::vector<SearchEntry> &list);
     void doSearch(std::vector<SearchEntry> &entries, const char *query);
     void flush();
     void close();

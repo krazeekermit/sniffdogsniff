@@ -131,7 +131,7 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &html_buf);
     err = curl_easy_perform(curl);
     if(err) {
-        logerr(<< "error opening " << url ": " << curl_errbuf);
+        logerr << "error opening " << url << ": " << curl_errbuf;
         curl_easy_cleanup(curl);
         return err;
     }
@@ -144,7 +144,7 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
     if (output->errors.length) {
         int i;
         for (i = 0; i < output->errors.length; i++)
-            logdebug( << "error opening %s: parser collected errors " << url << ": " << i);
+            logdebug << "error opening %s: parser collected errors " << url << ": " << i;
 
         gumbo_destroy_output(&kGumboDefaultOptions, output);
         return -1;

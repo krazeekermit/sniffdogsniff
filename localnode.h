@@ -5,6 +5,7 @@
 
 #include "searchentriesdb.h"
 #include "kademlia/kadroutingtable.h"
+#include "sdstask.h"
 
 #include <pthread.h>
 #include <map>
@@ -25,12 +26,17 @@ public:
     // used to insert new connected node into the ktable
     // usually called by the rpc request handler
     int nodeConnected(const unsigned char *id, const char *address);
-//    checkNode(id kademlia.KadId, addr string) bool
+    // checkNode(id kademlia.KadId, addr string) bool
+
+    void startTasks();
 
 private:
+    SdsConfig configs;
     pthread_mutex_t mutex;
-    KadRoutingTable ktable;
-    SearchEntriesDB searchesDB;
+    KadRoutingTable *ktable;
+    SearchEntriesDB *searchesDB;
+    SdsTask *syncNodesTask;
+    SdsTask *broadcastResultsTask;
 
     int doNodesLookup(KadNode &target, bool check);
     void publishResults(const std::vector<SearchEntry> &results);

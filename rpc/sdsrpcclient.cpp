@@ -87,13 +87,13 @@ int SdsRpcClient::newConnection()
     if (strcmp(suffix, ".onion") == 0 || this->config.force_tor_proxy) {
         fd = socks5_connect(this->config.tor_socks5_addr, this->config.tor_socks5_port, addr, port);
         if (fd < 1) {
-            logdebug(<< "error connecting to socks5 socket: " << socks5_strerror(fd));
+            logdebug << "error connecting to socks5 socket: " << socks5_strerror(fd);
             return -1;
         }
     } else if (strcmp(suffix, ".i2p") == 0) {
         Sam3Session ses;
         if (sam3NameLookup(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, addr)) {
-            logdebug(<< "i2p naming lookup fail:" << ses.error);
+            logdebug << "i2p naming lookup fail:" << ses.error;
             return -2;
         }
         if (sam3CreateSession(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, nullptr, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {

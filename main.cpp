@@ -1,7 +1,6 @@
 #include <iostream>
 
 #include "logging.hpp"
-#include "searchengine.h"
 
 #include "rpc/sdsrpcserver.h"
 #include "localnode.h"
@@ -25,6 +24,22 @@ static struct option long_options[] = {
    {0,              0,                 0,  0   }
 };
 
+void *startWebUi(void *hsrvp)
+{
+    LocalNode *node = static_cast<LocalNode*>(hsrvp);
+    if (node) {
+        SdsWebUiServer *hsrv = new SdsWebUiServer(node, "./res");
+        loginfo << "started WebUI..." << "\n";
+        hsrv->startListening("127.0.0.1", 8081);
+
+        delete hsrv;
+    } else {
+        logerr << "NODE IS NULL!!!\n";
+    }
+
+    return nullptr;
+}
+
 int main(int argc, char **argv)
 {
     int err;
@@ -39,7 +54,7 @@ int main(int argc, char **argv)
         case 'c':
             err = sds_config_parse_file(&cfg, optarg);
             if (err > 0) {
-                logfatalerr(<< "error parsing config file " << optarg << " at line" << err);
+                logfatalerr << "error parsing config file " << optarg << " at line" << err;
             } else if (err < 0) {
             }
             sds_config_print(&cfg);
@@ -75,7 +90,7 @@ int main(int argc, char **argv)
             }
 
             if (tor_add_onion(&torSession, hsaddr, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port, privateKey)) {
-                logfatalerr(<< "fatal error could not create onion hidden service" << torSession.errstr);
+                logfatalerr << "fatal error could not create onion hidden service" << torSession.errstr;
             }
 
             if ((hsfp = fopen(hsfpath, "w"))) {
@@ -83,7 +98,7 @@ int main(int argc, char **argv)
                 fclose(hsfp);
             }
 
-            loginfo(<< "successfully created tor hidden service at dest " << hsaddr);
+            loginfo << "successfully created tor hidden service at dest " << hsaddr;
         }
         break;
     case I2P_HIDDEN_SERVICE:
@@ -99,7 +114,7 @@ int main(int argc, char **argv)
 
         if (!privateKey) {
             if (sam3GenerateKeys(&i2pSession, cfg.i2p_sam_addr, 0, Sam3SigType::EdDSA_SHA512_Ed25519))
-                logfatalerr(<< "sam3 err" << i2pSession.error);
+                logfatalerr << "sam3 err" << i2pSession.error;
             privateKey = i2pSession.privkey;
 
             if ((hsfp = fopen(hsfpath, "w"))) {
@@ -108,14 +123,14 @@ int main(int argc, char **argv)
             }
 
             if (sam3CreateSession(&i2pSession, cfg.i2p_sam_addr, 0, privateKey, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
-                logfatalerr(<< "sam3 err" << i2pSession.error);
+                logfatalerr << "sam3 err" << i2pSession.error;
             }
 
             if (sam3StreamForward(&i2pSession, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
-                logfatalerr(<< "sam3 err" << i2pSession.error);
+                logfatalerr << "sam3 err" << i2pSession.error;
             }
 
-            loginfo(<< "successfully created i2p hidden service at dest " << i2pSession.pubkey);
+            loginfo << "successfully created i2p hidden service at dest " << i2pSession.pubkey;
         }
         break;
     case NO_HIDDEN_SERVICE:
@@ -125,19 +140,20 @@ int main(int argc, char **argv)
 
     //use smart ptrs?
     LocalNode  *node = new LocalNode(cfg);
+    loginfo << "started tasks...\n";
+    node->startTasks();
+
+    pthread_t webuiThread;
+    pthread_create(&webuiThread, nullptr, &startWebUi, node);
+
     SdsRpcServer *srv = new SdsRpcServer(node);
+    loginfo << "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port;
+    if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
 
-    //start node tasks..........
+    }
 
-    //start webui
-    SdsWebUiServer hsrv(node, "./res");
-
-    hsrv.startListening("127.0.0.1", 8081);
-
-//    loginfo(<< "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port);
-//    if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
-
-//    }
-
+    //delete hsrv;
+    //delete srv;
+    delete node;
     return 0;
 }

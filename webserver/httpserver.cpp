@@ -1,5 +1,7 @@
 #include "httpserver.h"
 
+#include "logging.hpp"
+
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -221,6 +223,7 @@ int HttpServer::startListening(const char *addrstr, int port)
     this->server_fd = fd;
 
     while ((client_fd = accept(fd, (struct sockaddr*)&address, &addrlen)) > -1) {
+        logdebug << "COND >>>>>>>>>>>>><|||\n";
         this->clientsQueue.push_back(client_fd);
         pthread_cond_signal(&this->cond);
     }

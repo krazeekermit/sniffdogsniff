@@ -462,6 +462,30 @@ sds_config.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/sds_config.cpp.s
 .PHONY : sds_config.cpp.s
 
+sdstask.o: sdstask.cpp.o
+.PHONY : sdstask.o
+
+# target to build an object file
+sdstask.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/sdstask.cpp.o
+.PHONY : sdstask.cpp.o
+
+sdstask.i: sdstask.cpp.i
+.PHONY : sdstask.i
+
+# target to preprocess a source file
+sdstask.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/sdstask.cpp.i
+.PHONY : sdstask.cpp.i
+
+sdstask.s: sdstask.cpp.s
+.PHONY : sdstask.s
+
+# target to generate assembly for a file
+sdstask.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/sdstask.cpp.s
+.PHONY : sdstask.cpp.s
+
 searchengine.o: searchengine.cpp.o
 .PHONY : searchengine.o
 
@@ -655,6 +679,9 @@ help:
 	@echo "... sds_config.o"
 	@echo "... sds_config.i"
 	@echo "... sds_config.s"
+	@echo "... sdstask.o"
+	@echo "... sdstask.i"
+	@echo "... sdstask.s"
 	@echo "... searchengine.o"
 	@echo "... searchengine.i"
 	@echo "... searchengine.s"

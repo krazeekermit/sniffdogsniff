@@ -224,6 +224,11 @@ KadId *SearchEntry::getMetrics() const
     return (KadId*) metrics;
 }
 
+int SearchEntry::evaluateMetrics(KadId metrics[METRICS_LEN], const char *query)
+{
+ //unimplemented
+}
+
 std::string SearchEntry::getTitle() const
 {
     return title;
@@ -257,7 +262,7 @@ std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 
 void SearchEntry::evaluateDistances()
 {
-
+    SearchEntry::evaluateMetrics(this->metrics, this->title.c_str());
 }
 
 /*****************************************************************
@@ -335,10 +340,10 @@ void SearchEntriesDB::insertResult(const SearchEntry &se)
     delete[] bytes;
 }
 
-void SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
+int SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
 {
     if (!this->dbp)
-        return;
+        return 0;
 
     list.clear();
 
@@ -351,6 +356,8 @@ void SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
     }
 
     this->modified();
+
+    return list.size();
 }
 
 void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, const char *query)

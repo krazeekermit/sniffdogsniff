@@ -140,7 +140,7 @@ rpc_fail:
 
         delete[] argsbuf;
 
-        logdebug(<< "rpcServer error " << reply.errcode << ": " << rpc_strerror(reply.errcode));
+        logdebug << "rpcServer error " << reply.errcode << ": " << rpc_strerror(reply.errcode);
     }
 
     return nullptr;

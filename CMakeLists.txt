@@ -12,6 +12,7 @@ add_executable(sniffdogsniffd
     utils.h macros.h
     logging.hpp
     sds_config.h sds_config.cpp
+    sdstask.h sdstask.cpp
     localnode.h localnode.cpp
     searchentriesdb.h searchentriesdb.cpp
     searchengine.h searchengine.cpp

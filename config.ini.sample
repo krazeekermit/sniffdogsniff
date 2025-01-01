@@ -41,11 +41,11 @@ address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
 name = Brave Search
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
 search_query_url = https://search.brave.com/search?q=%s&source=desktop
-results_container_element = div.results
-result_container_element = div.snippet
-result_url_element = a.h
+results_container_element = .react-results--main
+result_container_element = .LnpumSThxEWMIsDdAT17
+result_url_element = .eVNpHGjtxRBq_gLOfGDr
 result_url_property = href
-result_title_element = div.title
-result_title_property = text
+result_title_element = .EKtkFWMYpwzMKOYr0GYm
+# result_title_property = text
 
 
