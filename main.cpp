@@ -1,10 +1,9 @@
 #include <iostream>
 
-#include "logging.hpp"
+#include "logging.h"
 
 #include "rpc/sdsrpcserver.h"
 #include "localnode.h"
-#include "simhash.h"
 
 #include "sds_config.h"
 #include "net/tor.h"
@@ -45,6 +44,7 @@ int main(int argc, char **argv)
 {
     int err;
     int optdaemon = 0;
+    int optconfig = 0;
     SdsConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
 
@@ -57,8 +57,10 @@ int main(int argc, char **argv)
             if (err > 0) {
                 logfatalerr << "error parsing config file " << optarg << " at line" << err;
             } else if (err < 0) {
+                logfatalerr << "error parsing config file " << optarg << " wrong data" << err;
             }
-            sds_config_print(&cfg);
+            optconfig = 1;
+            //sds_config_print(&cfg);
             break;
         case 'l':
             break;
@@ -67,6 +69,10 @@ int main(int argc, char **argv)
         default:
             break;
         }
+    }
+
+    if (!optconfig) {
+        logwarn << "no configuration file submitted: using reasonable defaults";
     }
 
     FILE *hsfp;

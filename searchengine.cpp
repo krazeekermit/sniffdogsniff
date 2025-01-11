@@ -1,10 +1,10 @@
 #include "searchengine.h"
 
-#include "logging.hpp"
+#include "logging.h"
+
 #include <gumbo.h>
-
-
 #include <curl/curl.h>
+
 #include <locale>
 #include <codecvt>
 

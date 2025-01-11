@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(sniffdogsniffd
     main.cpp
     utils.h macros.h
-    logging.hpp
+    logging.h logging.cpp
     simhash.h simhash.cpp
     sds_config.h sds_config.cpp
     sdstask.h sdstask.cpp

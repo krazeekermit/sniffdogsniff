@@ -1,7 +1,7 @@
 #include "sdsrpcserver.h"
 
 #include "rpc_common.h"
-#include "logging.hpp"
+#include "logging.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>

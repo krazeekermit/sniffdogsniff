@@ -1,7 +1,7 @@
 #include "localnode.h"
 
 #include "rpc/sdsrpcclient.h"
-#include "logging.hpp"
+#include "logging.h"
 #include "searchengine.h"
 #include "utils.h"
 #include "simhash.h"

@@ -246,6 +246,30 @@ localnode.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/localnode.cpp.s
 .PHONY : localnode.cpp.s
 
+logging.o: logging.cpp.o
+.PHONY : logging.o
+
+# target to build an object file
+logging.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/logging.cpp.o
+.PHONY : logging.cpp.o
+
+logging.i: logging.cpp.i
+.PHONY : logging.i
+
+# target to preprocess a source file
+logging.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/logging.cpp.i
+.PHONY : logging.cpp.i
+
+logging.s: logging.cpp.s
+.PHONY : logging.s
+
+# target to generate assembly for a file
+logging.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/logging.cpp.s
+.PHONY : logging.cpp.s
+
 main.o: main.cpp.o
 .PHONY : main.o
 
@@ -534,6 +558,30 @@ searchentriesdb.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/searchentriesdb.cpp.s
 .PHONY : searchentriesdb.cpp.s
 
+simhash.o: simhash.cpp.o
+.PHONY : simhash.o
+
+# target to build an object file
+simhash.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/simhash.cpp.o
+.PHONY : simhash.cpp.o
+
+simhash.i: simhash.cpp.i
+.PHONY : simhash.i
+
+# target to preprocess a source file
+simhash.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/simhash.cpp.i
+.PHONY : simhash.cpp.i
+
+simhash.s: simhash.cpp.s
+.PHONY : simhash.s
+
+# target to generate assembly for a file
+simhash.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sniffdogsniffd.dir/build.make CMakeFiles/sniffdogsniffd.dir/simhash.cpp.s
+.PHONY : simhash.cpp.s
+
 webserver/Jinja2CppLight.o: webserver/Jinja2CppLight.cpp.o
 .PHONY : webserver/Jinja2CppLight.o
 
@@ -652,6 +700,9 @@ help:
 	@echo "... localnode.o"
 	@echo "... localnode.i"
 	@echo "... localnode.s"
+	@echo "... logging.o"
+	@echo "... logging.i"
+	@echo "... logging.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
@@ -688,6 +739,9 @@ help:
 	@echo "... searchentriesdb.o"
 	@echo "... searchentriesdb.i"
 	@echo "... searchentriesdb.s"
+	@echo "... simhash.o"
+	@echo "... simhash.i"
+	@echo "... simhash.s"
 	@echo "... webserver/Jinja2CppLight.o"
 	@echo "... webserver/Jinja2CppLight.i"
 	@echo "... webserver/Jinja2CppLight.s"

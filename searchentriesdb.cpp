@@ -2,7 +2,7 @@
 
 #include "utils.h"
 #include "macros.h"
-#include "logging.hpp"
+#include "logging.h"
 
 #include "searchentriesdb.h"
 
