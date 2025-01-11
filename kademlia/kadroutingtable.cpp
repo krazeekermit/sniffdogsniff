@@ -1,5 +1,7 @@
 #include "kadroutingtable.h"
 
+#include "logging.hpp"
+
 #include "macros.h"
 #include "utils.h"
 
@@ -32,6 +34,16 @@ KadNode KadRoutingTable::getSelfNode() const
 void KadRoutingTable::setSelfNode(KadNode &newSelfNode)
 {
     selfNode = newSelfNode;
+}
+
+bool KadRoutingTable::isFull()
+{
+    int i;
+    for (i = 0; i < KAD_ID_BIT_SZ; i++)
+        if (!this->buckets[i]->isFull())
+            return false;
+
+    return true;
 }
 
 bool KadRoutingTable::pushNode(KadNode &kn)
@@ -74,14 +86,26 @@ int KadRoutingTable::getClosestTo(std::vector<KadNode> &nodes, const KadId &id, 
 
     nodes.clear();
     int i;
+    count = count <= allNodes.size() ? count : allNodes.size();
     for (i = 0; i < count; i++)
         nodes.push_back(allNodes[i]);
 
     return nodes.size();
 }
 
-int KadRoutingTable::readFile(FILE *fp)
+const KadNode &KadRoutingTable::getNodeAtHeight(int height, int index)
 {
+    KadBucket *buck = this->buckets[height];
+    return buck->nodes.at(index);
+}
+
+int KadRoutingTable::readFile(const char *path)
+{
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        logwarn << "kadroutingtable: unable to open cache file " << path;
+        return -1;
+    }
     int ret, i, j, nodesCount;
     ret = 0;
     for (i = 0; i < KAD_ID_BIT_SZ; i++) {

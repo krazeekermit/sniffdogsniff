@@ -11,6 +11,7 @@ add_executable(sniffdogsniffd
     main.cpp
     utils.h macros.h
     logging.hpp
+    simhash.h simhash.cpp
     sds_config.h sds_config.cpp
     sdstask.h sdstask.cpp
     localnode.h localnode.cpp

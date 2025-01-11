@@ -4,6 +4,7 @@
 #include "logging.hpp"
 #include "searchengine.h"
 #include "utils.h"
+#include "simhash.h"
 
 #include <set>
 #include <algorithm>
@@ -15,12 +16,19 @@ LocalNode::LocalNode(SdsConfig &cfgs)
 {
     pthread_mutex_init(&this->mutex, nullptr);
     this->ktable = new KadRoutingTable();
-    for (auto it = this->configs.known_peers.begin(); it != this->configs.known_peers.end(); it++) {
-        KadNode kn(*it);
-        this->ktable->pushNode(kn);
+    char path[1024];
+    sprintf(path, "%s/%s", cfgs.work_dir_path, "ktable.dat");
+    if (this->ktable->readFile(path)) {
+        logdebug << "ktable is empty populating with known nodes from configs";
+        for (auto it = this->configs.known_peers.begin(); it != this->configs.known_peers.end(); it++) {
+            KadNode kn(*it);
+            this->ktable->pushNode(kn);
+        }
     }
 
     this->searchesDB = new SearchEntriesDB();
+    sprintf(path, "%s/%s", cfgs.work_dir_path, "searches.db");
+    this->searchesDB->open(path);
 }
 
 LocalNode::~LocalNode()
@@ -92,21 +100,18 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
 
     int i;
-    KadId metrics[METRICS_LEN];
     std::set<KadId> probed = {};
     std::set<KadId> failed;
     std::vector<KadNode> nodes;
     std::set<KadNode> targetNodes;
-    SearchEntry::evaluateMetrics(metrics, query);
-    for (i = 0; i < METRICS_LEN; i++) {
-        this->ktable->getKClosestTo(nodes, metrics[i]);
-        for (auto it = nodes.begin(); it != nodes.end(); it++) {
-            KadId id = it->getId();
-            if (id == selfNodeId) {
-                this->searchesDB->doSearch(results, query);
-            } else {
-                targetNodes.insert(*it);
-            }
+    KadId simHash = SimHash::digest(query);
+    this->ktable->getKClosestTo(nodes, simHash);
+    for (auto it = nodes.begin(); it != nodes.end(); it++) {
+        KadId id = it->getId();
+        if (id == selfNodeId) {
+            this->searchesDB->doSearch(results, query);
+        } else {
+            targetNodes.insert(*it);
         }
     }
 
@@ -156,11 +161,29 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 
 void LocalNode::startTasks()
 {
+    logdebug << "Started Nodes lookup round";
     //Node sync task
     this->syncNodesTask = new SdsTask([this] () {
-        //this->doNodesLookup();
+        std::vector<KadId> toLook;
+        int i;
+        if (this->ktable->isFull()) {
+            logdebug << "tabel IS full!";
+            time_t now = time(nullptr);
+            for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+                if ((now - this->ktable->getNodeAtHeight(i, 0).getLastSeen()) > UNIX_HOUR) {
+                    toLook.push_back(this->ktable->getNodeAtHeight(i, rand() % KAD_BUCKET_MAX).getId());
+                }
+            }
+        } else {
+            for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+                toLook.push_back(KadId::idNbitsFarFrom(this->ktable->getSelfNode().getId(), i));
+            }
+        }
+        for (i = 0; i < toLook.size(); i++) {
+            doNodesLookup(toLook.at(i), false);
+        }
         return;
-    }, 1000);
+    }, 1000 * 15 * 60);
 
     //Results publish task
     this->broadcastResultsTask = new SdsTask([this] () {
@@ -173,16 +196,13 @@ void LocalNode::startTasks()
 }
 
 //************************************************************************************//
-int LocalNode::doNodesLookup(KadNode &target, bool check)
+int LocalNode::doNodesLookup(const KadId targetId, bool check)
 {
-    const KadId targetId = target.getId();
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
     static int ALPHA = 3;
 
     std::vector<KadNode> alphaClosest;
-    if (this->ktable->getClosestTo(alphaClosest, targetId, ALPHA))
-        return 0;
-
+    this->ktable->getClosestTo(alphaClosest, targetId, ALPHA);
 
     int nDiscovered = 0;
     long startTime = time(nullptr);
@@ -261,19 +281,16 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
     std::map<KadId, std::future<int>> futures;
 
     for (auto rit = results.begin(); rit != results.end(); rit++) {
-        int qn = METRICS_LEN;
 
         targetNodes.clear();
-        for (i = 0; i < qn; i++) {
-            std::vector<KadNode> nodes;
-            this->ktable->getClosestTo(nodes, rit->getMetrics()[i], KAD_BUCKET_MAX / qn);
-            for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
-                KadId id = nit->getId();
-                if (id == selfNodeId) {
-                    this->searchesDB->insertResult(*rit);
-                } else {
-                    targetNodes.insert(*nit);
-                }
+        std::vector<KadNode> nodes;
+        this->ktable->getKClosestTo(nodes, rit->getSimHash());
+        for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
+            KadId id = nit->getId();
+            if (id == selfNodeId) {
+                this->searchesDB->insertResult(*rit);
+            } else {
+                targetNodes.insert(*nit);
             }
         }
 //		ln.tsLock.Unlock()

@@ -23,8 +23,9 @@ public:
 
     int getKClosestTo(std::vector<KadNode> &nodes, const KadId &id);
     int getClosestTo(std::vector<KadNode> &nodes, const KadId &id, int count);
+    const KadNode &getNodeAtHeight(int height, int index);
 
-    int readFile(FILE *fp);
+    int readFile(const char *path);
     int writeFile(FILE *fp);
 
     friend std::ostream &operator<<(std::ostream &os, const KadRoutingTable &kt2);

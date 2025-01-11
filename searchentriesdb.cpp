@@ -2,6 +2,7 @@
 
 #include "utils.h"
 #include "macros.h"
+#include "logging.hpp"
 
 #include "searchentriesdb.h"
 
@@ -59,10 +60,10 @@ uint8_t *SearchEntry::toBytes() const
     uint8_t *bytesp = bytes;
     int i;
     size_t len;
-    for (i = 0; i < 4; i++) {
-        memcpy(bytesp, this->metrics[i].id, KAD_ID_SZ);
-        bytesp += KAD_ID_SZ;
-    }
+//    for (i = 0; i < 4; i++) {
+//        memcpy(bytesp, this->metrics[i].id, KAD_ID_SZ);
+//        bytesp += KAD_ID_SZ;
+//    }
     len = this->title.length() + 1;
     memcpy(bytesp, this->title.c_str(), len);
     bytesp += len;
@@ -96,10 +97,10 @@ int SearchEntry::fromBytes(uint8_t *buf)
     if (max_len < 0)
         return -2;
 
-    for (i = 0; i < 4; i++) {
-        memcpy(this->metrics[i].id, buf, KAD_ID_SZ);
-        buf += KAD_ID_SZ;
-    }
+//    for (i = 0; i < 4; i++) {
+//        memcpy(this->metrics[i].id, buf, KAD_ID_SZ);
+//        buf += KAD_ID_SZ;
+//    }
 
     len = strlen((char*) buf) + 1;
     max_len -= len;
@@ -164,11 +165,11 @@ bool SearchEntry::unpack(msgpack11::MsgPack &obj)
         return false;
     msgpack11::MsgPack::array d = obj[1].array_items();
     int i;
-    for (i = 0; i < 4; i++) {
-        if (!d[i].is_string())
-            return false;
-        memcpy(this->metrics[i].id, d[i].string_value().c_str(), KAD_ID_SZ);
-    }
+//    for (i = 0; i < 4; i++) {
+//        if (!d[i].is_string())
+//            return false;
+//        memcpy(this->metrics[i].id, d[i].string_value().c_str(), KAD_ID_SZ);
+//    }
 
     if (!obj[2].is_string())
         return false;
@@ -203,8 +204,8 @@ void SearchEntry::pack(msgpack11::MsgPack &obj)
 
     msgpack11::MsgPack::array d;
     int i;
-    for (int i = 0; i < 4; i++)
-        d.push_back(std::string(this->metrics[i].id, this->metrics[i].id + KAD_ID_SZ));
+//    for (int i = 0; i < 4; i++)
+//        d.push_back(std::string(this->metrics[i].id, this->metrics[i].id + KAD_ID_SZ));
 
     o.push_back(d);
     o.push_back(this->title);
@@ -219,14 +220,9 @@ void SearchEntry::pack(msgpack11::MsgPack &obj)
     obj = o;
 }
 
-KadId *SearchEntry::getMetrics() const
+KadId SearchEntry::getSimHash() const
 {
-    return (KadId*) metrics;
-}
-
-int SearchEntry::evaluateMetrics(KadId metrics[METRICS_LEN], const char *query)
-{
- //unimplemented
+    return this->simHash;
 }
 
 std::string SearchEntry::getTitle() const
@@ -262,7 +258,7 @@ std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 
 void SearchEntry::evaluateDistances()
 {
-    SearchEntry::evaluateMetrics(this->metrics, this->title.c_str());
+    //SearchEntry::evaluateMetrics(this->metrics, this->title.c_str());
 }
 
 /*****************************************************************
@@ -285,12 +281,15 @@ void SearchEntriesDB::open(const char *db_path)
 {
     int ret = 0;
     if ((ret = db_create(&this->dbp, nullptr, 0))) {
+        logdebug << "unable to open db file " << db_path << ": " << db_strerror(ret);
         return;
     }
     if ((ret = this->dbp->set_cachesize(this->dbp, 0, 128 * 1024, 0)) != 0) {
+        logdebug << "unable to set db cache sz " << db_path << ": " << db_strerror(ret);
         return;
     }
     if ((ret = this->dbp->open(this->dbp, nullptr, db_path, nullptr, DB_HASH, DB_CREATE/* | DB_THREAD*/, 0664)) != 0) {
+        logerr << "unable to open db file " << db_path << ": " << db_strerror(ret);
         return;
     }
     this->modified();

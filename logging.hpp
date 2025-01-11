@@ -5,7 +5,7 @@
 #include <iostream>
 
 #define ANSI_RED     "\e[0;31m"
-#define ANSI_GREEN   "\e[0;32m"
+#define ANSI_CYAN    "\e[0;36m"
 #define ANSI_YELLOW  "\e[0;33m"
 #define ANSI_WHITE   "\e[0;37m"
 #define ANSI_RESET   "\e[0m"
@@ -38,33 +38,44 @@ public:
     {
 #if USE_COLORS
         switch (level) {
+        case LOG_LEVEL_WARNING:
+            _logging.fperr << ANSI_YELLOW;
+            break;
         case LOG_LEVEL_ERROR:
             _logging.fperr << ANSI_RED;
             break;
         case LOG_LEVEL_DEBUG:
-            _logging.fperr << ANSI_GREEN;
+            _logging.fperr << ANSI_CYAN;
             break;
         default:
             break;
         }
 #endif
+        const char *slevel = "";
 
-        time_t t = time(NULL);
-        struct tm tm = *localtime(&t);
-        _logging.fperr << tm.tm_year + 1900 << "/" <<tm.tm_mon + 1 << "/" << tm.tm_mday << " " << tm.tm_hour << ":" << tm.tm_min << ":"  << tm.tm_sec;
         switch (level) {
         case LOG_LEVEL_INFO:
-            _logging.fperr << " info ";
+            slevel = "info";
+            break;
+        case LOG_LEVEL_WARNING:
+            slevel = "warn";
             break;
         case LOG_LEVEL_ERROR:
-            _logging.fperr << " error ";
+            slevel = "error";
             break;
         case LOG_LEVEL_DEBUG:
-            _logging.fperr << " debug ";
+            slevel = "debug";
             break;
         default:
             break;
         }
+
+        time_t t = time(NULL);
+        struct tm tm = *localtime(&t);
+        char fmt[1024];
+        sprintf(fmt, "\n[%d/%02d/%02d %02d:%02d:%02d] [%5s] ", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, slevel);
+
+        _logging.fperr << fmt;
     }
 
     ~Log()
@@ -88,6 +99,7 @@ private:
 
 #define loginfo Log(LogLevel::LOG_LEVEL_INFO)
 #define logerr Log(LogLevel::LOG_LEVEL_ERROR)
+#define logwarn Log(LogLevel::LOG_LEVEL_WARNING)
 #define logdebug Log(LogLevel::LOG_LEVEL_DEBUG)
 #define logfatalerr Log(LogLevel::LOG_LEVEL_DEBUG)
 

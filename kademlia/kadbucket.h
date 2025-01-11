@@ -32,6 +32,7 @@ struct KadId
     };
 
     static KadId randomId();
+    static KadId idNbitsFarFrom(const KadId &id1, int bdist);
 
     // Member
     unsigned char id[KAD_ID_SZ];
@@ -83,6 +84,7 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const KadBucket &kb2);
 
     int getHeight() const;
+    bool isFull();
 
 private:
     int height;

@@ -24,12 +24,12 @@ void SdsTask::stop()
 void *SdsTask::runTask(void *p)
 {
     SdsTask *timer = static_cast<SdsTask*>(p);
-    clock_t startTime = clock();
     time_t msec;
 
     while (timer->run) {
         timer->task();
 
+        clock_t startTime = clock();
         do {
           clock_t delta = clock() - startTime;
           msec = delta * 1000 / CLOCKS_PER_SEC;

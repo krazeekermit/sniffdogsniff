@@ -48,13 +48,11 @@ public:
     bool unpack(msgpack11::MsgPack &obj);
     void pack(msgpack11::MsgPack &obj);
 
-    KadId *getMetrics() const;
-
-    static int evaluateMetrics(KadId metrics[METRICS_LEN], const char *query);
+    KadId getSimHash() const;
 
 private:
     SearchEntryHash256 hash;
-    KadId metrics[METRICS_LEN];
+    KadId simHash;
     std::string title;
     std::string url;
     SearchEntryType type;

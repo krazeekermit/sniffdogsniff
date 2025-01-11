@@ -4,6 +4,7 @@
 
 #include "rpc/sdsrpcserver.h"
 #include "localnode.h"
+#include "simhash.h"
 
 #include "sds_config.h"
 #include "net/tor.h"

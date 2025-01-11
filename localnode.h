@@ -38,7 +38,7 @@ private:
     SdsTask *syncNodesTask;
     SdsTask *broadcastResultsTask;
 
-    int doNodesLookup(KadNode &target, bool check);
+    int doNodesLookup(const KadId targetId, bool check);
     void publishResults(const std::vector<SearchEntry> &results);
 };
 

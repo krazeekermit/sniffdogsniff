@@ -62,6 +62,25 @@ KadId KadId::randomId()
     return newId;
 }
 
+KadId KadId::idNbitsFarFrom(const KadId &id1, int bdist)
+{
+    int dIdx = KAD_ID_BIT_SZ - bdist;
+    KadId ax;
+    int i;
+    for (i = 0; i < dIdx/8; i++) {
+        ax.id[i] = 0x0;
+    }
+
+    if (i < KAD_ID_SZ) {
+        ax.id[i] = 0xff << ((dIdx - i*8) % 8);
+    }
+
+    for (i++; i < KAD_ID_SZ; i++) {
+        ax.id[i] = 0xff;
+    }
+    return ax - id1;
+}
+
 /*
     KadNode
 */
@@ -73,17 +92,19 @@ KadNode::KadNode(const char *address_)
 KadNode::KadNode(std::string address_)
     : address(address_), lastSeen(0), stales(0)
 {
-    char addrBuf[1024];
-    strncpy(addrBuf, address_.c_str(), address_.size());
-    char addr[1024];
-    /*
-        Avoid creation of infinite nodes with the same address but different ports
-    */
-    net_urlparse(addrBuf, addr, nullptr, nullptr);
-    SHA_CTX ctx;
-    SHA1_Init(&ctx);
-    SHA1_Update(&ctx, addr, strlen(addr));
-    SHA1_Final(this->id.id, &ctx);
+    if (address.size()) {
+        char addrBuf[1024];
+        address.copy(addrBuf, address.size(), 0);
+        char addr[1024];
+        /*
+            Avoid creation of infinite nodes with the same address but different ports
+        */
+        net_urlparse(addr, nullptr, nullptr, addrBuf);
+        SHA_CTX ctx;
+        SHA1_Init(&ctx);
+        SHA1_Update(&ctx, addr, strlen(addr));
+        SHA1_Final(this->id.id, &ctx);
+    }
 }
 
 KadNode::KadNode(KadId id_, std::string address_)
@@ -117,7 +138,7 @@ bool KadNode::operator==(const KadNode &kn)
 
 bool KadNode::operator<(const KadNode &kn) const
 {
-    return this->stales < kn.stales;
+    return this->lastSeen < kn.lastSeen;
 }
 
 const std::string &KadNode::getAddress() const
@@ -231,7 +252,12 @@ bool KadBucket::removeNode(const KadId &id)
 
 int KadBucket::getHeight() const
 {
-    return height;
+    return this->height;
+}
+
+bool KadBucket::isFull()
+{
+    return this->nodes.size() == KAD_BUCKET_MAX;
 }
 
 //std::vector<KadNode*> KadBucket::getNodes() const
