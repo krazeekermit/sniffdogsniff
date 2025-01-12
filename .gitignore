@@ -8,6 +8,7 @@
 CMakeCache.txt
 sniffdogsniffd
 cmake_install.cmake
+Makefile
 
 #build dir
 build/
