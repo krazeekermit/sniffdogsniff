@@ -29,7 +29,7 @@ p2p_bind_port = 4222
 
 [peers]
 address = 127.0.0.1:4221
-address = 10.10.0.34:4222
+#address = 10.10.0.34:4222
 
 [blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion

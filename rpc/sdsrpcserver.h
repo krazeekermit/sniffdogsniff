@@ -3,8 +3,6 @@
 
 #include "localnode.h"
 
-#include "msgpack11/msgpack11.h"
-
 #include <pthread.h>
 
 #include <deque>
@@ -20,10 +18,10 @@ public:
 
 private:
     static void *handleRequest(void *srvp);
-    static int ping(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
-    static int findNode(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
-    static int storeResult(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
-    static int findResults(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
+    static int ping(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
+    static int findNode(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
+    static int storeResult(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
+    static int findResults(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
 
     int running;
 

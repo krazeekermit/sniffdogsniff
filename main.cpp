@@ -1,7 +1,6 @@
 #include <iostream>
 
 #include "logging.h"
-
 #include "rpc/sdsrpcserver.h"
 #include "localnode.h"
 
@@ -42,6 +41,7 @@ void *startWebUi(void *hsrvp)
 
 int main(int argc, char **argv)
 {
+
     int err;
     int optdaemon = 0;
     int optconfig = 0;

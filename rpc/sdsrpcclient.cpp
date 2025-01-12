@@ -19,27 +19,26 @@ SdsRpcClient::SdsRpcClient(std::string nodeAddress_, SdsConfig cfg_)
 
 int SdsRpcClient::ping(const KadId &id, std::string address)
 {
-    msgpack11::MsgPack a, r;
+    SdsBytesBuf a, r;
     PingArgs args(id, address);
-    args.pack(a);
+    args.write(a);
 
     return sendRpcRequest(FUNC_PING, a, r);
 }
 
 int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
 {
-    msgpack11::MsgPack a, r;
+    SdsBytesBuf a, r;
 
     FindNodeArgs args(id);
-    args.pack(a);
+    args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
     if (ret != 0)
         return ret;
 
     FindNodeReply reply;
-    if (!reply.unpack(r))
-        return ERR_SERIALIZE;
+    reply.read(r);
 
     nearest = reply.nearest;
     return ERR_NULL;
@@ -47,28 +46,27 @@ int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &i
 
 int SdsRpcClient::storeResult(SearchEntry se)
 {
-    msgpack11::MsgPack a, r;
+    SdsBytesBuf a, r;
 
     StoreResultArgs args(se);
-    args.pack(a);
+    args.write(a);
 
     return sendRpcRequest(FUNC_STORE_RESULT, a, r);
 }
 
 int SdsRpcClient::findResults(std::vector<SearchEntry> &results, const char *query)
 {
-    msgpack11::MsgPack a, r;
+    SdsBytesBuf a, r;
 
     FindResultsArgs args(query);
-    args.pack(a);
+    args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
     if (ret != 0)
         return ret;
 
     FindResultsReply reply;
-    if (!reply.unpack(r))
-        return ERR_SERIALIZE;
+    reply.read(r);
 
     results = reply.results;
     return ERR_NULL;
@@ -141,23 +139,21 @@ static void fillRandIdVec(uint8_t *vec, size_t sz)
     fclose(rfp);
 }
 
-int SdsRpcClient::sendRpcRequest(uint8_t funcode, msgpack11::MsgPack &args, msgpack11::MsgPack &reply)
+int SdsRpcClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     int fd = this->newConnection();
-    if (fd < 0)
+    if (fd < 0) {
         return -1;
+    }
 
     /* Send Request */
-    std::string argsDump = args.dump();
     RpcRequestHeader req = {
         .funcode = funcode,
-        .datasize = argsDump.length()
+        .datasize = args.size()
     };
     fillRandIdVec(req.id, ID_SIZE);
 
     int errcode = ERR_NULL;
-    char *rcvbuf = nullptr;
-    std::string unpackerrstr = "";
 
     RpcResponseHeader resp;
     memset(&resp, 0, sizeof(resp));
@@ -166,7 +162,7 @@ int SdsRpcClient::sendRpcRequest(uint8_t funcode, msgpack11::MsgPack &args, msgp
         errcode = -2;
         goto rpc_fail;
     }
-    if (send(fd, argsDump.c_str(), argsDump.length(), 0) != argsDump.length()) {
+    if (send(fd, args.bufPtr(), args.size(), 0) != args.size()) {
         errcode = -2;
         goto rpc_fail;
     }
@@ -187,17 +183,16 @@ int SdsRpcClient::sendRpcRequest(uint8_t funcode, msgpack11::MsgPack &args, msgp
         goto rpc_fail;
     }
 
-    rcvbuf = new char[resp.datasize];
-    if (recv(fd, rcvbuf, resp.datasize, 0) != resp.datasize) {
-        errcode = ERR_RECV_REQUEST;
-        goto rpc_fail;
+    if (resp.datasize > 0) {
+        reply.allocate(resp.datasize);
+        if (recv(fd, reply.bufPtr(), resp.datasize, 0) != resp.datasize) {
+            errcode = ERR_RECV_REQUEST;
+            goto rpc_fail;
+        }
     }
-
-    reply = msgpack11::MsgPack::parse(rcvbuf, resp.datasize, unpackerrstr);
 
 rpc_fail:
 
     close(fd);
-    delete[] rcvbuf;
     return errcode;
 }

@@ -13,59 +13,55 @@
 
 #define THREAD_POOL_SZ    4
 
-int SdsRpcServer::ping(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply)
+int SdsRpcServer::ping(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     PingArgs pingArgs;
-    if (!pingArgs.unpack(args))
-        return ERR_SERIALIZE;
+    pingArgs.read(args);
 
     srv->localNode->ping(pingArgs.id, pingArgs.address.c_str());
 
     return ERR_NULL;
 }
 
-int SdsRpcServer::findNode(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply)
+int SdsRpcServer::findNode(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     FindNodeArgs findArgs;
-    if (!findArgs.unpack(args))
-        return ERR_SERIALIZE;
+    findArgs.read(args);
 
     FindNodeReply findReply;
     srv->localNode->findNode(findReply.nearest, findArgs.id);
 
-    findReply.pack(reply);
+    findReply.write(reply);
     return ERR_NULL;
 }
 
-int SdsRpcServer::storeResult(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply)
+int SdsRpcServer::storeResult(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     StoreResultArgs storeArgs;
-    if (!storeArgs.unpack(args))
-        return ERR_SERIALIZE;
+    storeArgs.read(args);
 
     srv->localNode->storeResult(storeArgs.se);
 
     return ERR_NULL;
 }
 
-int SdsRpcServer::findResults(SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply)
+int SdsRpcServer::findResults(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     FindResultsArgs findArgs;
-    if (!findArgs.unpack(args))
-        return ERR_SERIALIZE;
+    findArgs.read(args);
 
     FindResultsReply findReply;
 
     srv->localNode->findResults(findReply.results, findArgs.query.c_str());
 
-    findReply.pack(reply);
+    findReply.write(reply);
 
     return ERR_NULL;
 }
 
 struct RequestHandler {
     uint8_t funcode;
-    int (*funptr) (SdsRpcServer *srv, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
+    int (*funptr) (SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
 };
 
 void *SdsRpcServer::handleRequest(void *srvp)
@@ -78,11 +74,8 @@ void *SdsRpcServer::handleRequest(void *srvp)
     };
 
     int i, client_fd;
-    char *argsbuf;
     uint64_t recv_sz;
     std::string errstr = "";
-    msgpack11::MsgPack args;
-    msgpack11::MsgPack resp;
     RpcRequestHeader req;
     RpcResponseHeader reply;
     SdsRpcServer *srv = static_cast<SdsRpcServer*>(srvp);
@@ -98,7 +91,8 @@ void *SdsRpcServer::handleRequest(void *srvp)
         memset(&req, 0, sizeof(req));
         memset(&reply, 0, sizeof(reply));
 
-        argsbuf = nullptr;
+        SdsBytesBuf argsBuf;
+        SdsBytesBuf replyBuf;
 
         recv_sz = sizeof(req);
         if (recv(client_fd, &req, recv_sz, 0) != recv_sz) {
@@ -108,14 +102,14 @@ void *SdsRpcServer::handleRequest(void *srvp)
         }
 
         recv_sz = req.datasize;
-        argsbuf = new char[recv_sz];
-        if (recv(client_fd, argsbuf, recv_sz, 0) != recv_sz) {
-            //logerror or send error
-            reply.errcode = ERR_RECV_REQUEST;
-            goto rpc_fail;
+        if (recv_sz > 0) {
+            argsBuf.allocate(recv_sz);
+            if (recv(client_fd, argsBuf.bufPtr(), recv_sz, 0) != recv_sz) {
+                //logerror or send error
+                reply.errcode = ERR_RECV_REQUEST;
+                goto rpc_fail;
+            }
         }
-
-        args = msgpack11::MsgPack::parse(argsbuf, recv_sz, errstr);
 
         reply.errcode = ERR_NOFUNCT;
         reply.funcode = req.funcode;
@@ -124,21 +118,18 @@ void *SdsRpcServer::handleRequest(void *srvp)
         for (i = 0; i < 4; i++) {
             RequestHandler handler = handlers[i];
             if (handler.funcode == req.funcode) {
-                reply.errcode = handler.funptr(srv, args, resp);
+                reply.errcode = handler.funptr(srv, argsBuf, replyBuf);
                 break;
             }
         }
 
 rpc_fail:
-        std::string respbuf = resp.dump();
-        reply.datasize = respbuf.length();
-
         send(client_fd, &reply, sizeof(reply), 0);
 
-        send(client_fd, respbuf.c_str(), respbuf.length(), 0);
+        if (replyBuf.size() > 0) {
+            send(client_fd, replyBuf.bufPtr(), replyBuf.size(), 0);
+        }
         close(client_fd);
-
-        delete[] argsbuf;
 
         logdebug << "rpcServer error " << reply.errcode << ": " << rpc_strerror(reply.errcode);
     }

@@ -288,7 +288,8 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
         for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
             KadId id = nit->getId();
             if (id == selfNodeId) {
-                this->searchesDB->insertResult(*rit);
+                SearchEntry se = *rit;
+                this->searchesDB->insertResult(se);
             } else {
                 targetNodes.insert(*nit);
             }

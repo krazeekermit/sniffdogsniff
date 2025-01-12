@@ -2,7 +2,7 @@
 #define SEARCHENTRIESDB_H
 
 #include "kademlia/kadbucket.h"
-#include "msgpack11/msgpack11.h"
+#include "sdsbytesbuf.h"
 
 #include <map>
 #include <cstdint>
@@ -28,7 +28,7 @@ class SearchEntry {
 
 public:
     SearchEntry();
-    SearchEntry(const std::string title, const std::string url, SearchEntryType type, std::map<uint8_t, std::string> properties = {});
+    SearchEntry(const std::string title, const std::string url, SearchEntryType type = SearchEntryType::SITE, std::map<uint8_t, std::string> properties = {});
     ~SearchEntry();
 
     void addProperty(uint8_t idx, const std::string value);
@@ -36,17 +36,14 @@ public:
     void removeProperty(uint8_t idx);
 
     void reHash();
-    uint8_t *toBytes() const;
-    int fromBytes(uint8_t *buf);
+    void read(SdsBytesBuf &buf);
+    void write(SdsBytesBuf &buf);
 
     friend std::ostream &operator<< (std::ostream &os, SearchEntry const &se);
 
     SearchEntryHash256 getHash() const;
     std::string getTitle() const;
     std::string getUrl() const;
-
-    bool unpack(msgpack11::MsgPack &obj);
-    void pack(msgpack11::MsgPack &obj);
 
     KadId getSimHash() const;
 
@@ -75,7 +72,7 @@ public:
 
     void open(const char *db_path);
 
-    void insertResult(const SearchEntry &se);
+    void insertResult(SearchEntry &se);
     int getEntriesForBroadcast(std::vector<SearchEntry> &list);
     void doSearch(std::vector<SearchEntry> &entries, const char *query);
     void flush();

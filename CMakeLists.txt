@@ -13,6 +13,7 @@ add_executable(sniffdogsniffd
     logging.h logging.cpp
     simhash.h simhash.cpp
     sds_config.h sds_config.cpp
+    sdsbytesbuf.h sdsbytesbuf.cpp
     sdstask.h sdstask.cpp
     localnode.h localnode.cpp
     searchentriesdb.h searchentriesdb.cpp
@@ -20,7 +21,6 @@ add_executable(sniffdogsniffd
     )
 
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")
-add_subdirectory(msgpack11)
 add_subdirectory(rpc)
 add_subdirectory(kademlia)
 add_subdirectory(crawler)

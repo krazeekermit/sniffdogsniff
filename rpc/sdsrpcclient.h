@@ -6,7 +6,6 @@
 
 #include <map>
 
-
 class SdsRpcClient
 {
 public:
@@ -19,7 +18,7 @@ public:
 
 private:
     int newConnection();
-    int sendRpcRequest(uint8_t fun, msgpack11::MsgPack &args, msgpack11::MsgPack &reply);
+    int sendRpcRequest(uint8_t fun, SdsBytesBuf &args, SdsBytesBuf &reply);
 
     std::string nodeAddress;
     SdsConfig config;
