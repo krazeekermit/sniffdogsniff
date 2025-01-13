@@ -1,24 +1,21 @@
 ## Build and Install
 ### Build
 
-* Install Go
-Download Go here [see here](https://go.dev/doc/install).
-
-On FreeBSD you can install Go from the packages repos or from ports
+* Install depenencies
+ - Debian
 ```bash
-pkg install lang/go
+apt-get install cmake libssl-dev libdb-dev libgumbo-dev libcurl-dev 
 ```
-or
+ - FreeBSD
 ```bash
-cd /usr/ports/lang/go/ && make install clean
+pkg install cmake openssl db5 gumbo curl
 ```
 
 * Build
 ```bash
-cd <your goroot>/src/
-mkdir github.com && cd github.com
 git clone https://github.com/krazeekermit/sniffdogsniff.git
 cd sniffdogsniff
+cmake .
 make
 ```
 
