@@ -2,3 +2,10 @@
     - Add timeout (select)
     - Replace socket creation with unified code everywere
     - better error handling
+
+* Add crawler
+* Add SIGINT handling
+* Add self node id creation based on cfg
+* Add manpages for cli args and for config file
+
+* Investigate replace Cmake with plain makefiles
