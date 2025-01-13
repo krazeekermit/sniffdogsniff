@@ -1,6 +1,8 @@
 #ifndef LOGGING_HPP
 #define LOGGING_HPP
 
+#include <pthread.h>
+
 #include <sstream>
 #include <iostream>
 
@@ -24,9 +26,9 @@ public:
     static void setLevel(LogLevel level);
     static void setLogFile(const char *path);
 
+    pthread_mutex_t mutex;
     LogLevel level;
-    std::ostream &fperr;
-    std::ostream &fpout;
+    FILE *fperr;
 };
 
 class Log {
@@ -37,13 +39,13 @@ public:
     template<typename T>
     Log &operator<<(const T &data)
     {
-        this->logStream() << data;
+        this->logStream << data;
         return *this;
     }
 
 private:
     LogLevel level;
-    std::ostream &logStream();
+    std::ostringstream logStream;
 };
 
 

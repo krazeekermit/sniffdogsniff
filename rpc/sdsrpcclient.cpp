@@ -104,25 +104,9 @@ int SdsRpcClient::newConnection()
 
         fd = samConn->fd;
     } else {
-        int i;
-        ssize_t valread;
-        struct sockaddr_in address;
-        int opt = 1;
-        socklen_t addrlen = sizeof(address);
-
-        fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (fd < 0)
-            return -1;
-
-        if (inet_pton(AF_INET, addr, &address.sin_addr) <= 0) {
-            return -1;
-        }
-
-        address.sin_family = AF_INET;
-        address.sin_port = htons(port);
-
-        if (connect(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-            return -2;
+        fd = net_socket_connect(addr, port, 5);
+        if (fd <= 0) {
+            logerr << "error connecting to " << this->nodeAddress << ": " << strerror(errno);
         }
     }
 
@@ -142,9 +126,8 @@ static void fillRandIdVec(uint8_t *vec, size_t sz)
 int SdsRpcClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     int fd = this->newConnection();
-    if (fd < 0) {
+    if (fd < 0)
         return -1;
-    }
 
     /* Send Request */
     RpcRequestHeader req = {

@@ -299,7 +299,7 @@ int sds_config_parse_file(SdsConfig *cfg, const char *path)
             .userAgent = lookup_string(*it, USER_AGENT, nullptr),
             .searchQueryUrl = lookup_string(*it, SEARCH_QUERY_URL, nullptr),
             .resultsContainerElement = lookup_string(*it, RESULTS_CONTAINER_ELEMENT, nullptr),
-            .resultContainerElement = lookup_string(*it, RESULTS_CONTAINER_ELEMENT, nullptr),
+            .resultContainerElement = lookup_string(*it, RESULT_CONTAINER_ELEMENT, nullptr),
             .resultUrlElement = lookup_string(*it, RESULT_URL_ELEMENT, nullptr),
             .resultUrlProperty = lookup_string(*it, RESULT_URL_PROPERTY, nullptr),
             .resultUrlIsJson = lookup_bool(*it, RESULT_URL_IS_JSON, 0),

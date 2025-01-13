@@ -29,7 +29,8 @@ p2p_bind_port = 4222
 
 [peers]
 address = 127.0.0.1:4221
-#address = 10.10.0.34:4222
+address = 10.10.0.34:4222
+address = 127.0.0.1:56778
 
 [blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
@@ -38,14 +39,13 @@ address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
 # search engines
 
 [external_search_engine]
-name = Brave Search
+name = Start Page
 user_agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36
-search_query_url = https://search.brave.com/search?q=%s&source=desktop
-results_container_element = .react-results--main
-result_container_element = .LnpumSThxEWMIsDdAT17
-result_url_element = .eVNpHGjtxRBq_gLOfGDr
+search_query_url = https://www.startpage.com/sp/search?q=%s
+results_container_element = .w-gl
+result_container_element = .result
+result_url_element = .result-link
 result_url_property = href
-result_title_element = .EKtkFWMYpwzMKOYr0GYm
+result_title_element = .css-yum8zr
 # result_title_property = text
-
 

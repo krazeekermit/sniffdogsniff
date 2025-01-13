@@ -14,6 +14,7 @@ SearchEngine::SearchEngine(SearchEngineConfigs &configs_)
 
 void SearchEngine::doSearch(std::vector<SearchEntry> &entries, const char *query)
 {
+    logdebug << "do search - " << this->configs.name;
     char searchUrl[512];
     sprintf(searchUrl, this->configs.searchQueryUrl, query);
     extractSearchResults(entries, searchUrl);
@@ -52,11 +53,6 @@ static GumboNode *getElementByAttr(GumboNode *parent, const char *attrName, cons
 {
     if (!parent)
         return nullptr;
-
-
-//    const char *tname = parent->v.element.tag == GUMBO_TAG_UNKNOWN ? "???" : gumbo_normalized_tagname(parent->v.element.tag);
-//        logdebug(<< "node type " << parent->type << ", "<< tname
-//                 << ", childrens " << parent->v.element.children.length);
 
     if (parent->type != GUMBO_NODE_DOCUMENT && parent->type != GUMBO_NODE_ELEMENT)
         return nullptr;
@@ -140,6 +136,10 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
     curl_easy_cleanup(curl);
     //return err;
 
+//    FILE *fp = fopen("./html_d.html", "w");
+//    fprintf(fp, "%s", html_buf.c_str());
+//    fclose(fp);
+
     GumboOutput *output = gumbo_parse_with_options(&kGumboDefaultOptions, html_buf.data(), html_buf.length());
     if (output->errors.length) {
         int i;
@@ -184,6 +184,7 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
                     }
                 }
 
+                logdebug << "new result " << rlink;
                 entries.emplace_back(title, rlink, SearchEntryType::SITE);
             }
         }

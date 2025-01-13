@@ -28,6 +28,8 @@ inline int net_urlparse(char *addr, char *suffix, int *port, const char *url)
     return 0;
 }
 
+int net_socket_connect(const char *addr, int port, long timeout);
+
 #ifdef __cplusplus
 }
 #endif
