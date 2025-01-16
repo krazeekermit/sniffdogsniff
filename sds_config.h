@@ -1,7 +1,7 @@
 #ifndef SDSCONFIG_H
 #define SDSCONFIG_H
 
-#include "searchengine.h"
+#include "crawler/searchengine.h"
 
 #include <vector>
 

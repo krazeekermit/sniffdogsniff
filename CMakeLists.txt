@@ -17,7 +17,6 @@ add_executable(sniffdogsniffd
     sdstask.h sdstask.cpp
     localnode.h localnode.cpp
     searchentriesdb.h searchentriesdb.cpp
-    searchengine.h searchengine.cpp
     )
 
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")

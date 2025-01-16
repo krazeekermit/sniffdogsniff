@@ -10,14 +10,41 @@
 
 #define THREAD_POOL_SZ 1
 
-//static void httpUnescape(std::string &ss)
-//{
-//    int i;
-//    std::string unescaped = "";
-//    for (i = 0; i < ss.length(); i++) {
+static std::string httpUnescape(const char *ss)
+{
+    std::string unescaped = "";
 
-//    }
-//}
+    char c, hi, lo;
+    int i = 0;
+    while (i < strlen(ss)) {
+        c = ss[i++];
+        switch (c) {
+        case '+':
+            unescaped += ' ';
+            break;
+        case '%':
+        case '$':
+            hi = ss[i++];
+            lo = ss[i++];
+            if (hi >= '0' && hi <= '9')
+                hi = hi - '0';
+            else if (hi >= 'A' && hi <= 'F')
+                hi = hi - 'A' + 10;
+
+            if (lo >= '0' && lo <= '9')
+                lo = lo - '0';
+            else if (lo >= 'A' && lo <= 'F')
+                lo = lo - 'A' + 10;
+
+            c = ((hi << 4) & 0xf0) | (lo & 0x0f);
+            unescaped += c;
+            break;
+        default:
+            unescaped += c;
+        }
+    }
+    return unescaped;
+}
 
 static int parseHttpAttrs(HttpRequest &req, char *valssp)
 {
@@ -223,7 +250,6 @@ int HttpServer::startListening(const char *addrstr, int port)
     this->server_fd = fd;
 
     while ((client_fd = accept(fd, (struct sockaddr*)&address, &addrlen)) > -1) {
-        logdebug << "COND >>>>>>>>>>>>><|||\n";
         this->clientsQueue.push_back(client_fd);
         pthread_cond_signal(&this->cond);
     }

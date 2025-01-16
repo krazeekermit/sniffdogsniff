@@ -2,7 +2,7 @@
 
 #include "rpc/sdsrpcclient.h"
 #include "logging.h"
-#include "searchengine.h"
+#include "crawler/searchengine.h"
 #include "utils.h"
 #include "simhash.h"
 
@@ -29,6 +29,8 @@ LocalNode::LocalNode(SdsConfig &cfgs)
     this->searchesDB = new SearchEntriesDB();
     sprintf(path, "%s/%s", cfgs.work_dir_path, "searches.db");
     this->searchesDB->open(path);
+
+    this->crawler = new WebCrawler(cfgs);
 }
 
 LocalNode::~LocalNode()
@@ -147,10 +149,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     }
 
     //do search ...... on external search engines replace with crawler
-    for (auto it = this->configs.search_engines.begin(); it != this->configs.search_engines.end(); it++) {
-        SearchEngine en = SearchEngine(*it);
-        en.doSearch(results, query);
-    }
+    this->crawler->doSearch(results, query);
 
     std::async(std::launch::async, [this, results] () {
         this->publishResults(results);
@@ -192,6 +191,8 @@ void LocalNode::startTasks()
             this->publishResults(results);
 
     }, UNIX_HOUR);
+
+    this->crawler->startCrawling();
 
 }
 

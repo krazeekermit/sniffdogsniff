@@ -3,7 +3,7 @@
 
 #include "sds_config.h"
 
-#include "searchentriesdb.h"
+#include "crawler/webcrawler.h"
 #include "kademlia/kadroutingtable.h"
 #include "sdstask.h"
 
@@ -35,6 +35,7 @@ private:
     pthread_mutex_t mutex;
     KadRoutingTable *ktable;
     SearchEntriesDB *searchesDB;
+    WebCrawler *crawler;
     SdsTask *syncNodesTask;
     SdsTask *broadcastResultsTask;
 
