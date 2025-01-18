@@ -4,6 +4,7 @@
 #include "logging.h"
 
 #include <map>
+#include <cstring>
 
 WebCrawler::WebCrawler(SdsConfig &cfg)
 {
@@ -13,6 +14,44 @@ WebCrawler::WebCrawler(SdsConfig &cfg)
     for (int i = 0; i < cfg.search_engines.size(); i++) {
         this->searchEngines.emplace_back(cfg.search_engines[i]);
     }
+}
+
+int WebCrawler::load(const char *path)
+{
+    FILE *fp = fopen(path, "r");
+    if (!fp)
+        return -1;
+
+    pthread_mutex_lock(&this->mutex);
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        char *endp = strchr(buffer, '\n');
+        if (endp)
+            *endp = '\0';
+        this->urlQueue.emplace_back(endp);
+    }
+    fclose(fp);
+    pthread_cond_signal(&this->cond);
+    pthread_mutex_unlock(&this->mutex);
+
+    return 0;
+}
+
+int WebCrawler::save(const char *path)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp)
+        return -1;
+
+    pthread_mutex_lock(&this->mutex);
+    for (int i = 0; i < this->urlQueue.size(); i++) {
+        fprintf(fp, "%s\n", this->urlQueue[i].c_str());
+    }
+    fclose(fp);
+    pthread_cond_signal(&this->cond);
+    pthread_mutex_unlock(&this->mutex);
+
+    return 0;
 }
 
 static void scanDocument(GumboNode *parent, std::string siteUrl, std::map<std::string, SearchEntry> &entries)
@@ -47,7 +86,7 @@ void *WebCrawler::crawlingFunc(void *p)
     WebCrawler *crawler = static_cast<WebCrawler*>(p);
     if (crawler) {
         std::map<std::string, SearchEntry> entries;
-        while (1) {
+        while (crawler->run) {
             pthread_mutex_lock(&crawler->mutex);
             while (crawler->urlQueue.empty()) {
                 pthread_cond_wait(&crawler->cond, &crawler->mutex);
@@ -82,6 +121,28 @@ void *WebCrawler::crawlingFunc(void *p)
 void WebCrawler::startCrawling()
 {
     pthread_create(&this->thread, nullptr, &crawlingFunc, this);
+    this->run = true;
+}
+
+void WebCrawler::stopCrawling()
+{
+    this->run = false;
+    pthread_join(this->thread, nullptr);
+}
+
+int WebCrawler::getEntriesForBroadcast(std::vector<SearchEntry> &entries)
+{
+    int finds = 0;
+    pthread_mutex_lock(&this->mutex);
+    for (auto it = this->searches.begin(); it != this->searches.end(); it++) {
+        entries.push_back(*it);
+    }
+    finds = this->searches.size();
+    this->searches.clear();
+    pthread_cond_signal(&this->cond);
+    pthread_mutex_unlock(&this->mutex);
+
+    return finds;
 }
 
 void WebCrawler::doSearch(std::vector<SearchEntry> &entries, const char *query)

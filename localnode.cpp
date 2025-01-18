@@ -2,7 +2,6 @@
 
 #include "rpc/sdsrpcclient.h"
 #include "logging.h"
-#include "crawler/searchengine.h"
 #include "utils.h"
 #include "simhash.h"
 
@@ -15,8 +14,13 @@ LocalNode::LocalNode(SdsConfig &cfgs)
     : configs(cfgs)
 {
     pthread_mutex_init(&this->mutex, nullptr);
-    this->ktable = new KadRoutingTable();
     char path[1024];
+
+    this->searchesDB = new SearchEntriesDB();
+    sprintf(path, "%s/%s", cfgs.work_dir_path, "searches.db");
+    this->searchesDB->open(path);
+
+    this->ktable = new KadRoutingTable();
     sprintf(path, "%s/%s", cfgs.work_dir_path, "ktable.dat");
     if (this->ktable->readFile(path)) {
         logdebug << "ktable is empty populating with known nodes from configs";
@@ -26,11 +30,11 @@ LocalNode::LocalNode(SdsConfig &cfgs)
         }
     }
 
-    this->searchesDB = new SearchEntriesDB();
-    sprintf(path, "%s/%s", cfgs.work_dir_path, "searches.db");
-    this->searchesDB->open(path);
-
+    sprintf(path, "%s/%s", cfgs.work_dir_path, "crawlerseeds.dat");
     this->crawler = new WebCrawler(cfgs);
+    if (this->crawler->load(path)) {
+        logwarn << "crawler is not seeded";
+    }
 }
 
 LocalNode::~LocalNode()
@@ -187,7 +191,9 @@ void LocalNode::startTasks()
     //Results publish task
     this->broadcastResultsTask = new SdsTask([this] () {
         std::vector<SearchEntry> results;
-        if (this->searchesDB->getEntriesForBroadcast(results) > 0)
+        this->searchesDB->getEntriesForBroadcast(results);
+        this->crawler->getEntriesForBroadcast(results);
+        if (results.size() > 0)
             this->publishResults(results);
 
     }, UNIX_HOUR);

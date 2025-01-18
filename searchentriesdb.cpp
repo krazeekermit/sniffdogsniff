@@ -212,8 +212,6 @@ int SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
     if (!this->dbp)
         return 0;
 
-    list.clear();
-
     time_t now = time(nullptr);
     for (auto it = this->timestamps.begin(); it != this->timestamps.end(); it++) {
         if ((now - it->second) >= UNIX_HOUR) {
