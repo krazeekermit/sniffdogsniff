@@ -11,6 +11,8 @@
 #include "webserver/sdswebuiserver.h"
 
 #include <getopt.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include <vector>
 
@@ -23,20 +25,44 @@ static struct option long_options[] = {
    {0,              0,                 0,  0   }
 };
 
-void *startWebUi(void *hsrvp)
+struct SdsMainCtx {
+    LocalNode *node;
+    SdsRpcServer *rpcSrv;
+    SdsWebUiServer *webSrv;
+
+    int p2p_hidden_service;
+    TorControlSession *torSession;
+    Sam3Session *i2pSession;
+};
+
+static SdsMainCtx sdsContext = {
+    .node = nullptr,
+    .rpcSrv = nullptr,
+    .webSrv = nullptr,
+    .torSession = nullptr,
+    .i2pSession = nullptr
+};
+
+void sigintHandler(int signo)
 {
-    LocalNode *node = static_cast<LocalNode*>(hsrvp);
-    if (node) {
-        SdsWebUiServer *hsrv = new SdsWebUiServer(node, "./res");
-        loginfo << "started WebUI..." << "\n";
-        hsrv->startListening("127.0.0.1", 8081);
+    loginfo << "INT signal received, shutting down...";
+    sdsContext.rpcSrv->shutdown();
+    sdsContext.node->shutdown();
+    sdsContext.webSrv->shutdown();
 
-        delete hsrv;
-    } else {
-        logerr << "NODE IS NULL!!!\n";
+    switch (sdsContext.p2p_hidden_service) {
+    case TOR_HIDDEN_SERVICE: {
+
+        }
+        break;
+    case I2P_HIDDEN_SERVICE:
+        loginfo << "closing I2P session";
+        sam3CloseSession(sdsContext.i2pSession);
+        break;
+    case NO_HIDDEN_SERVICE:
+    default:
+        break;
     }
-
-    return nullptr;
 }
 
 int main(int argc, char **argv)
@@ -64,8 +90,8 @@ int main(int argc, char **argv)
             break;
         case 'l':
             break;
-        case 'b':
-
+        case 'd':
+            optdaemon = 1;
         default:
             break;
         }
@@ -75,12 +101,27 @@ int main(int argc, char **argv)
         logwarn << "no configuration file submitted: using reasonable defaults";
     }
 
+    if (optdaemon) {
+        pid_t pid = fork();
+        switch (pid) {
+        case -1:
+           perror("fork");
+           exit(EXIT_FAILURE);
+        case 0:
+           break;
+        default:
+           logdebug << "sniffdogsniffd started as process pid=" << pid;
+           exit(EXIT_SUCCESS);
+        }
+    }
+
     FILE *hsfp;
     char hsfpath[1024];
     char hsaddr[512];
     char *privateKey = nullptr;
     TorControlSession torSession;
     Sam3Session i2pSession;
+    sdsContext.p2p_hidden_service = cfg.p2p_hidden_service;
     switch (cfg.p2p_hidden_service) {
     case TOR_HIDDEN_SERVICE: {
             tor_control_session_init(&torSession, cfg.tor_control_addr, 0, cfg.tor_auth_cookie, cfg.tor_password);
@@ -105,6 +146,7 @@ int main(int argc, char **argv)
                 fclose(hsfp);
             }
 
+            sdsContext.torSession = &torSession;
             loginfo << "successfully created tor hidden service at dest " << hsaddr;
         }
         break;
@@ -137,6 +179,7 @@ int main(int argc, char **argv)
                 logfatalerr << "sam3 err" << i2pSession.error;
             }
 
+            sdsContext.i2pSession = &i2pSession;
             loginfo << "successfully created i2p hidden service at dest " << i2pSession.pubkey;
         }
         break;
@@ -145,22 +188,34 @@ int main(int argc, char **argv)
         break;
     }
 
+    struct sigaction act = {0};
+    act.sa_flags = SA_SIGINFO;
+    act.sa_handler = &sigintHandler;
+    if (sigaction(SIGINT, &act, NULL) == -1) {
+
+    }
+
     //use smart ptrs?
     LocalNode  *node = new LocalNode(cfg);
-    loginfo << "started tasks...\n";
+    sdsContext.node = node;
+    loginfo << "started tasks...";
     node->startTasks();
 
-    pthread_t webuiThread;
-    pthread_create(&webuiThread, nullptr, &startWebUi, node);
+    SdsWebUiServer *webSrv = new SdsWebUiServer(node, "./res");
+    sdsContext.webSrv = webSrv;
+    loginfo << "started web ui server on ";
+    webSrv->startListening("127.0.0.1", 8081, true);
 
     SdsRpcServer *srv = new SdsRpcServer(node);
+    sdsContext.rpcSrv = srv;
+
     loginfo << "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port;
     if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
 
     }
 
-    //delete hsrv;
-    //delete srv;
+    delete srv;
+    delete webSrv;
     delete node;
     return 0;
 }

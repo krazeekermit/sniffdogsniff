@@ -2,6 +2,7 @@
 
 #include "logging.h"
 
+#include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -152,7 +153,7 @@ static int createResponse(HttpResponse &resp, std::string &body)
 }
 
 HttpServer::HttpServer()
-    : defaultContentType("text/html")
+    : detach(false), defaultContentType("text/html")
 {
     pthread_mutex_init(&this->mutex, nullptr);
     pthread_cond_init(&this->cond, nullptr);
@@ -160,6 +161,10 @@ HttpServer::HttpServer()
 
 HttpServer::~HttpServer()
 {
+    this->shutdown();
+    pthread_mutex_destroy(&this->mutex);
+    pthread_cond_destroy(&this->cond);
+
     for (auto it = this->handlers.begin(); it != this->handlers.end(); it++)
         delete it->second;
 
@@ -171,9 +176,13 @@ void *accessHandlerCallback(void *cls) {
     int client_fd;
     int previous_error = 0;
     if (srv) {
-        while (1) {
+        while (srv->running) {
             pthread_mutex_lock(&srv->mutex);
             while (srv->clientsQueue.empty()) {
+                if (!srv->running) {
+                    pthread_mutex_unlock(&srv->mutex);
+                    return nullptr;
+                }
                 pthread_cond_wait(&srv->cond, &srv->mutex);
             }
             client_fd = srv->clientsQueue.front();
@@ -210,20 +219,31 @@ void *accessHandlerCallback(void *cls) {
     return 0;
 }
 
-int HttpServer::startListening(const char *addrstr, int port)
+void *acceptFun(void *cls)
 {
-    int i, fd, client_fd;
+    HttpServer *srv = static_cast<HttpServer*>(cls);
+    if (srv) {
+        int client_fd;
+        struct sockaddr_in address;
+        socklen_t addrlen = sizeof(address);
+        while ((client_fd = accept(srv->server_fd, (struct sockaddr*)&address, &addrlen)) > -1) {
+            pthread_mutex_lock(&srv->mutex);
+            srv->clientsQueue.push_back(client_fd);
+            pthread_cond_signal(&srv->cond);
+            pthread_mutex_unlock(&srv->mutex);
+        }
+    }
+
+    return nullptr;
+}
+
+int HttpServer::startListening(const char *addrstr, int port, bool detach)
+{
+    int i, fd;
     ssize_t valread;
     struct sockaddr_in address;
     int opt = 1;
     socklen_t addrlen = sizeof(address);
-
-    if (!this->threadPool) {
-        this->threadPool = new pthread_t[THREAD_POOL_SZ];
-        for (i = 0; i < THREAD_POOL_SZ; i++) {
-            pthread_create(&this->threadPool[i], nullptr, &accessHandlerCallback, this);
-        }
-    }
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0)
@@ -248,10 +268,17 @@ int HttpServer::startListening(const char *addrstr, int port)
     }
 
     this->server_fd = fd;
+    if (!this->threadPool) {
+        this->threadPool = new pthread_t[THREAD_POOL_SZ];
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_create(&this->threadPool[i], nullptr, &accessHandlerCallback, this);
+        }
+    }
 
-    while ((client_fd = accept(fd, (struct sockaddr*)&address, &addrlen)) > -1) {
-        this->clientsQueue.push_back(client_fd);
-        pthread_cond_signal(&this->cond);
+    if (detach) {
+        pthread_create(&this->acceptThread, nullptr, &acceptFun, this);
+    } else {
+        acceptFun(this);
     }
 
     return 0;
@@ -259,7 +286,25 @@ int HttpServer::startListening(const char *addrstr, int port)
 
 int HttpServer::shutdown()
 {
+    if (this->threadPool) {
+        pthread_mutex_lock(&this->mutex);
+        this->running = false;
+        pthread_cond_broadcast(&this->cond);
+        pthread_mutex_unlock(&this->mutex);
 
+        int i;
+        void *dummy = nullptr;
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_join(this->threadPool[i], &dummy);
+        }
+
+        close(this->server_fd);
+        pthread_cancel(this->acceptThread);
+
+        delete[] this->threadPool;
+        this->threadPool = nullptr;
+    }
+    return 0;
 }
 
 void HttpServer::addHandler(std::string u, HttpRequestHandler *h)

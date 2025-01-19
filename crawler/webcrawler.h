@@ -13,6 +13,7 @@ class WebCrawler
 {
 public:
     WebCrawler(SdsConfig &cfg);
+    ~WebCrawler();
 
     int load(const char *path);
     int save(const char *path);

@@ -29,6 +29,7 @@ public:
     // checkNode(id kademlia.KadId, addr string) bool
 
     void startTasks();
+    void shutdown();
 
 private:
     SdsConfig configs;

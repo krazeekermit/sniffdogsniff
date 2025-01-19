@@ -11,7 +11,9 @@
 #include <unistd.h>
 #include <unordered_map>
 
-#define THREAD_POOL_SZ    4
+#define THREAD_POOL_SZ    2
+
+int threadNo = 0;
 
 int SdsRpcServer::ping(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
@@ -72,7 +74,8 @@ void *SdsRpcServer::handleRequest(void *srvp)
         {.funcode=FUNC_STORE_RESULT,    .funptr=&SdsRpcServer::storeResult},
         {.funcode=FUNC_FIND_RESULTS,    .funptr=&SdsRpcServer::findResults},
     };
-
+    threadNo++;
+    int me = threadNo;
     int i, client_fd;
     uint64_t recv_sz;
     std::string errstr = "";
@@ -82,6 +85,11 @@ void *SdsRpcServer::handleRequest(void *srvp)
     while (srv->running) {
         pthread_mutex_lock(&srv->mutex);
         while (srv->clientsQueue.empty()) {
+            if (!srv->running) {
+                logdebug << "server thread down..." << me;
+                pthread_mutex_unlock(&srv->mutex);
+                return nullptr;
+            }
             pthread_cond_wait(&srv->cond, &srv->mutex);
         }
         client_fd = srv->clientsQueue.front();
@@ -138,10 +146,17 @@ rpc_fail:
 }
 
 SdsRpcServer::SdsRpcServer(LocalNode *node)
-    : running(1), threadPool(nullptr), localNode(node)
+    : running(true), threadPool(nullptr), localNode(node)
 {
     pthread_mutex_init(&this->mutex, nullptr);
     pthread_cond_init(&this->cond, nullptr);
+}
+
+SdsRpcServer::~SdsRpcServer()
+{
+    this->shutdown();
+    pthread_mutex_destroy(&this->mutex);
+    pthread_cond_destroy(&this->cond);
 }
 
 int SdsRpcServer::startListening(const char *addrstr, int port)
@@ -151,13 +166,6 @@ int SdsRpcServer::startListening(const char *addrstr, int port)
     struct sockaddr_in address;
     int opt = 1;
     socklen_t addrlen = sizeof(address);
-
-    if (!this->threadPool) {
-        this->threadPool = new pthread_t[THREAD_POOL_SZ];
-        for (i = 0; i < THREAD_POOL_SZ; i++) {
-            pthread_create(&this->threadPool[i], nullptr, &SdsRpcServer::handleRequest, this);
-        }
-    }
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0)
@@ -182,10 +190,18 @@ int SdsRpcServer::startListening(const char *addrstr, int port)
     }
 
     this->server_fd = fd;
+    if (!this->threadPool) {
+        this->threadPool = new pthread_t[THREAD_POOL_SZ];
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_create(&this->threadPool[i], nullptr, &SdsRpcServer::handleRequest, this);
+        }
+    }
 
     while ((client_fd = accept(fd, (struct sockaddr*)&address, &addrlen)) > -1) {
+        pthread_mutex_lock(&this->mutex);
         this->clientsQueue.push_back(client_fd);
         pthread_cond_signal(&this->cond);
+        pthread_mutex_unlock(&this->mutex);
     }
 
     return 0;
@@ -193,12 +209,21 @@ int SdsRpcServer::startListening(const char *addrstr, int port)
 
 void SdsRpcServer::shutdown()
 {
-    int i;
-    void *punused = nullptr;
-    this->running = 0;
-    for (i = 0; i < THREAD_POOL_SZ; i++) {
-        pthread_join(this->threadPool[i], &punused);
+    if (this->threadPool) {
+        pthread_mutex_lock(&this->mutex);
+        this->running = false;
+        pthread_cond_broadcast(&this->cond);
+        pthread_mutex_unlock(&this->mutex);
+
+        int i;
+        void *dummy = nullptr;
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_join(this->threadPool[i], &dummy);
+        }
+
+        close(this->server_fd);
+
+        delete[] this->threadPool;
+        this->threadPool = nullptr;
     }
-    delete[] this->threadPool;
-    this->threadPool = nullptr;
 }

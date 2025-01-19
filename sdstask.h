@@ -9,8 +9,10 @@
 class SdsTask
 {
 public:
-    SdsTask(std::function<void()> task_, time_t delay_, bool detach_ = true);
+    SdsTask(std::function<void(SdsTask *timer)> task_, time_t delay_, bool detach_ = true);
     ~SdsTask();
+
+    bool isRunning();
 
     void stop();
 
@@ -20,9 +22,9 @@ protected:
 private:
     pthread_t tthread;
     bool detach;
-    int run;
+    bool run;
     time_t delay;
-    std::function<void()> task;
+    std::function<void(SdsTask *timer)> task;
 
 };
 

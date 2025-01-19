@@ -142,7 +142,6 @@ SearchEntriesDB::SearchEntriesDB()
 SearchEntriesDB::~SearchEntriesDB()
 {
     this->close();
-    delete this->dbp;
 }
 
 void SearchEntriesDB::open(const char *db_path)
@@ -227,7 +226,29 @@ int SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
 
 void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, const char *query)
 {
+//    int ret = 0;
+//    DBT key, data;
+//    DBC *dbcp;
+//    if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
+//        return;
+//    }
 
+//    memset(&key, 0, sizeof(key));
+//    memset(&data, 0, sizeof(data));
+
+//    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
+//        SearchEntry se;
+//        SdsBytesBuf buf(data.data, data.size);
+//        se.read(buf);
+//    }
+
+//    if (ret != DB_NOTFOUND) {
+//        return;
+//    }
+
+//    if ((ret = dbcp->close(dbcp)) != 0) {
+
+//    }
 }
 
 void SearchEntriesDB::flush()
@@ -235,7 +256,9 @@ void SearchEntriesDB::flush()
     if (!this->dbp)
         return;
 
-    if (this->dbp->sync(this->dbp, 0)) {
+    int dberr = this->dbp->sync(this->dbp, 0);
+    if (dberr) {
+        logerr << "SearchEntriesDB error: " << db_strerror(dberr);
     }
 }
 
@@ -244,7 +267,9 @@ void SearchEntriesDB::close()
     if (!this->dbp)
         return;
 
-    if (this->dbp->close(this->dbp, 0)) {
+    int dberr = this->dbp->close(this->dbp, 0);
+    if (dberr) {
+        logerr << "SearchEntriesDB error: " << db_strerror(dberr);
     }
 }
 

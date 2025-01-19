@@ -39,6 +39,8 @@ LocalNode::LocalNode(SdsConfig &cfgs)
 
 LocalNode::~LocalNode()
 {
+    pthread_mutex_destroy(&this->mutex);
+
     delete this->ktable;
     delete this->searchesDB;
     delete this->syncNodesTask;
@@ -166,7 +168,7 @@ void LocalNode::startTasks()
 {
     logdebug << "Started Nodes lookup round";
     //Node sync task
-    this->syncNodesTask = new SdsTask([this] () {
+    this->syncNodesTask = new SdsTask([this] (SdsTask *timer) {
         std::vector<KadId> toLook;
         int i;
         if (this->ktable->isFull()) {
@@ -182,14 +184,14 @@ void LocalNode::startTasks()
                 toLook.push_back(KadId::idNbitsFarFrom(this->ktable->getSelfNode().getId(), i));
             }
         }
-        for (i = 0; i < toLook.size(); i++) {
+        for (i = 0; timer->isRunning() && i < toLook.size(); i++) {
             doNodesLookup(toLook.at(i), false);
         }
         return;
     }, 1000 * 15 * 60);
 
     //Results publish task
-    this->broadcastResultsTask = new SdsTask([this] () {
+    this->broadcastResultsTask = new SdsTask([this] (SdsTask *timer) {
         std::vector<SearchEntry> results;
         this->searchesDB->getEntriesForBroadcast(results);
         this->crawler->getEntriesForBroadcast(results);
@@ -200,6 +202,14 @@ void LocalNode::startTasks()
 
     this->crawler->startCrawling();
 
+}
+
+void LocalNode::shutdown()
+{
+    loginfo << "stopping tasks...";
+    this->syncNodesTask->stop();
+    this->broadcastResultsTask->stop();
+    this->crawler->stopCrawling();
 }
 
 //************************************************************************************//

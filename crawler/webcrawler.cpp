@@ -16,6 +16,13 @@ WebCrawler::WebCrawler(SdsConfig &cfg)
     }
 }
 
+WebCrawler::~WebCrawler()
+{
+    this->stopCrawling();
+    pthread_mutex_destroy(&this->mutex);
+    pthread_cond_destroy(&this->cond);
+}
+
 int WebCrawler::load(const char *path)
 {
     FILE *fp = fopen(path, "r");
@@ -89,6 +96,10 @@ void *WebCrawler::crawlingFunc(void *p)
         while (crawler->run) {
             pthread_mutex_lock(&crawler->mutex);
             while (crawler->urlQueue.empty()) {
+                if (!crawler->run) {
+                    goto crawling_end;
+                }
+
                 pthread_cond_wait(&crawler->cond, &crawler->mutex);
             }
             std::string url = crawler->urlQueue.front();
@@ -115,6 +126,9 @@ void *WebCrawler::crawlingFunc(void *p)
             }
         }
     }
+crawling_end:
+
+    logdebug << "crawler shutted down!";
     return nullptr;
 }
 
@@ -126,8 +140,13 @@ void WebCrawler::startCrawling()
 
 void WebCrawler::stopCrawling()
 {
+    pthread_mutex_lock(&this->mutex);
     this->run = false;
-    pthread_join(this->thread, nullptr);
+    pthread_cond_signal(&this->cond);
+    pthread_mutex_unlock(&this->mutex);
+
+    void *dummy = nullptr;
+    pthread_join(this->thread, &dummy);
 }
 
 int WebCrawler::getEntriesForBroadcast(std::vector<SearchEntry> &entries)

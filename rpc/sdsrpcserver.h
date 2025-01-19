@@ -23,7 +23,7 @@ private:
     static int storeResult(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
     static int findResults(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply);
 
-    int running;
+    bool running;
 
     LocalNode *localNode;
     std::deque<int> clientsQueue;

@@ -41,7 +41,7 @@ public:
     HttpServer();
     ~HttpServer();
 
-    int startListening(const char *addr, int port);
+    int startListening(const char *addr, int port, bool detach = false);
     int shutdown();
 
     void addHandler(std::string u, HttpRequestHandler *h);
@@ -54,6 +54,9 @@ protected:
     virtual int handleError(HttpRequest &request, HttpResponse &response, int errorCode);
 
 private:
+    bool detach;
+    bool running;
+    pthread_t acceptThread;
     pthread_t *threadPool;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -63,6 +66,7 @@ private:
     std::string defaultContentType;
 
     friend void *accessHandlerCallback(void *cls);
+    friend void *acceptFun(void *cls);
 };
 
 #endif // HTTPSERVER_H
