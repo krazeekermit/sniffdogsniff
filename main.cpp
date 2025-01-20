@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <vector>
 
@@ -35,34 +36,12 @@ struct SdsMainCtx {
     Sam3Session *i2pSession;
 };
 
-static SdsMainCtx sdsContext = {
-    .node = nullptr,
-    .rpcSrv = nullptr,
-    .webSrv = nullptr,
-    .torSession = nullptr,
-    .i2pSession = nullptr
-};
+SdsRpcServer *rpcSrv = nullptr;
 
 void sigintHandler(int signo)
 {
     loginfo << "INT signal received, shutting down...";
-    sdsContext.rpcSrv->shutdown();
-    sdsContext.node->shutdown();
-    sdsContext.webSrv->shutdown();
-
-    switch (sdsContext.p2p_hidden_service) {
-    case TOR_HIDDEN_SERVICE: {
-
-        }
-        break;
-    case I2P_HIDDEN_SERVICE:
-        loginfo << "closing I2P session";
-        sam3CloseSession(sdsContext.i2pSession);
-        break;
-    case NO_HIDDEN_SERVICE:
-    default:
-        break;
-    }
+    rpcSrv->shutdown();
 }
 
 int main(int argc, char **argv)
@@ -101,27 +80,42 @@ int main(int argc, char **argv)
         logwarn << "no configuration file submitted: using reasonable defaults";
     }
 
+    FILE *hsfp;
+    char hsfpath[1024];
     if (optdaemon) {
+        sprintf(hsfpath, "%s/%s", cfg.work_dir_path, "sds.pid");
+        struct stat pidstat = {0};
+        if (!stat(hsfpath, &pidstat)) {
+            logfatalerr << "Another instance of " << argv[0] << " is already running, pidfile=" << hsfpath;
+        }
         pid_t pid = fork();
         switch (pid) {
         case -1:
-           perror("fork");
-           exit(EXIT_FAILURE);
+           logfatalerr << "error creating child process";
         case 0:
+            cfg.log_to_file = 1;
            break;
         default:
-           logdebug << "sniffdogsniffd started as process pid=" << pid;
+           hsfp = fopen(hsfpath, "w");
+           if (!hsfp) {
+               logfatalerr << hsfpath << ": unable to write pid file";
+           }
+           fprintf(hsfp, "%d", pid);
+           fclose(hsfp);
+           loginfo << "sniffdogsniffd started as process pid=" << pid;
            exit(EXIT_SUCCESS);
         }
     }
 
-    FILE *hsfp;
-    char hsfpath[1024];
+    if (cfg.log_to_file) {
+        sprintf(hsfpath, "%s/%s", cfg.work_dir_path, cfg.log_file_name);
+        Logging::setLogFile(hsfpath);
+    }
+
     char hsaddr[512];
     char *privateKey = nullptr;
     TorControlSession torSession;
     Sam3Session i2pSession;
-    sdsContext.p2p_hidden_service = cfg.p2p_hidden_service;
     switch (cfg.p2p_hidden_service) {
     case TOR_HIDDEN_SERVICE: {
             tor_control_session_init(&torSession, cfg.tor_control_addr, 0, cfg.tor_auth_cookie, cfg.tor_password);
@@ -130,7 +124,6 @@ int main(int argc, char **argv)
             sprintf(hsfpath, "%s/%s", cfg.work_dir_path, "onionkey.dat");
             char pkbuf[512];
             if ((hsfp = fopen(hsfpath, "r"))) {
-
                 if (fgets(pkbuf, sizeof(pkbuf), hsfp) != NULL) {
                     privateKey = pkbuf;
                 }
@@ -146,7 +139,6 @@ int main(int argc, char **argv)
                 fclose(hsfp);
             }
 
-            sdsContext.torSession = &torSession;
             loginfo << "successfully created tor hidden service at dest " << hsaddr;
         }
         break;
@@ -179,7 +171,6 @@ int main(int argc, char **argv)
                 logfatalerr << "sam3 err" << i2pSession.error;
             }
 
-            sdsContext.i2pSession = &i2pSession;
             loginfo << "successfully created i2p hidden service at dest " << i2pSession.pubkey;
         }
         break;
@@ -197,24 +188,39 @@ int main(int argc, char **argv)
 
     //use smart ptrs?
     LocalNode  *node = new LocalNode(cfg);
-    sdsContext.node = node;
     loginfo << "started tasks...";
     node->startTasks();
 
     SdsWebUiServer *webSrv = new SdsWebUiServer(node, "./res");
-    sdsContext.webSrv = webSrv;
     loginfo << "started web ui server on ";
     webSrv->startListening("127.0.0.1", 8081, true);
 
-    SdsRpcServer *srv = new SdsRpcServer(node);
-    sdsContext.rpcSrv = srv;
+    rpcSrv = new SdsRpcServer(node);
 
     loginfo << "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port;
-    if (srv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
+    if (rpcSrv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
 
     }
 
-    delete srv;
+    node->shutdown();
+    webSrv->shutdown();
+
+    switch (cfg.p2p_hidden_service) {
+    case TOR_HIDDEN_SERVICE: {
+        loginfo << "closing TOR session";
+        tor_del_onion(&torSession, hsaddr);
+        }
+        break;
+    case I2P_HIDDEN_SERVICE:
+        loginfo << "closing I2P session";
+        sam3CloseSession(&i2pSession);
+        break;
+    case NO_HIDDEN_SERVICE:
+    default:
+        break;
+    }
+
+    delete rpcSrv;
     delete webSrv;
     delete node;
     return 0;

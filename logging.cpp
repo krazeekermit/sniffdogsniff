@@ -3,7 +3,7 @@
 static Logging _logging;
 
 Logging::Logging()
-    : level(LogLevel::LOG_LEVEL_DEBUG), fperr(stderr)
+    : level(LogLevel::LOG_LEVEL_DEBUG), fperr(stderr), logToFile(false)
 {
     pthread_mutex_init(&this->mutex, nullptr);
 }
@@ -15,7 +15,11 @@ void Logging::setLevel(LogLevel level)
 
 void Logging::setLogFile(const char *path)
 {
-
+    FILE *fp = fopen(path, "w");
+    if (fp) {
+        _logging.logToFile = true;
+        _logging.fperr = fp;
+    }
 }
 
 Log::Log(LogLevel level_)
@@ -50,24 +54,28 @@ Log::~Log()
 
     pthread_mutex_lock(&_logging.mutex);
 #if USE_COLORS
-    switch (level) {
-    case LOG_LEVEL_WARNING:
-        fprintf(_logging.fperr, ANSI_YELLOW);
-        break;
-    case LOG_LEVEL_FATAL:
-    case LOG_LEVEL_ERROR:
-        fprintf(_logging.fperr, ANSI_RED);
-        break;
-    case LOG_LEVEL_DEBUG:
-        fprintf(_logging.fperr, ANSI_CYAN);
-        break;
-    default:
-        break;
+    if (_logging.logToFile == false) {
+        switch (level) {
+        case LOG_LEVEL_WARNING:
+            fprintf(_logging.fperr, ANSI_YELLOW);
+            break;
+        case LOG_LEVEL_FATAL:
+        case LOG_LEVEL_ERROR:
+            fprintf(_logging.fperr, ANSI_RED);
+            break;
+        case LOG_LEVEL_DEBUG:
+            fprintf(_logging.fperr, ANSI_CYAN);
+            break;
+        default:
+            break;
+        }
     }
 #endif
     fprintf(_logging.fperr, "[%d/%02d/%02d %02d:%02d:%02d] [%5s] %s", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, slevel, this->logStream.str().c_str());
 #if USE_COLORS
-    fprintf(_logging.fperr, ANSI_RESET);
+    if (_logging.logToFile == false) {
+        fprintf(_logging.fperr, ANSI_RESET);
+    }
 #endif
     fprintf(_logging.fperr, "\n");
     pthread_mutex_unlock(&_logging.mutex);

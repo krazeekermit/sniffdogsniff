@@ -235,9 +235,7 @@ int sds_config_parse_file(SdsConfig *cfg, const char *path)
     }
 
     cfg->log_to_file = lookup_bool(root, LOG_TO_FILE, 0);
-    if (cfg->log_to_file) {
-        cfg->log_file_name = lookup_string(root, LOG_FILE_NAME, DEFAULT_LOG_FILE_NAME);
-    }
+    cfg->log_file_name = lookup_string(root, LOG_FILE_NAME, DEFAULT_LOG_FILE_NAME);
 
     cfg->db_cache_sz = lookup_int(root, DB_CACHE_SIZE, 512);
     cfg->allow_result_invalidate = lookup_bool(root, ALLOW_RESULTS_INVALIDATION, 1);

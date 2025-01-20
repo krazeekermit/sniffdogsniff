@@ -29,6 +29,7 @@ public:
     pthread_mutex_t mutex;
     LogLevel level;
     FILE *fperr;
+    bool logToFile;
 };
 
 class Log {
