@@ -2,6 +2,7 @@
 #include <algorithm>
 
 #include "kadbucket.h"
+#include "logging.h"
 
 #include "net/netutil.h"
 
@@ -28,8 +29,9 @@ KadId KadId::operator-(const KadId &id2) const
 {
     KadId distance;
     int i;
-    for (i = 0; i < KAD_ID_SZ; i++)
+    for (i = 0; i < KAD_ID_SZ; i++) {
         distance.id[i] = id[i] ^ id2.id[i];
+    }
 
     return distance;
 }

@@ -33,7 +33,7 @@ KadNode KadRoutingTable::getSelfNode() const
 
 void KadRoutingTable::setSelfNode(KadNode &newSelfNode)
 {
-    selfNode = newSelfNode;
+    this->selfNode = newSelfNode;
 }
 
 bool KadRoutingTable::isFull()
@@ -87,8 +87,10 @@ int KadRoutingTable::getClosestTo(std::vector<KadNode> &nodes, const KadId &id, 
     nodes.clear();
     int i;
     count = count <= allNodes.size() ? count : allNodes.size();
-    for (i = 0; i < count; i++)
+    for (i = 0; i < count; i++) {
+        //logdebug << " :: " << __func__ << " " << allNodes[i];
         nodes.push_back(allNodes[i]);
+    }
 
     return nodes.size();
 }

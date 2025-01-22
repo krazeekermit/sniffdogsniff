@@ -17,6 +17,7 @@ public:
     LocalNode(SdsConfig &cfgs);
     ~LocalNode();
 
+    void setSelfNodeAddress(std::string address);
     int ping(const KadId &id, std::string address);
     int findNode(std::map<KadId, std::string> &nearest, const KadId &id);
     int storeResult(SearchEntry se);

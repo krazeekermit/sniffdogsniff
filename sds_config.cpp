@@ -286,8 +286,7 @@ int sds_config_parse_file(SdsConfig *cfg, const char *path)
     delete[] hidden_service;
 
     cfg->p2p_server_bind_port = lookup_int(root, P2P_BIND_PORT, 4111);
-    if (!cfg->p2p_hidden_service)
-        cfg->p2p_server_bind_addr = lookup_string(root, P2P_BIND_ADDR, "127.0.0.1");
+    cfg->p2p_server_bind_addr = lookup_string(root, P2P_BIND_ADDR, "127.0.0.1");
 
     std::vector<cfgentry*> entries;
     lookups(root, entries, EXTERNAL_SEARCH_ENGINE);

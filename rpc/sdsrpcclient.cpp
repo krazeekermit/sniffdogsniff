@@ -78,7 +78,7 @@ int SdsRpcClient::newConnection()
     int fd = -1;
 
     char suffix[64];
-    char addr[256];
+    char addr[1024];
     if (net_urlparse(addr, suffix, &port, this->nodeAddress.c_str())) {
         return -1;
     }
@@ -90,15 +90,22 @@ int SdsRpcClient::newConnection()
         }
     } else if (strcmp(suffix, ".i2p") == 0) {
         Sam3Session ses;
-        if (sam3NameLookup(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, addr)) {
-            logdebug << "i2p naming lookup fail:" << ses.error;
-            return -2;
-        }
+        Sam3Connection *samConn = nullptr;
         if (sam3CreateSession(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, nullptr, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
             return -2;
         }
-        Sam3Connection *samConn = sam3StreamConnect(&ses, ses.destkey);
+        if (strstr(addr, ".b32.i2p")) {
+            if (sam3NameLookup(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, addr)) {
+                logdebug << "i2p naming lookup fail:" << ses.error;
+                sam3CloseSession(&ses);
+                return -2;
+            }
+            samConn = sam3StreamConnect(&ses, ses.destkey);
+        } else {
+            samConn = sam3StreamConnect(&ses, addr);
+        }
         if (!samConn) {
+            sam3CloseSession(&ses);
             return -2;
         }
 

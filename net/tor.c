@@ -82,7 +82,7 @@ static int read_reply(int fd, char *reply_buf, size_t buf_size)
     int errcode = TOR_CODE_SUCCESS;
     sscanf(resultp, "%d ", &errcode);
     if (errcode != TOR_CODE_SUCCESS) {
-        return -errcode;
+        return errcode;
     }
 
     return 0;
@@ -90,8 +90,9 @@ static int read_reply(int fd, char *reply_buf, size_t buf_size)
 
 static int read_reply_PROTOCOLINFO(int fd, char *method, char *cfpath) { // authmethod, cookiefile
     char reply_buf[2048];
-    if (read_reply(fd, reply_buf, sizeof(reply_buf)))
-        return -1;
+    int tor_errno = read_reply(fd, reply_buf, sizeof(reply_buf));
+    if (tor_errno)
+        return tor_errno;
 
     char *tokap = NULL;
     char *tokv = NULL;
@@ -131,8 +132,9 @@ static int read_reply_PROTOCOLINFO(int fd, char *method, char *cfpath) { // auth
 static int read_reply_AUTHCHALLENGE(int fd, unsigned char *hash, unsigned char *nonce)
 { // authmethod, cookiefile
     char reply_buf[2048];
-    if (read_reply(fd, reply_buf, sizeof(reply_buf)))
-        return -1;
+    int tor_errno = read_reply(fd, reply_buf, sizeof(reply_buf));
+    if (tor_errno)
+        return tor_errno;
 
     char *tokap = NULL;
     char *tokv = NULL;
@@ -170,8 +172,9 @@ static int read_reply_AUTHCHALLENGE(int fd, unsigned char *hash, unsigned char *
 static int read_reply_ADD_ONION(int fd, char *priv, char *onionaddr)
 { // authmethod, cookiefile
     char reply_buf[2048];
-    if (read_reply(fd, reply_buf, sizeof(reply_buf)))
-        return -1;
+    int tor_errno = read_reply(fd, reply_buf, sizeof(reply_buf));
+    if (tor_errno)
+        return tor_errno;
 
     char *tokap = NULL;
     char *tokv = NULL;
@@ -190,11 +193,55 @@ static int read_reply_ADD_ONION(int fd, char *priv, char *onionaddr)
 
     toka = strtok_r(toka, "=", &tokv);
     if (!toka || strcmp(toka, "250-PrivateKey")) {
-        return -1;
+        return 0;
     }
     strcpy(priv, tokv);
 
     return 0;// serverhash, servernonce
+}
+
+char *tor_strerror(int tor_errno)
+{
+    if (tor_errno >= EPERM && tor_errno <= ERANGE) {
+        return strerror(tor_errno);
+    }
+
+    switch (tor_errno) {
+        case -2:
+            return "Unknown tor control auth method";
+        case 451:
+            return "Resource exhausted";
+        case 500:
+            return "Syntax error: protocol";
+        case 510:
+            return "Unrecognized command";
+        case 511:
+            return "Unimplemented command";
+        case 512:
+            return "Syntax error in command argument";
+        case 513:
+            return "Unrecognized command argument";
+        case 514:
+            return "Authentication required";
+        case 515:
+            return "Bad authentication";
+        case 550:
+            return "Unspecified Tor error";
+        case 551:
+            return "Internal error";
+        case 552:
+            return "Unrecognized entity";
+        case 553:
+            return "Invalid configuration value";
+        case 554:
+            return "Invalid descriptor";
+        case 555:
+            return "Unmanaged entity";
+        case 650:
+            return "Asynchronous event notification";
+        default:
+            return "Unknown error";
+    }
 }
 
 int tor_control_session_init(TorControlSession *ctx, char *addr, int port, int auth_cookie, char *pass)
@@ -202,9 +249,12 @@ int tor_control_session_init(TorControlSession *ctx, char *addr, int port, int a
     ctx->auth_cookie = auth_cookie;
     ctx->control_addr = addr;
     ctx->control_port = port;
-    strncpy(ctx->password, pass, strlen(pass));
+    memset(ctx->privkey, 0, sizeof(ctx->privkey));
+    memset(ctx->service_id, 0, sizeof(ctx->service_id));
+    if (pass) {
+        strncpy(ctx->password, pass, strlen(pass));
+    }
     ctx->control_sock_fd = -1;
-    ctx->errstr[0] = '\0';
     return 0;
 }
 
@@ -219,25 +269,27 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
     char buf[2048];
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0)
-        return -1;
+    if (fd < 0) {
+        return errno;
+    }
 
     int flags =1;
     if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof(flags))) {
-        return -1;
+        return errno;
     };
 
     if (inet_pton(AF_INET, ctx->control_addr, &address.sin_addr) <= 0) {
-        return -1;
+        return errno;
     }
 
     address.sin_family = AF_INET;
     address.sin_port = htons(ctx->control_port);
 
     if (connect(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        return -1;
+        return errno;
     }
 
+    int tor_errno = 0;
     char password[256];
     size_t send_sz = 0;
     if (ctx->auth_cookie) {
@@ -245,28 +297,33 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         sprintf(buf, "PROTOCOLINFO\n");
         send_sz = strlen(buf);
         if (send(fd, buf, send_sz, 0) != send_sz) {
-            return -1;
+            close(fd);
+            return errno;
         }
         char method[64];
         char cfpath[512];
-        if (read_reply_PROTOCOLINFO(fd, method, cfpath)) {
-            return -1;
+        tor_errno = read_reply_PROTOCOLINFO(fd, method, cfpath);
+        if (tor_errno) {
+            close(fd);
+            return tor_errno;
         }
 
         if (strcmp(method, "COOKIE,SAFECOOKIE")) {
-            return -1;
+            close(fd);
+            return -2;
         }
 
         unsigned char cookie_data[32];
         FILE *cfp = fopen(cfpath, "rb");
         if (!cfp) {
-            sprintf(ctx->errstr, "cannot open tor cookie file %s: %s", cfpath, strerror(errno));
-            return -1;
+            close(fd);
+            return errno;
         }
 
         if (fread(cookie_data, sizeof(cookie_data), 1, cfp) != 1) {
+            close(fd);
             fclose(cfp);
-            return -1;
+            return errno;
         }
         fclose(cfp);
 
@@ -281,11 +338,14 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         sprintf(buf, "AUTHCHALLENGE SAFECOOKIE %s\n", hex_data);
         send_sz = strlen(buf);
         if (send(fd, buf, send_sz, 0) != send_sz) {
-            return -1;
+            close(fd);
+            return errno;
         }
 
-        if (read_reply_AUTHCHALLENGE(fd, server_hash, server_nonce)) {
-            return -1;
+        tor_errno = read_reply_AUTHCHALLENGE(fd, server_hash, server_nonce);
+        if (tor_errno) {
+            close(fd);
+            return tor_errno;
         }
 
         HMAC_CTX *hmac_ctx = HMAC_CTX_new();
@@ -298,7 +358,8 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         HMAC_CTX_free(hmac_ctx);
 
         if (memcmp(server_hash, server_hash_chk, 32)) {
-            return -1;
+            close(fd);
+            return -3;
         }
 
         hmac_ctx = HMAC_CTX_new();
@@ -310,52 +371,63 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         HMAC_CTX_free(hmac_ctx);
 
         btostrhex(password, server_hash_chk, 32);
-    } else if (ctx->password) {
+    } else {
         strcpy(password, ctx->password);
     }
 
     sprintf(buf, "AUTHENTICATE %s\n", password);
     send_sz = strlen(buf);
     if (send(fd, buf, send_sz, 0) != send_sz) {
-        return -1;
+        close(fd);
+        return errno;
     }
-    if (read_reply(fd, buf, 2048)) {
-        return -1;
+
+    tor_errno = read_reply(fd, buf, 2048);
+    if (tor_errno) {
+        close(fd);
+        return tor_errno;
     }
 
     ctx->control_sock_fd = fd;
 
     if (privkey) {
+        strcpy(ctx->privkey, privkey);
         sprintf(buf, "ADD_ONION %s Port=%d,%s:%d\n", privkey, bport, baddr, bport);
     } else {
         sprintf(buf, "ADD_ONION NEW:ED25519-V3 Port=%d,%s:%d\n", bport, baddr, bport);
     }
     send_sz = strlen(buf);
     if (send(fd, buf, send_sz, 0) != send_sz) {
-        return -1;
+        close(fd);
+        return errno;
     }
 
-    if (read_reply_ADD_ONION(fd, ctx->privkey, onionaddr)) {
-        return -1;
+    tor_errno = read_reply_ADD_ONION(fd, ctx->privkey, ctx->service_id);
+    if (tor_errno) {
+        close(fd);
+        return tor_errno;
     }
 
+    sprintf(onionaddr, "%s.onion:%d", ctx->service_id, bport);
     return 0;
 }
 
-int tor_del_onion(TorControlSession *ctx, const char *onion_addr)
+int tor_del_onion(TorControlSession *ctx)
 {
     if (ctx->control_sock_fd < 0) {
         return -1;
     }
 
     char buf[2048];
-    sprintf(buf, "DEL_ONION %s\n", onion_addr);
+    sprintf(buf, "DEL_ONION %s\n", ctx->service_id);
     size_t send_sz = strlen(buf);
     if (send(ctx->control_sock_fd, buf, send_sz, 0) != send_sz) {
-        return -1;
+        return errno;
     }
-    if (read_reply(ctx->control_sock_fd, buf, 2048)) {
-        return -1;
+
+    int tor_errno = read_reply(ctx->control_sock_fd, buf, 2048);
+    if (tor_errno) {
+        return tor_errno;
     }
     return 0;
 }

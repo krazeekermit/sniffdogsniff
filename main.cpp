@@ -102,7 +102,7 @@ int main(int argc, char **argv)
            }
            fprintf(hsfp, "%d", pid);
            fclose(hsfp);
-           loginfo << "sniffdogsniffd started as process pid=" << pid;
+           loginfo << "started as daemon pid=" << pid;
            exit(EXIT_SUCCESS);
         }
     }
@@ -112,15 +112,15 @@ int main(int argc, char **argv)
         Logging::setLogFile(hsfpath);
     }
 
+    LocalNode  *node = new LocalNode(cfg);
+
     char hsaddr[512];
     char *privateKey = nullptr;
     TorControlSession torSession;
     Sam3Session i2pSession;
     switch (cfg.p2p_hidden_service) {
     case TOR_HIDDEN_SERVICE: {
-            tor_control_session_init(&torSession, cfg.tor_control_addr, 0, cfg.tor_auth_cookie, cfg.tor_password);
-
-
+            tor_control_session_init(&torSession, cfg.tor_control_addr, cfg.tor_control_port, cfg.tor_auth_cookie, cfg.tor_password);
             sprintf(hsfpath, "%s/%s", cfg.work_dir_path, "onionkey.dat");
             char pkbuf[512];
             if ((hsfp = fopen(hsfpath, "r"))) {
@@ -130,8 +130,9 @@ int main(int argc, char **argv)
                 fclose(hsfp);
             }
 
-            if (tor_add_onion(&torSession, hsaddr, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port, privateKey)) {
-                logfatalerr << "fatal error could not create onion hidden service" << torSession.errstr;
+            int tor_errno = tor_add_onion(&torSession, hsaddr, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port, privateKey);
+            if (tor_errno) {
+                logfatalerr << "could not create tor hidden service: " << tor_strerror(tor_errno);
             }
 
             if ((hsfp = fopen(hsfpath, "w"))) {
@@ -139,12 +140,14 @@ int main(int argc, char **argv)
                 fclose(hsfp);
             }
 
+            node->setSelfNodeAddress(hsaddr);
             loginfo << "successfully created tor hidden service at dest " << hsaddr;
         }
         break;
     case I2P_HIDDEN_SERVICE:
         sprintf(hsfpath, "%s/%s", cfg.work_dir_path, "i2pkey.dat");
-        char pkbuf[512];
+        char pkbuf[SAM3_PRIVKEY_MAX_SIZE];
+        memset(pkbuf, 0, sizeof(pkbuf));
         if ((hsfp = fopen(hsfpath, "r"))) {
 
             if (fgets(pkbuf, sizeof(pkbuf), hsfp) != NULL) {
@@ -154,28 +157,38 @@ int main(int argc, char **argv)
         }
 
         if (!privateKey) {
-            if (sam3GenerateKeys(&i2pSession, cfg.i2p_sam_addr, 0, Sam3SigType::EdDSA_SHA512_Ed25519))
-                logfatalerr << "sam3 err" << i2pSession.error;
-            privateKey = i2pSession.privkey;
+            if (sam3GenerateKeys(&i2pSession, cfg.i2p_sam_addr, cfg.i2p_sam_port, Sam3SigType::EdDSA_SHA512_Ed25519)) {
+                logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+            }
 
+            strcpy(pkbuf, i2pSession.privkey);
+            privateKey = pkbuf;
             if ((hsfp = fopen(hsfpath, "w"))) {
                 fprintf(hsfp, "%s", i2pSession.privkey);
                 fclose(hsfp);
             }
-
-            if (sam3CreateSession(&i2pSession, cfg.i2p_sam_addr, 0, privateKey, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
-                logfatalerr << "sam3 err" << i2pSession.error;
-            }
-
-            if (sam3StreamForward(&i2pSession, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
-                logfatalerr << "sam3 err" << i2pSession.error;
-            }
-
-            loginfo << "successfully created i2p hidden service at dest " << i2pSession.pubkey;
         }
+
+        if (sam3CreateSession(&i2pSession, cfg.i2p_sam_addr, cfg.i2p_sam_port, privateKey, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
+            logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+        }
+
+        if (sam3StreamForward(&i2pSession, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
+            logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+        }
+
+        /*
+         *  As of now we use the public key as an address (base64) thus the naming lookup is not necessary.
+         *  In the future we can create base32 i2p encoded addresses
+         */
+        sprintf(hsaddr, "%s.i2p:%d", i2pSession.pubkey, cfg.p2p_server_bind_port);
+        node->setSelfNodeAddress(hsaddr);
+        loginfo << "successfully created i2p hidden service at dest " << hsaddr;
         break;
     case NO_HIDDEN_SERVICE:
     default:
+        sprintf(hsaddr, "%s:%d", cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port);
+        node->setSelfNodeAddress(hsaddr);
         break;
     }
 
@@ -186,8 +199,6 @@ int main(int argc, char **argv)
 
     }
 
-    //use smart ptrs?
-    LocalNode  *node = new LocalNode(cfg);
     loginfo << "started tasks...";
     node->startTasks();
 
@@ -207,12 +218,15 @@ int main(int argc, char **argv)
 
     switch (cfg.p2p_hidden_service) {
     case TOR_HIDDEN_SERVICE: {
-        loginfo << "closing TOR session";
-        tor_del_onion(&torSession, hsaddr);
+        loginfo << "deleting tor hidden service at dest " << hsaddr;
+        int tor_errno = tor_del_onion(&torSession);
+        if (tor_errno) {
+            logfatalerr << "could not delete tor hidden service: " << tor_strerror(tor_errno);
+        }
         }
         break;
     case I2P_HIDDEN_SERVICE:
-        loginfo << "closing I2P session";
+        loginfo << "deleting i2p hidden service at dest " << hsaddr;
         sam3CloseSession(&i2pSession);
         break;
     case NO_HIDDEN_SERVICE:

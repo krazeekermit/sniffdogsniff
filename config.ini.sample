@@ -25,12 +25,12 @@ web_ui_bind_addr = 127.0.0.1:8081 # Web Ui bind address and port
 # p2p_hidden_service = tor # or i2p or none
 # for i2p service p2p_bind_port is not needed
 p2p_bind_addr = 127.0.0.1
-p2p_bind_port = 4222
+p2p_bind_port = 4225
 
 [peers]
-address = 127.0.0.1:4221
+address = tereiuhuygftfrdggggy665fff.onion:4221
 address = 10.10.0.34:4222
-address = 127.0.0.1:56778
+address = yftftftftftf5re5r5erdffg78uj88j8j8j.onion:56778
 
 [blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion

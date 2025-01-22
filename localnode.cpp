@@ -47,6 +47,14 @@ LocalNode::~LocalNode()
     delete this->broadcastResultsTask;
 }
 
+void LocalNode::setSelfNodeAddress(std::string address)
+{
+    KadNode self(address.c_str());
+    this->ktable->setSelfNode(self);
+
+    logdebug << "self node " << self;
+}
+
 int LocalNode::ping(const KadId &id, std::string address)
 {
 
@@ -172,7 +180,6 @@ void LocalNode::startTasks()
         std::vector<KadId> toLook;
         int i;
         if (this->ktable->isFull()) {
-            logdebug << "tabel IS full!";
             time_t now = time(nullptr);
             for (i = 0; i < KAD_ID_BIT_SZ; i++) {
                 if ((now - this->ktable->getNodeAtHeight(i, 0).getLastSeen()) > UNIX_HOUR) {
@@ -234,8 +241,9 @@ int LocalNode::doNodesLookup(const KadId targetId, bool check)
         futures.clear();
         for (int i = 0; i < alphaClosest.size(); i++) {
             KadNode ikn = alphaClosest[i];
-            if (ikn.getId() == selfNodeId)
+            if (ikn.getId() == selfNodeId) {
                 continue;
+            }
 
             futures.push_back(std::move(std::async(std::launch::async, [ikn, targetId]() {
                 SdsRpcClient client(ikn.getAddress());
@@ -249,7 +257,7 @@ int LocalNode::doNodesLookup(const KadId targetId, bool check)
         }
 
         discovered.clear();
-        for (int i = 0; i < alphaClosest.size(); i++) {
+        for (int i = 0; i < futures.size(); i++) {
             KadNode ikn = alphaClosest[i];
             probed.insert(ikn.getId());
 
@@ -280,8 +288,9 @@ int LocalNode::doNodesLookup(const KadId targetId, bool check)
             }
         }
 
-//        if (time(nullptr) - startTime > TIME_TASK_MAX)
-//            break;
+        if (time(nullptr) - startTime > 60) {
+            break;
+        }
     }
 
     logdebug << "Discovered " << nDiscovered << " closest nodes to " << targetId;
