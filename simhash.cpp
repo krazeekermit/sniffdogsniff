@@ -1,69 +1,65 @@
 #include "simhash.h"
 
+#include "common/stringutil.h"
+
 #include <map>
 #include <cstring>
 #include <algorithm>
 #include <cctype>
 #include <string>
 
+#include <climits>
+
 struct wordhash {
     int weight;
     unsigned char *hash;
 };
 
-static inline bool toSkipChar(char c)
+SimHash::SimHash(std::string str)
 {
-    return c == '.' || c == ',' || c == ';' || c == ':' || c == '(' || c == ')' ||
-           c == '[' || c == ']' || c == '{' || c == '}' || c == '#' || c == '@';
+    std::vector<std::string> tokens = tokenize(str, " \n\r", ".:,;()[]{}#@");
+    this->init(tokens);
 }
 
-static void strclean(std::string &str)
+SimHash::SimHash(std::vector<std::string> &tokens)
 {
-    size_t i;
-    for (i = 0; i < str.size(); i++) {
-        str[i] = std::tolower(str[i]);
-    }
-
-    for (i = 0; i < str.size(); i++) {
-        if (!toSkipChar(str[i])) {
-            break;
-        }
-    }
-    str.erase(0, i);
-
-    size_t lastIdx = str.size() - 1;
-    for (i = lastIdx; i >= 0; i--) {
-        if (!toSkipChar(str[i])) {
-            break;
-        }
-    }
-    str.erase(i+1, lastIdx);
+    this->init(tokens);
 }
 
-void SimHash::update(std::string str)
+KadId SimHash::getId() const
 {
-    size_t pos = 0;
-    while ((pos = str.find(" ")) != std::string::npos) {
-        std::string tok = str.substr(0, pos);
-        strclean(tok);
-        if (tok.size()) {
-            this->tokens.push_back(tok);
-        }
-        str.erase(0, pos + 1);
-    }
-
-    strclean(str);
-    if (str.size()) {
-        this->tokens.push_back(str);
-    }
+    return id;
 }
 
-KadId SimHash::digest() const
+int SimHash::distance(SimHash &other)
+{
+    KadId ax = this->id - other.id;
+    int hamming = 0;
+    for (int i = 0; i < KAD_ID_SZ; i++) {
+        for (unsigned char n = ax.id[i]; n; hamming++) {
+            n &= n - 1;
+        }
+    }
+
+    return hamming;
+}
+
+void SimHash::read(SdsBytesBuf &buf)
+{
+    buf.readBytes(this->id.id, KAD_ID_SZ);
+}
+
+void SimHash::write(SdsBytesBuf &buf)
+{
+    buf.writeBytes(this->id.id, KAD_ID_SZ);
+}
+
+void SimHash::init(std::vector<std::string> &tokens)
 {
     int i, j;
     std::map<std::string, wordhash> tokenMults;
-    for (i = 0; i < this->tokens.size(); i++) {
-        std::string tok = this->tokens[i];
+    for (i = 0; i < tokens.size(); i++) {
+        std::string tok = tokens[i];
         if (tokenMults.find(tok) == tokenMults.end()) {
             unsigned char *hash = new unsigned char[SHA_DIGEST_LENGTH];
             SHA_CTX ctx;
@@ -93,21 +89,12 @@ KadId SimHash::digest() const
         delete[] hash;
     }
 
-    KadId id;
+    memset(this->id.id, 0, sizeof(this->id.id));
     for (i = 0; i < SHA_DIGEST_LENGTH; i++) {
         for (j = 0; j < 8; j++) {
             if (simWeights[i*8 + j] > 0) {
-                id.id[i] |= (0x80 >> j);
+                this->id.id[i] |= (0x80 >> j);
             }
         }
     }
-
-    return id;
-}
-
-const KadId SimHash::digest(std::string str)
-{
-    SimHash sim;
-    sim.update(str);
-    return sim.digest();
 }

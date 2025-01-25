@@ -120,8 +120,8 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     std::set<KadId> failed;
     std::vector<KadNode> nodes;
     std::set<KadNode> targetNodes;
-    KadId simHash = SimHash::digest(query);
-    this->ktable->getKClosestTo(nodes, simHash);
+    SimHash simHash(query);
+    this->ktable->getKClosestTo(nodes, simHash.getId());
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
         KadId id = it->getId();
         if (id == selfNodeId) {
@@ -310,7 +310,7 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
 
         targetNodes.clear();
         std::vector<KadNode> nodes;
-        this->ktable->getKClosestTo(nodes, rit->getSimHash());
+        this->ktable->getKClosestTo(nodes, rit->getSimHash().getId());
         for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
             KadId id = nit->getId();
             if (id == selfNodeId) {

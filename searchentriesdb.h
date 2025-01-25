@@ -1,8 +1,7 @@
 #ifndef SEARCHENTRIESDB_H
 #define SEARCHENTRIESDB_H
 
-#include "kademlia/kadbucket.h"
-#include "sdsbytesbuf.h"
+#include "simhash.h"
 
 #include <map>
 #include <cstdint>
@@ -45,11 +44,11 @@ public:
     std::string getTitle() const;
     std::string getUrl() const;
 
-    KadId getSimHash() const;
+    SimHash getSimHash() const;
 
 private:
     SearchEntryHash256 hash;
-    KadId simHash;
+    SimHash simHash;
     std::string title;
     std::string url;
     SearchEntryType type;
@@ -74,7 +73,7 @@ public:
 
     void insertResult(SearchEntry &se);
     int getEntriesForBroadcast(std::vector<SearchEntry> &list);
-    void doSearch(std::vector<SearchEntry> &entries, const char *query);
+    void doSearch(std::vector<SearchEntry> &entries, std::string query);
     void flush();
     void close();
 

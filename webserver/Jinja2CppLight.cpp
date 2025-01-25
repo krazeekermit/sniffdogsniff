@@ -10,8 +10,6 @@
 #include <vector>
 #include <sstream>
 
-#include "stringhelper.h"
-
 #include "Jinja2CppLight.h"
 
 using namespace std;
@@ -286,7 +284,7 @@ STATIC std::string Template::doSubstitutions( std::string sourceCode, const Valu
         int dotPos = -1;
         int tupleElem = -1;
         if ((dotPos = name.find(".")) > -1) {
-            tupleElem = atoi(name.substr(dotPos + 1, name.length()));
+            tupleElem = stoi(name.substr(dotPos + 1, name.length()));
             name = name.substr(0, dotPos);
         }
 //        cout << "name: " << name << endl;

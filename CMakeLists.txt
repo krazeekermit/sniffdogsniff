@@ -20,6 +20,7 @@ add_executable(sniffdogsniffd
     )
 
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")
+add_subdirectory(common)
 add_subdirectory(rpc)
 add_subdirectory(kademlia)
 add_subdirectory(crawler)

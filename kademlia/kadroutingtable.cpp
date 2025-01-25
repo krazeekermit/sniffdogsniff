@@ -74,25 +74,44 @@ int KadRoutingTable::getKClosestTo(std::vector<KadNode> &nodes, const KadId &id)
     return getClosestTo(nodes, id, KAD_ID_SZ);
 }
 
-int KadRoutingTable::getClosestTo(std::vector<KadNode> &nodes, const KadId &id, int count)
+int KadRoutingTable::getClosestTo(std::vector<KadNode> &closest, const KadId &id, int count)
 {
+    closest.clear();
     if (this->selfNode.getId() == id)
         return 0;
 
-    std::vector<KadNode> allNodes = getAllNodes();
-    std::sort(allNodes.begin(), allNodes.end(), [id](const KadNode &a, const KadNode &b) {
+    int height, i, j;
+    KadId distance = this->selfNode.getId() - id;
+    height = distance.height();
+
+    KadBucket *buck = this->buckets[height];
+    for (j = 0; j < buck->nodes.size() && closest.size() < count; j++) {
+        closest.push_back(buck->nodes[j]);
+    }
+
+    for (i = 1; height - i >= 0 || height + i < KAD_ID_BIT_SZ; i++) {
+        if (height - i >= 0) {
+            buck = this->buckets[height - i];
+
+            for (j = 0; j < buck->nodes.size() && closest.size() < count; j++) {
+                closest.push_back(buck->nodes[j]);
+            }
+        }
+
+        if (height + i < KAD_ID_BIT_SZ) {
+            buck = this->buckets[height + i];
+
+            for (j = 0; j < buck->nodes.size() && closest.size() < count; j++) {
+                closest.push_back(buck->nodes[j]);
+            }
+        }
+    }
+
+    std::sort(closest.begin(), closest.end(), [id](const KadNode &a, const KadNode &b) {
         return (a.getId() - id) < (b.getId() - id);
     });
 
-    nodes.clear();
-    int i;
-    count = count <= allNodes.size() ? count : allNodes.size();
-    for (i = 0; i < count; i++) {
-        //logdebug << " :: " << __func__ << " " << allNodes[i];
-        nodes.push_back(allNodes[i]);
-    }
-
-    return nodes.size();
+    return closest.size();
 }
 
 const KadNode &KadRoutingTable::getNodeAtHeight(int height, int index)

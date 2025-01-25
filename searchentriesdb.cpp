@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "common/stringutil.h"
 #include "utils.h"
 #include "macros.h"
 #include "logging.h"
@@ -17,7 +18,7 @@ SearchEntry::SearchEntry()
 {}
 
 SearchEntry::SearchEntry(const std::string title, const std::string url, SearchEntryType type, std::map<uint8_t, std::string> properties)
-    : title(title), url(url), type(type), properties(properties)
+    : simHash(title), title(title), url(url), type(type), properties(properties)
 {
     this->hash = {};
     reHash();
@@ -46,7 +47,7 @@ void SearchEntry::removeProperty(uint8_t idx)
 
 /* Calculate the SHA256 of the URL */
 void SearchEntry::reHash()
-{
+{    
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
     SHA256_Update(&ctx, this->url.c_str(), this->url.length());
@@ -55,7 +56,7 @@ void SearchEntry::reHash()
 
 void SearchEntry::read(SdsBytesBuf &buf)
 {
-    buf.readBytes(this->simHash.id, KAD_ID_SZ);
+    this->simHash.read(buf);
     this->title = buf.readString();
     this->url = buf.readString();
     this->type = static_cast<SearchEntryType>(buf.readUint8());
@@ -72,7 +73,7 @@ void SearchEntry::read(SdsBytesBuf &buf)
 
 void SearchEntry::write(SdsBytesBuf &buf)
 {
-    buf.writeBytes(this->simHash.id, KAD_ID_SZ);
+    this->simHash.write(buf);
     buf.writeString(this->title);
     buf.writeString(this->url);
     buf.writeUint8(static_cast<uint8_t>(this->type));
@@ -88,7 +89,7 @@ SearchEntryHash256 SearchEntry::getHash() const
     return hash;
 }
 
-KadId SearchEntry::getSimHash() const
+SimHash SearchEntry::getSimHash() const
 {
     return this->simHash;
 }
@@ -164,6 +165,7 @@ void SearchEntriesDB::open(const char *db_path)
     DBT key, data;
     DBC *dbcp;
     if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
+        logerr << db_strerror(ret);
         return;
     }
 
@@ -181,7 +183,7 @@ void SearchEntriesDB::open(const char *db_path)
     }
 
     if ((ret = dbcp->close(dbcp)) != 0) {
-
+        logerr << db_strerror(ret);
     }
 }
 
@@ -224,31 +226,54 @@ int SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
     return list.size();
 }
 
-void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, const char *query)
+static int similarTo(SearchEntry &se, std::vector<std::string> &tokens)
 {
-//    int ret = 0;
-//    DBT key, data;
-//    DBC *dbcp;
-//    if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
-//        return;
-//    }
+    // to be implemented...
+    int count = 0;
+    return count + 1;
+}
 
-//    memset(&key, 0, sizeof(key));
-//    memset(&data, 0, sizeof(data));
+void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string query)
+{
+    int ret = 0;
+    DBT key, data;
+    DBC *dbcp;
+    if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
+        logerr << db_strerror(ret);
+        return;
+    }
 
-//    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
-//        SearchEntry se;
-//        SdsBytesBuf buf(data.data, data.size);
-//        se.read(buf);
-//    }
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
 
-//    if (ret != DB_NOTFOUND) {
-//        return;
-//    }
+    std::vector<std::string> queryTokens = tokenize(query, " \n\r", ".:,;()[]{}#@");
+    SimHash queryHash(queryTokens);
 
-//    if ((ret = dbcp->close(dbcp)) != 0) {
+    std::vector<SearchEntry> candidates;
+    while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
+        SearchEntry se;
+        SdsBytesBuf buf(data.data, data.size);
+        se.read(buf);
 
-//    }
+        if (se.getSimHash().distance(queryHash) < 48) {
+            candidates.push_back(se);
+        }
+    }
+
+    if (ret != DB_NOTFOUND) {
+        return;
+    }
+
+    if ((ret = dbcp->close(dbcp)) != 0) {
+        logerr << db_strerror(ret);
+    }
+
+    for (int i = 0; i < candidates.size(); i++) {
+        SearchEntry candidate = candidates[i];
+        if (similarTo(candidate, queryTokens)) {
+            entries.push_back(candidate);
+        }
+    }
 }
 
 void SearchEntriesDB::flush()

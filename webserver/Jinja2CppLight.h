@@ -12,7 +12,8 @@
 // - variable substitution, ie {{myvar}}
 // - for loops, ie {% for i in range(myvar) %}
 
-#pragma once
+#ifndef JINJA_CPP_LIGHT_H
+#define JINJA_CPP_LIGHT_H
 
 #include <string>
 #include <iostream>
@@ -21,7 +22,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <memory>
-#include "stringhelper.h"
+#include "common/stringutil.h"
 
 #define VIRTUAL virtual
 #define STATIC static
@@ -356,4 +357,6 @@ private:
 };
 
 }
+
+#endif // JINJA_CPP_LIGHT_H
 

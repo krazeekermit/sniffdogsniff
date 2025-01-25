@@ -2,6 +2,7 @@
 #define SIMHASH_H
 
 #include "kademlia/kadbucket.h"
+#include "sdsbytesbuf.h"
 
 #include <iostream>
 #include <vector>
@@ -9,15 +10,20 @@
 class SimHash {
 public:
     SimHash() = default;
+    SimHash(std::string str);
+    SimHash(std::vector<std::string> &tokens);
     ~SimHash() = default;
 
-    void update(std::string str);
-    KadId digest() const;
+    KadId getId() const;
+    int distance(SimHash &other);
 
-    static const KadId digest(std::string str);
+    void read(SdsBytesBuf &buf);
+    void write(SdsBytesBuf &buf);
 
 private:
-    std::vector<std::string> tokens;
+    KadId id;
+
+    void init(std::vector<std::string> &tokens);
 };
 
 #endif // SIMHASH_H
