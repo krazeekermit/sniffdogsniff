@@ -1,8 +1,8 @@
 #include "localnode.h"
 
 #include "rpc/sdsrpcclient.h"
-#include "logging.h"
-#include "utils.h"
+#include "common/logging.h"
+#include "common/utils.h"
 #include "simhash.h"
 
 #include <set>

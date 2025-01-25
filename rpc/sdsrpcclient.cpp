@@ -5,7 +5,7 @@
 #include "net/socks5.h"
 #include "net/libsam3.h"
 #include "net/netutil.h"
-#include "logging.h"
+#include "common/logging.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>

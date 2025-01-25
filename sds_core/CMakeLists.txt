@@ -1,0 +1,13 @@
+target_sources(sniffdogsniffd
+    PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/sds_config.h
+    ${CMAKE_CURRENT_LIST_DIR}/sds_config.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/searchentriesdb.h
+    ${CMAKE_CURRENT_LIST_DIR}/searchentriesdb.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/simhash.h
+    ${CMAKE_CURRENT_LIST_DIR}/simhash.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sdstask.h
+    ${CMAKE_CURRENT_LIST_DIR}/sdstask.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/localnode.h
+    ${CMAKE_CURRENT_LIST_DIR}/localnode.cpp
+)

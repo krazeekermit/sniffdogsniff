@@ -61,7 +61,7 @@ void SimHash::init(std::vector<std::string> &tokens)
     for (i = 0; i < tokens.size(); i++) {
         std::string tok = tokens[i];
         if (tokenMults.find(tok) == tokenMults.end()) {
-            unsigned char *hash = new unsigned char[SHA_DIGEST_LENGTH];
+            unsigned char *hash = new unsigned char[KAD_ID_SZ];
             SHA_CTX ctx;
             SHA1_Init(&ctx);
             SHA1_Update(&ctx, tok.c_str(), tok.size());
@@ -73,12 +73,12 @@ void SimHash::init(std::vector<std::string> &tokens)
         tokenMults[tok].weight += 1;
     }
 
-    char simWeights[SHA_DIGEST_LENGTH*8];
+    char simWeights[KAD_ID_BIT_SZ];
     memset(simWeights, 0, sizeof(simWeights));
 
     for (auto it = tokenMults.begin(); it != tokenMults.end(); it++) {
         unsigned char *hash = it->second.hash;
-        for (i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        for (i = 0; i < KAD_ID_SZ; i++) {
             char ih = hash[i];
             for (j = 0; j < 8; j++) {
                 int no = ((ih & (0x80 >> j)) == 0 ? -1 : 1) * it->second.weight;
@@ -90,7 +90,7 @@ void SimHash::init(std::vector<std::string> &tokens)
     }
 
     memset(this->id.id, 0, sizeof(this->id.id));
-    for (i = 0; i < SHA_DIGEST_LENGTH; i++) {
+    for (i = 0; i < KAD_ID_SZ; i++) {
         for (j = 0; j < 8; j++) {
             if (simWeights[i*8 + j] > 0) {
                 this->id.id[i] |= (0x80 >> j);

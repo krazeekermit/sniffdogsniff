@@ -1,8 +1,8 @@
 #ifndef SDSRPCCLIENT_H
 #define SDSRPCCLIENT_H
 
-#include "sds_config.h"
-#include "searchentriesdb.h"
+#include "sds_core/sds_config.h"
+#include "sds_core/searchentriesdb.h"
 
 #include <map>
 

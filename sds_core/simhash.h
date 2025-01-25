@@ -2,7 +2,7 @@
 #define SIMHASH_H
 
 #include "kademlia/kadbucket.h"
-#include "sdsbytesbuf.h"
+#include "common/sdsbytesbuf.h"
 
 #include <iostream>
 #include <vector>

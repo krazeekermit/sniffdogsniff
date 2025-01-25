@@ -1,7 +1,7 @@
 #ifndef KADBUCKET_H
 #define KADBUCKET_H
 
-#include "macros.h"
+#include "common/macros.h"
 
 #include <openssl/sha.h>
 #include <cstdint>

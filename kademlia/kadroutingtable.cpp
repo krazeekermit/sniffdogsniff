@@ -1,9 +1,8 @@
 #include "kadroutingtable.h"
 
-#include "logging.h"
-
-#include "macros.h"
-#include "utils.h"
+#include "common/macros.h"
+#include "common/logging.h"
+#include "common/utils.h"
 
 #include <algorithm>
 

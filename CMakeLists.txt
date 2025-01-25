@@ -7,20 +7,11 @@ link_libraries(pthread crypto db gumbo curl)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(sniffdogsniffd
-    main.cpp
-    utils.h macros.h
-    logging.h logging.cpp
-    simhash.h simhash.cpp
-    sds_config.h sds_config.cpp
-    sdsbytesbuf.h sdsbytesbuf.cpp
-    sdstask.h sdstask.cpp
-    localnode.h localnode.cpp
-    searchentriesdb.h searchentriesdb.cpp
-    )
+add_executable(sniffdogsniffd main.cpp)
 
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")
 add_subdirectory(common)
+add_subdirectory(sds_core)
 add_subdirectory(rpc)
 add_subdirectory(kademlia)
 add_subdirectory(crawler)

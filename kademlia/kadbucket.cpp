@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include "kadbucket.h"
-#include "logging.h"
 
 #include "net/netutil.h"
 

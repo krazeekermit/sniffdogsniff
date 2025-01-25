@@ -1,10 +1,10 @@
 #include <iostream>
 
-#include "logging.h"
+#include "common/logging.h"
 #include "rpc/sdsrpcserver.h"
-#include "localnode.h"
+#include "sds_core/localnode.h"
+#include "sds_core/sds_config.h"
 
-#include "sds_config.h"
 #include "net/tor.h"
 #include "net/libsam3.h"
 
@@ -46,7 +46,6 @@ void sigintHandler(int signo)
 
 int main(int argc, char **argv)
 {
-
     int err;
     int optdaemon = 0;
     int optconfig = 0;

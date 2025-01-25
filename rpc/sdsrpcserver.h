@@ -1,7 +1,7 @@
 #ifndef SDSRPCSERVER_H
 #define SDSRPCSERVER_H
 
-#include "localnode.h"
+#include "sds_core/localnode.h"
 
 #include <pthread.h>
 

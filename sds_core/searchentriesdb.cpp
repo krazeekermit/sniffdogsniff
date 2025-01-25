@@ -1,9 +1,9 @@
 #include <string.h>
 
 #include "common/stringutil.h"
-#include "utils.h"
-#include "macros.h"
-#include "logging.h"
+#include "common/utils.h"
+#include "common/macros.h"
+#include "common/logging.h"
 
 #include "searchentriesdb.h"
 

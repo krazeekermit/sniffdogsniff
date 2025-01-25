@@ -1,7 +1,7 @@
 #include "webcrawler.h"
 
 #include "crawlerutils.h"
-#include "logging.h"
+#include "common/logging.h"
 
 #include <map>
 #include <cstring>

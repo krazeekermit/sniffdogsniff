@@ -1,10 +1,9 @@
 #ifndef RPC_COMMON_H
 #define RPC_COMMON_H
 
-#include "macros.h"
+#include "common/sdsbytesbuf.h"
 #include "kademlia/kadbucket.h"
-#include "searchentriesdb.h"
-#include "sdsbytesbuf.h"
+#include "sds_core/searchentriesdb.h"
 
 #include <cstdint>
 #include <cstring>

@@ -3,7 +3,7 @@
 
 #include "searchengine.h"
 
-#include "sds_config.h"
+#include "sds_core/sds_config.h"
 
 #include <pthread.h>
 

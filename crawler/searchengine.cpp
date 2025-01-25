@@ -1,7 +1,7 @@
 #include "searchengine.h"
 
-#include "logging.h"
 #include "crawlerutils.h"
+#include "common/logging.h"
 
 SearchEngine::SearchEngine(SearchEngineConfigs &configs_)
     : configs(configs_)

@@ -1,7 +1,7 @@
 #ifndef SEARCHENGINE_H
 #define SEARCHENGINE_H
 
-#include "searchentriesdb.h"
+#include "sds_core/searchentriesdb.h"
 
 struct SearchEngineConfigs {
     char *name;
