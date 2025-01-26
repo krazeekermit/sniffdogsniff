@@ -6,7 +6,7 @@
 PingArgs::PingArgs()
     : address("")
 {
-    memset(this->id.id, 0, KAD_ID_SZ);
+    memset(this->id.id, 0, KAD_ID_LENGTH);
 }
 
 PingArgs::PingArgs(const KadId &id_, std::string address_)
@@ -16,13 +16,13 @@ PingArgs::PingArgs(const KadId &id_, std::string address_)
 int PingArgs::read(SdsBytesBuf &buf)
 {
     address = buf.readString();
-    return buf.readBytes(id.id, KAD_ID_SZ) == KAD_ID_SZ;
+    return buf.readBytes(id.id, KAD_ID_LENGTH) == KAD_ID_LENGTH;
 }
 
 void PingArgs::write(SdsBytesBuf &buf)
 {
     buf.writeString(address);
-    buf.writeBytes(id.id, KAD_ID_SZ);
+    buf.writeBytes(id.id, KAD_ID_LENGTH);
 }
 
 /*
@@ -30,7 +30,7 @@ void PingArgs::write(SdsBytesBuf &buf)
 */
 FindNodeArgs::FindNodeArgs()
 {
-    memset(this->id.id, 0, KAD_ID_SZ);
+    memset(this->id.id, 0, KAD_ID_LENGTH);
 }
 
 FindNodeArgs::FindNodeArgs(const KadId &id_)
@@ -39,12 +39,12 @@ FindNodeArgs::FindNodeArgs(const KadId &id_)
 
 void FindNodeArgs::read(SdsBytesBuf &buf)
 {
-    buf.readBytes(id.id, KAD_ID_SZ);
+    buf.readBytes(id.id, KAD_ID_LENGTH);
 }
 
 void FindNodeArgs::write(SdsBytesBuf &buf)
 {
-    buf.writeBytes(id.id, KAD_ID_SZ);
+    buf.writeBytes(id.id, KAD_ID_LENGTH);
 }
 
 /*
@@ -55,7 +55,7 @@ void FindNodeReply::read(SdsBytesBuf &buf)
     int size = buf.readInt32();
     for (int i = 0; i < size; i++) {
         KadId id;
-        buf.readBytes(id.id, KAD_ID_SZ);
+        buf.readBytes(id.id, KAD_ID_LENGTH);
 
         std::string addr = buf.readString();
         nearest[id] = addr;
@@ -66,7 +66,7 @@ void FindNodeReply::write(SdsBytesBuf &buf)
 {
     buf.writeInt32(nearest.size());
     for (auto it = nearest.begin(); it != nearest.end(); it++) {
-        buf.writeBytes(it->first.id, KAD_ID_SZ);
+        buf.writeBytes(it->first.id, KAD_ID_LENGTH);
         buf.writeString(it->second);
     }
 }

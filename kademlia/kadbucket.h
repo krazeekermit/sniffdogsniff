@@ -10,8 +10,8 @@
 #include <iostream>
 #include <vector>
 
-#define KAD_ID_SZ      SHA_DIGEST_LENGTH
-#define KAD_ID_BIT_SZ  160
+#define KAD_ID_LENGTH      SHA256_DIGEST_LENGTH / 2
+#define KAD_ID_BIT_LENGTH  KAD_ID_LENGTH*8
 #define KAD_BUCKET_MAX 20
 #define STALES_THR     5
 
@@ -27,7 +27,7 @@ struct KadId
 
     friend std::ostream &operator<<(std::ostream &os, const KadId &id2)
     {
-        STREAM_HEX(os, id2.id, KAD_ID_SZ);
+        STREAM_HEX(os, id2.id, KAD_ID_LENGTH);
         return os;
     };
 
@@ -35,7 +35,7 @@ struct KadId
     static KadId idNbitsFarFrom(const KadId &id1, int bdist);
 
     // Member
-    unsigned char id[KAD_ID_SZ];
+    unsigned char id[KAD_ID_LENGTH];
 };
 
 class KadNode

@@ -112,7 +112,8 @@ std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 
     STREAM_HEX(os, se.hash, SHA256_DIGEST_LENGTH);
 
-    os << ", title=" << se.title
+    os << ", simHash=" << se.simHash
+       << ", title=" << se.title
        << ", url=" << se.url
        << ", type=" << (int) se.type
        << ", properties=[";

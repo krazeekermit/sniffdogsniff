@@ -9,17 +9,17 @@
 KadRoutingTable::KadRoutingTable()
     : selfNode("")
 {
-    this->buckets = new KadBucket*[KAD_ID_BIT_SZ];
+    this->buckets = new KadBucket*[KAD_ID_BIT_LENGTH];
 
     int i;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++)
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++)
         this->buckets[i] = new KadBucket(i);
 }
 
 KadRoutingTable::~KadRoutingTable()
 {
     int i;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++)
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++)
         delete this->buckets[i];
 
     delete this->buckets;
@@ -38,7 +38,7 @@ void KadRoutingTable::setSelfNode(KadNode &newSelfNode)
 bool KadRoutingTable::isFull()
 {
     int i;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++)
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++)
         if (!this->buckets[i]->isFull())
             return false;
 
@@ -70,7 +70,7 @@ bool KadRoutingTable::removeNode(const KadId &id)
 
 int KadRoutingTable::getKClosestTo(std::vector<KadNode> &nodes, const KadId &id)
 {
-    return getClosestTo(nodes, id, KAD_ID_SZ);
+    return getClosestTo(nodes, id, KAD_ID_LENGTH);
 }
 
 int KadRoutingTable::getClosestTo(std::vector<KadNode> &closest, const KadId &id, int count)
@@ -88,7 +88,7 @@ int KadRoutingTable::getClosestTo(std::vector<KadNode> &closest, const KadId &id
         closest.push_back(buck->nodes[j]);
     }
 
-    for (i = 1; height - i >= 0 || height + i < KAD_ID_BIT_SZ; i++) {
+    for (i = 1; height - i >= 0 || height + i < KAD_ID_BIT_LENGTH; i++) {
         if (height - i >= 0) {
             buck = this->buckets[height - i];
 
@@ -97,7 +97,7 @@ int KadRoutingTable::getClosestTo(std::vector<KadNode> &closest, const KadId &id
             }
         }
 
-        if (height + i < KAD_ID_BIT_SZ) {
+        if (height + i < KAD_ID_BIT_LENGTH) {
             buck = this->buckets[height + i];
 
             for (j = 0; j < buck->nodes.size() && closest.size() < count; j++) {
@@ -128,14 +128,14 @@ int KadRoutingTable::readFile(const char *path)
     }
     int ret, i, j, nodesCount;
     ret = 0;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i] = new KadBucket(i);
         // GOTO_IF(fwrite(&buck->height, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         nodesCount = 0;
         GOTO_IF(fread(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
         for (j = 0; j < nodesCount; j++) {
             KadNode kn("");
-            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_SZ, fp) != KAD_ID_SZ, end_read, ret, -1);
+            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_read, ret, -1);
             GOTO_IF(fgetstdstr(kn.address, fp) == 0, end_read, ret, -1);
             GOTO_IF(fread(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_read, ret, -1);
             GOTO_IF(fread(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
@@ -147,7 +147,7 @@ int KadRoutingTable::readFile(const char *path)
         GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
         for (j = 0; j < nodesCount; j++) {
             KadNode kn("");
-            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_SZ, fp) != KAD_ID_SZ, end_read, ret, -1);
+            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_read, ret, -1);
             GOTO_IF(fgetstdstr(kn.address, fp) == 0, end_read, ret, -1);
             GOTO_IF(fread(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_read, ret, -1);
             GOTO_IF(fread(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
@@ -166,14 +166,14 @@ int KadRoutingTable::writeFile(FILE *fp)
 {
     int ret, i, j, nodesCount;
     ret = 0;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i];
         // GOTO_IF(fwrite(&buck->height, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         nodesCount = buck->nodes.size();
         GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         for (j = 0; j < nodesCount; j++) {
             KadNode kn = buck->nodes[i];
-            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_SZ, fp) != KAD_ID_SZ, end_write, ret, -1);
+            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_write, ret, -1);
             GOTO_IF(fwrite(kn.address.c_str(), kn.address.length() + 1, 1, fp) != kn.address.length() + 1, end_write, ret, -1);
             GOTO_IF(fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_write, ret, -1);
             GOTO_IF(fwrite(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
@@ -183,7 +183,7 @@ int KadRoutingTable::writeFile(FILE *fp)
         GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         for (j = 0; j < nodesCount; j++) {
             KadNode kn = buck->replacementNodes[i];
-            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_SZ, fp) != KAD_ID_SZ, end_write, ret, -1);
+            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_write, ret, -1);
             GOTO_IF(fwrite(kn.address.c_str(), kn.address.length() + 1, 1, fp) != kn.address.length() + 1, end_write, ret, -1);
             GOTO_IF(fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_write, ret, -1);
             GOTO_IF(fwrite(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
@@ -202,7 +202,7 @@ std::ostream &operator<<(std::ostream &os, const KadRoutingTable &kt2)
        << ", buckets=[\n";
 
     int i;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         os << *kt2.buckets[i] << "\n";
     }
 
@@ -214,7 +214,7 @@ std::vector<KadNode> KadRoutingTable::getAllNodes()
 {
     int i;
     std::vector<KadNode> allNodes;
-    for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+    for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         std::vector<KadNode> on = this->buckets[i]->nodes;
         allNodes.insert(allNodes.end(), on.begin(), on.end());
     }

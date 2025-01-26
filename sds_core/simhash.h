@@ -20,6 +20,12 @@ public:
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 
+    friend std::ostream &operator<<(std::ostream &os, const SimHash &id2)
+    {
+        os << id2.id;
+        return os;
+    };
+
 private:
     KadId id;
 

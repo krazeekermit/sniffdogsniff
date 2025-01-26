@@ -181,13 +181,13 @@ void LocalNode::startTasks()
         int i;
         if (this->ktable->isFull()) {
             time_t now = time(nullptr);
-            for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+            for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
                 if ((now - this->ktable->getNodeAtHeight(i, 0).getLastSeen()) > UNIX_HOUR) {
                     toLook.push_back(this->ktable->getNodeAtHeight(i, rand() % KAD_BUCKET_MAX).getId());
                 }
             }
         } else {
-            for (i = 0; i < KAD_ID_BIT_SZ; i++) {
+            for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
                 toLook.push_back(KadId::idNbitsFarFrom(this->ktable->getSelfNode().getId(), i));
             }
         }

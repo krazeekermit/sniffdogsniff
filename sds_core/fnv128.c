@@ -12,8 +12,8 @@
 #ifndef _FNV128_C_
 #define _FNV128_C_
 
-#include "fnv-private.h"
-#include "FNV128.h"
+
+#include "fnv128.h"
 
 /* common code for 64 and 32 bit modes */
 
