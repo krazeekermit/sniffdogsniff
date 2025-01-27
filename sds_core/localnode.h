@@ -11,8 +11,13 @@
 #include <map>
 #include <vector>
 
+class NodesLookupTask;
+
 class LocalNode
 {
+friend class NodesLookupTask;
+friend class EntriesPublishTask;
+
 public:
     LocalNode(SdsConfig &cfgs);
     ~LocalNode();
@@ -38,11 +43,8 @@ private:
     KadRoutingTable *ktable;
     SearchEntriesDB *searchesDB;
     WebCrawler *crawler;
-    SdsTask *syncNodesTask;
-    SdsTask *broadcastResultsTask;
-
-    int doNodesLookup(const KadId targetId, bool check);
-    void publishResults(const std::vector<SearchEntry> &results);
+    SdsTask *nodesLookupTask;
+    SdsTask *entriesPublishTask;
 };
 
 #endif // LOCALNODE_H

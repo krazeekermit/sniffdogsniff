@@ -9,23 +9,23 @@
 class SdsTask
 {
 public:
-    SdsTask(std::function<void(SdsTask *timer)> task_, time_t delay_, bool detach_ = true);
-    ~SdsTask();
+    SdsTask(time_t delay_, bool detach_ = true);
+    virtual ~SdsTask();
 
     bool isRunning();
-
+    void start();
     void stop();
 
 protected:
-    static void *runTask(void *p);
+    virtual int execute() = 0;
 
 private:
+    static void *executeFunc(void *p);
+
     pthread_t tthread;
     bool detach;
-    bool run;
+    bool running;
     time_t delay;
-    std::function<void(SdsTask *timer)> task;
-
 };
 
 #endif // SDSTIMER_H
