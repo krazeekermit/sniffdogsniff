@@ -111,9 +111,23 @@ int LocalNode::findResults(std::vector<SearchEntry> &results, const char *query)
     return results.size();
 }
 
+int LocalNode::nodeConnected(const KadId &id, std::string &address)
+{
+    pthread_mutex_lock(&this->mutex);
+
+    KadNode kn(id, address);
+    loginfo << "new neighbour node conected " << kn;
+    this->ktable->pushNode(kn);
+
+    pthread_mutex_unlock(&this->mutex);
+
+    return 0;
+}
+
 int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 {
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
+    const std::string selfNodeAddress = this->ktable->getSelfNode().getAddress();
 
     int i;
     std::set<KadId> probed = {};
@@ -138,10 +152,10 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
             continue;
         }
 
-        futures[id] = std::move(std::async(std::launch::async, [ikn, query] () {
+        futures[id] = std::move(std::async(std::launch::async, [ikn, selfNodeId, selfNodeAddress ,query] () {
             SdsRpcClient client(ikn->getAddress());
             std::vector<SearchEntry> newResults;
-            int res = client.findResults(newResults, query);
+            int res = client.findResults(newResults, selfNodeId, selfNodeAddress, query);
             return std::make_pair(res, newResults);
         }));
 
@@ -223,6 +237,7 @@ void LocalNode::shutdown()
 int LocalNode::doNodesLookup(const KadId targetId, bool check)
 {
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
+    const std::string selfNodeAddress = this->ktable->getSelfNode().getAddress();
     static int ALPHA = 3;
 
     std::vector<KadNode> alphaClosest;
@@ -245,11 +260,11 @@ int LocalNode::doNodesLookup(const KadId targetId, bool check)
                 continue;
             }
 
-            futures.push_back(std::move(std::async(std::launch::async, [ikn, targetId]() {
+            futures.push_back(std::move(std::async(std::launch::async, [ikn, selfNodeId, selfNodeAddress, targetId]() {
                 SdsRpcClient client(ikn.getAddress());
                 std::map<KadId, std::string> newNodes;
 
-                if (client.findNode(newNodes, targetId) != 0) {
+                if (client.findNode(newNodes, selfNodeId, selfNodeAddress, targetId) != 0) {
                     newNodes.clear();
                 }
                 return newNodes;
@@ -300,12 +315,14 @@ int LocalNode::doNodesLookup(const KadId targetId, bool check)
 //************************************************************************************//
 void LocalNode::publishResults(const std::vector<SearchEntry> &results)
 {
-    int i;
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
+    const std::string selfNodeAddress = this->ktable->getSelfNode().getAddress();
+
     std::set<KadId> failed;
     std::set<KadNode> targetNodes;
     std::map<KadId, std::future<int>> futures;
 
+    int i;
     for (auto rit = results.begin(); rit != results.end(); rit++) {
 
         targetNodes.clear();
@@ -326,9 +343,9 @@ void LocalNode::publishResults(const std::vector<SearchEntry> &results)
         for (auto itn = targetNodes.begin(); itn != targetNodes.end(); itn++) {
             if (failed.find(itn->getId()) != failed.end()) {
 
-                futures[itn->getId()] = std::move(std::async(std::launch::async, [itn, rit]() {
+                futures[itn->getId()] = std::move(std::async(std::launch::async, [itn, selfNodeId, selfNodeAddress, rit]() {
                     SdsRpcClient client(itn->getAddress());
-                    return client.storeResult(*rit);
+                    return client.storeResult(selfNodeId, selfNodeAddress, *rit);
                 }));
 
                 if (futures.size() >= 3) {

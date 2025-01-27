@@ -26,11 +26,11 @@ int SdsRpcClient::ping(const KadId &id, std::string address)
     return sendRpcRequest(FUNC_PING, a, r);
 }
 
-int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
+int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &callerId, std::string callerAddress, const KadId &id)
 {
     SdsBytesBuf a, r;
 
-    FindNodeArgs args(id);
+    FindNodeArgs args(callerId, callerAddress, id);
     args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
@@ -44,21 +44,21 @@ int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &i
     return ERR_NULL;
 }
 
-int SdsRpcClient::storeResult(SearchEntry se)
+int SdsRpcClient::storeResult(const KadId &callerId, std::string callerAddress, SearchEntry se)
 {
     SdsBytesBuf a, r;
 
-    StoreResultArgs args(se);
+    StoreResultArgs args(callerId, callerAddress, se);
     args.write(a);
 
     return sendRpcRequest(FUNC_STORE_RESULT, a, r);
 }
 
-int SdsRpcClient::findResults(std::vector<SearchEntry> &results, const char *query)
+int SdsRpcClient::findResults(std::vector<SearchEntry> &results, const KadId &callerId, std::string callerAddress, const char *query)
 {
     SdsBytesBuf a, r;
 
-    FindResultsArgs args(query);
+    FindResultsArgs args(callerId, callerAddress, query);
     args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);

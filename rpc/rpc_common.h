@@ -70,7 +70,8 @@ packed_struct RpcResponseHeader {
 /*
     Rpc Args
 */
-struct ArgsBase {
+struct ArgsBase
+{
     KadId callerId;
     std::string callerAddress;
 
@@ -81,22 +82,29 @@ struct ArgsBase {
     void write(SdsBytesBuf &buf);
 };
 
-struct ReplyBase {
+struct ReplyBase
+{
 };
 
 /*
     Ping
 */
-struct PingArgs : public ArgsBase {
+struct PingArgs : public ArgsBase
+{
+
+    PingArgs() = default;
+    PingArgs(const KadId &callerId_, std::string callerAddress_);
 };
 
-struct PingReply : public ReplyBase {
+struct PingReply : public ReplyBase
+{
 };
 
 /*
     FindNode
 */
-struct FindNodeArgs : public ArgsBase {
+struct FindNodeArgs : public ArgsBase
+{
     KadId targetId;
 
     FindNodeArgs() = default;
@@ -106,7 +114,8 @@ struct FindNodeArgs : public ArgsBase {
     void write(SdsBytesBuf &buf);
 };
 
-struct FindNodeReply : public ReplyBase {
+struct FindNodeReply : public ReplyBase
+{
     std::map<KadId, std::string> nearest;
 
     void read(SdsBytesBuf &buf);
@@ -116,7 +125,8 @@ struct FindNodeReply : public ReplyBase {
 /*
     StoreResult
 */
-struct StoreResultArgs : public ArgsBase  {
+struct StoreResultArgs : public ArgsBase
+{
     SearchEntry se;
 
     StoreResultArgs() = default;
@@ -126,23 +136,26 @@ struct StoreResultArgs : public ArgsBase  {
     void write(SdsBytesBuf &buf);
 };
 
-struct StoreResultReply {
+struct StoreResultReply : public ReplyBase
+{
 };
 
 /*
     FindResults
 */
-struct FindResultsArgs {
+struct FindResultsArgs : public ArgsBase
+{
     std::string query;
 
     FindResultsArgs() = default;
-    FindResultsArgs(std::string query_);
+    FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct FindResultsReply {
+struct FindResultsReply : public ReplyBase
+{
     std::vector<SearchEntry> results;
 
     void read(SdsBytesBuf &buf);

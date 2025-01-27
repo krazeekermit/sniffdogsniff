@@ -26,7 +26,7 @@ public:
 
     // used to insert new connected node into the ktable
     // usually called by the rpc request handler
-    int nodeConnected(const unsigned char *id, const char *address);
+    int nodeConnected(const KadId &id, std::string &address);
     // checkNode(id kademlia.KadId, addr string) bool
 
     void startTasks();

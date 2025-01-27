@@ -12,9 +12,9 @@ public:
     SdsRpcClient(std::string nodeAddress_, SdsConfig cfg_ = {});
 
     int ping(const KadId &id, std::string address);
-    int findNode(std::map<KadId, std::string> &nearest, const KadId &id);
-    int storeResult(SearchEntry se);
-    int findResults(std::vector<SearchEntry> &results, const char *query);
+    int findNode(std::map<KadId, std::string> &nearest, const KadId &callerId, std::string callerAddress, const KadId &id);
+    int storeResult(const KadId &callerId, std::string callerAddress, SearchEntry se);
+    int findResults(std::vector<SearchEntry> &results, const KadId &callerId, std::string callerAddress, const char *query);
 
 private:
     int newConnection();

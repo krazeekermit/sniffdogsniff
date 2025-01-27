@@ -5,8 +5,9 @@
 */
 
 ArgsBase::ArgsBase(const KadId &id_, std::string address_)
-    : callerAddress(address_), callerId(id_)
-{}
+    : callerId(id_), callerAddress(address_)
+{
+}
 
 void ArgsBase::read(SdsBytesBuf &buf)
 {
@@ -18,6 +19,14 @@ void ArgsBase::write(SdsBytesBuf &buf)
 {
     buf.writeString(callerAddress);
     buf.writeBytes(callerId.id, KAD_ID_LENGTH);
+}
+
+/*
+    PingArgs
+*/
+PingArgs::PingArgs(const KadId &callerId_, std::string callerAddress_)
+    : ArgsBase(callerId_, callerAddress_)
+{
 }
 
 /*
@@ -86,18 +95,20 @@ void StoreResultArgs::write(SdsBytesBuf &buf)
 /*
     FindResults
 */
-FindResultsArgs::FindResultsArgs(std::string query_)
-    : query(query_)
+FindResultsArgs::FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_)
+    : ArgsBase(callerId_, callerAddress_), query(query_)
 {
 }
 
 void FindResultsArgs::read(SdsBytesBuf &buf)
 {
+    ArgsBase::read(buf);
     query = buf.readString();
 }
 
 void FindResultsArgs::write(SdsBytesBuf &buf)
 {
+    ArgsBase::write(buf);
     buf.writeString(query);
 }
 
