@@ -2,7 +2,6 @@
 #define RPC_COMMON_H
 
 #include "common/sdsbytesbuf.h"
-#include "kademlia/kadbucket.h"
 #include "sds_core/searchentriesdb.h"
 
 #include <cstdint>
@@ -69,36 +68,45 @@ packed_struct RpcResponseHeader {
 };
 
 /*
-    Ping
+    Rpc Args
 */
-struct PingArgs {
-    KadId id;
-    std::string address;
+struct ArgsBase {
+    KadId callerId;
+    std::string callerAddress;
 
-    PingArgs();
-    PingArgs(const KadId &id_, std::string address_);
-
-    int read(SdsBytesBuf &buf);
-    void write(SdsBytesBuf &buf);
-};
-
-struct PingReply {
-};
-
-/*
-    FindNode
-*/
-struct FindNodeArgs {
-    KadId id;
-
-    FindNodeArgs();
-    FindNodeArgs(const KadId &id_);
+    ArgsBase() = default;
+    ArgsBase(const KadId &id_, std::string address_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct FindNodeReply {
+struct ReplyBase {
+};
+
+/*
+    Ping
+*/
+struct PingArgs : public ArgsBase {
+};
+
+struct PingReply : public ReplyBase {
+};
+
+/*
+    FindNode
+*/
+struct FindNodeArgs : public ArgsBase {
+    KadId targetId;
+
+    FindNodeArgs() = default;
+    FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_);
+
+    void read(SdsBytesBuf &buf);
+    void write(SdsBytesBuf &buf);
+};
+
+struct FindNodeReply : public ReplyBase {
     std::map<KadId, std::string> nearest;
 
     void read(SdsBytesBuf &buf);
@@ -108,11 +116,11 @@ struct FindNodeReply {
 /*
     StoreResult
 */
-struct StoreResultArgs {
+struct StoreResultArgs : public ArgsBase  {
     SearchEntry se;
 
     StoreResultArgs() = default;
-    StoreResultArgs(SearchEntry se_);
+    StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);

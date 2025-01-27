@@ -1,50 +1,43 @@
 #include "rpc_common.h"
 
 /*
-    PingArgs
+    ArgsBase
 */
-PingArgs::PingArgs()
-    : address("")
-{
-    memset(this->id.id, 0, KAD_ID_LENGTH);
-}
 
-PingArgs::PingArgs(const KadId &id_, std::string address_)
-    : address(address_), id(id_)
+ArgsBase::ArgsBase(const KadId &id_, std::string address_)
+    : callerAddress(address_), callerId(id_)
 {}
 
-int PingArgs::read(SdsBytesBuf &buf)
+void ArgsBase::read(SdsBytesBuf &buf)
 {
-    address = buf.readString();
-    return buf.readBytes(id.id, KAD_ID_LENGTH) == KAD_ID_LENGTH;
+    callerAddress = buf.readString();
+    buf.readBytes(callerId.id, KAD_ID_LENGTH);
 }
 
-void PingArgs::write(SdsBytesBuf &buf)
+void ArgsBase::write(SdsBytesBuf &buf)
 {
-    buf.writeString(address);
-    buf.writeBytes(id.id, KAD_ID_LENGTH);
+    buf.writeString(callerAddress);
+    buf.writeBytes(callerId.id, KAD_ID_LENGTH);
 }
 
 /*
     FindNodeArgs
 */
-FindNodeArgs::FindNodeArgs()
+FindNodeArgs::FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_)
+    : ArgsBase(callerId_, callerAddress_), targetId(targetId_)
 {
-    memset(this->id.id, 0, KAD_ID_LENGTH);
 }
-
-FindNodeArgs::FindNodeArgs(const KadId &id_)
-    : id(id_)
-{}
 
 void FindNodeArgs::read(SdsBytesBuf &buf)
 {
-    buf.readBytes(id.id, KAD_ID_LENGTH);
+    ArgsBase::read(buf);
+    buf.readBytes(targetId.id, KAD_ID_LENGTH);
 }
 
 void FindNodeArgs::write(SdsBytesBuf &buf)
 {
-    buf.writeBytes(id.id, KAD_ID_LENGTH);
+    ArgsBase::write(buf);
+    buf.writeBytes(targetId.id, KAD_ID_LENGTH);
 }
 
 /*
@@ -74,17 +67,19 @@ void FindNodeReply::write(SdsBytesBuf &buf)
 /*
     StoreResultArgs
 */
-StoreResultArgs::StoreResultArgs(SearchEntry se_)
-    : se(se_)
+StoreResultArgs::StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_)
+    : ArgsBase(callerId_, callerAddress_), se(se_)
 {}
 
 void StoreResultArgs::read(SdsBytesBuf &buf)
 {
+    ArgsBase::read(buf);
     se.read(buf);
 }
 
 void StoreResultArgs::write(SdsBytesBuf &buf)
 {
+    ArgsBase::write(buf);
     se.write(buf);
 }
 
