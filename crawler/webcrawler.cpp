@@ -18,7 +18,6 @@ WebCrawler::WebCrawler(SdsConfig &cfg)
 
 WebCrawler::~WebCrawler()
 {
-    this->stopCrawling();
     pthread_mutex_destroy(&this->mutex);
     pthread_cond_destroy(&this->cond);
 }
@@ -55,7 +54,6 @@ int WebCrawler::save(const char *path)
         fprintf(fp, "%s\n", this->urlQueue[i].c_str());
     }
     fclose(fp);
-    pthread_cond_signal(&this->cond);
     pthread_mutex_unlock(&this->mutex);
 
     return 0;
@@ -97,6 +95,7 @@ void *WebCrawler::crawlingFunc(void *p)
             pthread_mutex_lock(&crawler->mutex);
             while (crawler->urlQueue.empty()) {
                 if (!crawler->run) {
+                    pthread_mutex_unlock(&crawler->mutex);
                     goto crawling_end;
                 }
 

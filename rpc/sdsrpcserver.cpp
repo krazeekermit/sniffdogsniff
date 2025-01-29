@@ -129,6 +129,9 @@ void *SdsRpcServer::handleRequest(void *srvp)
             RequestHandler handler = handlers[i];
             if (handler.funcode == req.funcode) {
                 reply.errcode = handler.funptr(srv, argsBuf, replyBuf);
+                if (reply.errcode == ERR_NULL) {
+                    reply.datasize = replyBuf.size();
+                }
                 break;
             }
         }
@@ -136,7 +139,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
 rpc_fail:
         send(client_fd, &reply, sizeof(reply), 0);
 
-        if (replyBuf.size() > 0) {
+        if (replyBuf.size() > 0 && reply.errcode == ERR_NULL) {
             send(client_fd, replyBuf.bufPtr(), replyBuf.size(), 0);
         }
         close(client_fd);

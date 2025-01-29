@@ -143,7 +143,6 @@ SearchEntriesDB::SearchEntriesDB()
 
 SearchEntriesDB::~SearchEntriesDB()
 {
-    this->close();
 }
 
 void SearchEntriesDB::open(const char *db_path)
@@ -157,7 +156,7 @@ void SearchEntriesDB::open(const char *db_path)
         logdebug << "unable to set db cache sz " << db_path << ": " << db_strerror(ret);
         return;
     }
-    if ((ret = this->dbp->open(this->dbp, nullptr, db_path, nullptr, DB_HASH, DB_CREATE/* | DB_THREAD*/, 0664)) != 0) {
+    if ((ret = this->dbp->open(this->dbp, nullptr, db_path, nullptr, DB_HASH, DB_CREATE | DB_THREAD, 0664)) != 0) {
         logerr << "unable to open db file " << db_path << ": " << db_strerror(ret);
         return;
     }

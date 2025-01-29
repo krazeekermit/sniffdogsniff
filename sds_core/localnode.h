@@ -45,6 +45,9 @@ private:
     WebCrawler *crawler;
     SdsTask *nodesLookupTask;
     SdsTask *entriesPublishTask;
+
+    void lock();
+    void unlock();
 };
 
 #endif // LOCALNODE_H

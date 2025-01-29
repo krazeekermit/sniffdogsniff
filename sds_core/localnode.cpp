@@ -50,12 +50,16 @@ private:
 
     int doNodesLookup(const KadId targetId, bool check)
     {
+        this->node->lock();
+
         const KadId selfNodeId = this->node->ktable->getSelfNode().getId();
         const std::string selfNodeAddress = this->node->ktable->getSelfNode().getAddress();
         static int ALPHA = 3;
 
         std::vector<KadNode> alphaClosest;
         this->node->ktable->getClosestTo(alphaClosest, targetId, ALPHA);
+
+        this->node->unlock();
 
         int nDiscovered = 0;
         long startTime = time(nullptr);
@@ -86,6 +90,8 @@ private:
             }
 
             discovered.clear();
+
+            this->node->lock();
             for (int i = 0; i < futures.size(); i++) {
                 KadNode ikn = alphaClosest[i];
                 probed.insert(ikn.getId());
@@ -104,6 +110,7 @@ private:
                     }
                 }
             }
+            this->node->unlock();
 
             std::sort(discovered.begin(), discovered.end(), [targetId](const KadNode &a, const KadNode &b) {
                 return (a.getId() - targetId) < (b.getId() - targetId);
@@ -144,8 +151,12 @@ protected:
     int execute() override
     {
         std::vector<SearchEntry> results;
+
+        this->node->lock();
         this->node->searchesDB->getEntriesForBroadcast(results);
         this->node->crawler->getEntriesForBroadcast(results);
+        this->node->unlock();
+
         if (results.size() > 0)
             this->publishResults(results);
 
@@ -168,6 +179,7 @@ private:
         int i;
         for (auto rit = results.begin(); rit != results.end(); rit++) {
 
+            this->node->lock();
             targetNodes.clear();
             std::vector<KadNode> nodes;
             this->node->ktable->getKClosestTo(nodes, rit->getSimHash().getId());
@@ -180,7 +192,7 @@ private:
                     targetNodes.insert(*nit);
                 }
             }
-    //		ln.tsLock.Unlock()
+            this->node->unlock();
 
             futures.clear();
             for (auto itn = targetNodes.begin(); itn != targetNodes.end(); itn++) {
@@ -203,9 +215,11 @@ private:
             }
         }
 
+        this->node->lock();
         for (auto it = failed.begin(); it != failed.end(); it++) {
             this->node->ktable->removeNode(*it);
         }
+        this->node->unlock();
     }
 };
 
@@ -267,19 +281,19 @@ int LocalNode::ping(const KadId &id, std::string address)
 {
 
     int res = 0;
-    pthread_mutex_lock(&this->mutex);
+    this->lock();
 
     KadNode kn(address);
     res = this->ktable->pushNode(kn);
 
-    pthread_mutex_unlock(&this->mutex);
+    this->unlock();
 
     return res;
 }
 
 int LocalNode::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
 {
-    pthread_mutex_lock(&this->mutex);
+    this->lock();
 
     std::vector<KadNode> nodes;
     this->ktable->getKClosestTo(nodes, id);
@@ -291,49 +305,51 @@ int LocalNode::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
         nearest[kn.getId()] = kn.getAddress();
     }
 
-    pthread_mutex_unlock(&this->mutex);
+    this->unlock();
 
     return nearest.size();
 }
 
 int LocalNode::storeResult(SearchEntry se)
 {
-    pthread_mutex_lock(&this->mutex);
+    this->lock();
 
     this->searchesDB->insertResult(se);
 
-    pthread_mutex_unlock(&this->mutex);
+    this->unlock();
 
     return 0;
 }
 
 int LocalNode::findResults(std::vector<SearchEntry> &results, const char *query)
 {
-    pthread_mutex_lock(&this->mutex);
+    this->lock();
 
     results.clear();
     this->searchesDB->doSearch(results, query);
 
-    pthread_mutex_unlock(&this->mutex);
+    this->unlock();
 
     return results.size();
 }
 
 int LocalNode::nodeConnected(const KadId &id, std::string &address)
 {
-    pthread_mutex_lock(&this->mutex);
+    this->lock();
 
     KadNode kn(id, address);
     loginfo << "new neighbour node conected " << kn;
     this->ktable->pushNode(kn);
 
-    pthread_mutex_unlock(&this->mutex);
+    this->unlock();
 
     return 0;
 }
 
 int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 {
+    this->lock();
+
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
     const std::string selfNodeAddress = this->ktable->getSelfNode().getAddress();
 
@@ -352,6 +368,8 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
             targetNodes.insert(*it);
         }
     }
+
+    this->unlock();
 
     std::map<KadId, std::future<std::pair<int, std::vector<SearchEntry>>>> futures;
     for (auto ikn = targetNodes.begin(); ikn != targetNodes.end(); ikn++) {
@@ -380,9 +398,13 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
         }
     }
 
+    this->lock();
+
     for (auto it = failed.begin(); it != failed.end(); it++) {
         this->ktable->removeNode(*it);
     }
+
+    this->unlock();
 
     /*
         If no results are found then fallback to the external centralized search engines
@@ -399,7 +421,6 @@ void LocalNode::startTasks()
     this->nodesLookupTask->start();
     this->entriesPublishTask->start();
     this->crawler->startCrawling();
-
 }
 
 void LocalNode::shutdown()
@@ -408,4 +429,27 @@ void LocalNode::shutdown()
     this->nodesLookupTask->stop();
     this->entriesPublishTask->stop();
     this->crawler->stopCrawling();
+
+    this->lock();
+
+    char path[1024];
+    this->searchesDB->close();
+
+    sprintf(path, "%s/%s", this->configs.work_dir_path, "ktable.dat");
+    this->ktable->writeFile(path);
+
+    sprintf(path, "%s/%s", this->configs.work_dir_path, "crawlerseeds.dat");
+    this->crawler->save(path);
+
+    this->unlock();
+}
+
+void LocalNode::lock()
+{
+    pthread_mutex_lock(&this->mutex);
+}
+
+void LocalNode::unlock()
+{
+    pthread_mutex_unlock(&this->mutex);
 }

@@ -130,27 +130,80 @@ int KadRoutingTable::readFile(const char *path)
     ret = 0;
     for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i] = new KadBucket(i);
-        // GOTO_IF(fwrite(&buck->height, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         nodesCount = 0;
-        GOTO_IF(fread(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
+        if (fread(&nodesCount, sizeof(int32_t), 1, fp) != 1) {
+            ret = -1;
+            goto end_read;
+        }
         for (j = 0; j < nodesCount; j++) {
             KadNode kn("");
-            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_read, ret, -1);
-            GOTO_IF(fgetstdstr(kn.address, fp) == 0, end_read, ret, -1);
-            GOTO_IF(fread(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_read, ret, -1);
-            GOTO_IF(fread(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
+
+            if (fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+                ret = -1;
+                goto end_read;
+            }
+            uint16_t addrLen = kn.address.length();
+            if (fread(&addrLen, sizeof(uint16_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
+            if (!addrLen) {
+                ret = -1;
+                goto end_read;
+            }
+            char buf[512];
+            if (fread(buf, sizeof(char), addrLen, fp) != addrLen) {
+                ret = -1;
+                goto end_read;
+            }
+            buf[addrLen] = '\0';
+            kn.address = std::string(buf);
+            if (fread(&kn.lastSeen, sizeof(time_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
+            if (fread(&kn.stales, sizeof(int32_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
 
             buck->nodes.push_back(kn);
         }
 
-
-        GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
+        if (fread(&nodesCount, sizeof(int32_t), 1, fp) != 1) {
+            ret = -1;
+            goto end_read;
+        }
         for (j = 0; j < nodesCount; j++) {
             KadNode kn("");
-            GOTO_IF(fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_read, ret, -1);
-            GOTO_IF(fgetstdstr(kn.address, fp) == 0, end_read, ret, -1);
-            GOTO_IF(fread(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_read, ret, -1);
-            GOTO_IF(fread(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_read, ret, -1);
+            if (fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+                ret = -1;
+                goto end_read;
+            }
+            uint16_t addrLen = kn.address.length();
+            if (fread(&addrLen, sizeof(uint16_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
+            if (!addrLen) {
+                ret = -1;
+                goto end_read;
+            }
+            char buf[512];
+            if (fread(buf, sizeof(char), addrLen, fp) != addrLen) {
+                ret = -1;
+                goto end_read;
+            }
+            buf[addrLen] = '\0';
+            kn.address = std::string(buf);
+            if (fread(&kn.lastSeen, sizeof(time_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
+            if (fread(&kn.stales, sizeof(int32_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_read;
+            }
 
             buck->replacementNodes.push_back(kn);
         }
@@ -159,40 +212,88 @@ int KadRoutingTable::readFile(const char *path)
 end_read:
     fclose(fp);
 
+    logdebug << *this;
+
     return ret;
 }
 
-int KadRoutingTable::writeFile(FILE *fp)
+int KadRoutingTable::writeFile(const char *path)
 {
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        logwarn << "kadroutingtable: unable to open cache file " << path;
+        return -1;
+    }
     int ret, i, j, nodesCount;
     ret = 0;
     for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i];
-        // GOTO_IF(fwrite(&buck->height, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
         nodesCount = buck->nodes.size();
-        GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
+        if (fwrite(&nodesCount, sizeof(int32_t), 1, fp) != 1) {
+            ret = -1;
+            goto end_write;
+        }
         for (j = 0; j < nodesCount; j++) {
-            KadNode kn = buck->nodes[i];
-            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_write, ret, -1);
-            GOTO_IF(fwrite(kn.address.c_str(), kn.address.length() + 1, 1, fp) != kn.address.length() + 1, end_write, ret, -1);
-            GOTO_IF(fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_write, ret, -1);
-            GOTO_IF(fwrite(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
+            KadNode kn = buck->nodes[j];
+            if (fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+                ret = -1;
+                goto end_write;
+            }
+            uint16_t addrLen = kn.address.length();
+            if (fwrite(&addrLen, sizeof(uint16_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(kn.address.c_str(), sizeof(char), kn.address.length(), fp) != kn.address.length()) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(&kn.stales, sizeof(int32_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
         }
 
         nodesCount = buck->replacementNodes.size();
-        GOTO_IF(fwrite(&nodesCount, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
+        if (fwrite(&nodesCount, sizeof(int32_t), 1, fp) != 1) {
+            ret = -1;
+            goto end_write;
+        }
         for (j = 0; j < nodesCount; j++) {
-            KadNode kn = buck->replacementNodes[i];
-            GOTO_IF(fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH, end_write, ret, -1);
-            GOTO_IF(fwrite(kn.address.c_str(), kn.address.length() + 1, 1, fp) != kn.address.length() + 1, end_write, ret, -1);
-            GOTO_IF(fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != sizeof(time_t), end_write, ret, -1);
-            GOTO_IF(fwrite(&kn.stales, sizeof(int32_t), 1, fp) != sizeof(int32_t), end_write, ret, -1);
+            KadNode kn = buck->replacementNodes[j];
+            if (fwrite(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+                ret = -1;
+                goto end_write;
+            }
+            uint16_t addrLen = kn.address.length();
+            if (fwrite(&addrLen, sizeof(uint16_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(kn.address.c_str(), sizeof(char), kn.address.length(), fp) != kn.address.length()) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(&kn.lastSeen, sizeof(time_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
+            if (fwrite(&kn.stales, sizeof(int32_t), 1, fp) != 1) {
+                ret = -1;
+                goto end_write;
+            }
         }
     }
 
 end_write:
     fclose(fp);
 
+    if (ret)
+        logdebug << "error in writing ktable";
     return ret;
 }
 
