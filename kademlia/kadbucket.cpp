@@ -21,7 +21,7 @@ KadBucket::~KadBucket()
 //    KadNode *ikn =
 //}
 
-bool KadBucket::pushNode(KadNode &kn)
+bool KadBucket::pushNode(const KadNode &kn)
 {
     auto ikn = std::find(this->nodes.begin(), this->nodes.end(), kn);
     bool found = ikn != this->nodes.end();

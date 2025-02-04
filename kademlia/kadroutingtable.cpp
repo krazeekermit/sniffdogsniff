@@ -45,7 +45,7 @@ bool KadRoutingTable::isFull()
     return true;
 }
 
-bool KadRoutingTable::pushNode(KadNode &kn)
+bool KadRoutingTable::pushNode(const KadNode &kn)
 {
     if (this->selfNode == kn)
         return false;

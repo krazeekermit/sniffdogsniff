@@ -267,6 +267,7 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
 
     this->server_fd = fd;
     if (!this->threadPool) {
+        this->running = true;
         this->threadPool = new pthread_t[THREAD_POOL_SZ];
         for (i = 0; i < THREAD_POOL_SZ; i++) {
             pthread_create(&this->threadPool[i], nullptr, &accessHandlerCallback, this);

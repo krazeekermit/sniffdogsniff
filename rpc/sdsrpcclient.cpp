@@ -11,11 +11,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-SdsRpcClient::SdsRpcClient(std::string nodeAddress_, SdsConfig cfg_)
-    : nodeAddress(nodeAddress_), config(cfg_)
-{
-
-}
+SdsRpcClient::SdsRpcClient(SdsConfig &cfg_, std::string nodeAddress_)
+    : config(cfg_), nodeAddress(nodeAddress_)
+{}
 
 int SdsRpcClient::ping(const KadId &id, std::string address)
 {
@@ -26,7 +24,7 @@ int SdsRpcClient::ping(const KadId &id, std::string address)
     return sendRpcRequest(FUNC_PING, a, r);
 }
 
-int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &callerId, std::string callerAddress, const KadId &id)
+int SdsRpcClient::findNode(FindNodeReply &reply, const KadId &callerId, std::string callerAddress, const KadId &id)
 {
     SdsBytesBuf a, r;
 
@@ -35,12 +33,10 @@ int SdsRpcClient::findNode(std::map<KadId, std::string> &nearest, const KadId &c
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
     if (ret != 0)
-        return ret;
+        throw SdsRpcException(ret);
+        //return ret;
 
-    FindNodeReply reply;
     reply.read(r);
-
-    nearest = reply.nearest;
     return ERR_NULL;
 }
 
@@ -54,7 +50,7 @@ int SdsRpcClient::storeResult(const KadId &callerId, std::string callerAddress, 
     return sendRpcRequest(FUNC_STORE_RESULT, a, r);
 }
 
-int SdsRpcClient::findResults(std::vector<SearchEntry> &results, const KadId &callerId, std::string callerAddress, const char *query)
+int SdsRpcClient::findResults(FindResultsReply &reply, const KadId &callerId, std::string callerAddress, const char *query)
 {
     SdsBytesBuf a, r;
 
@@ -62,13 +58,12 @@ int SdsRpcClient::findResults(std::vector<SearchEntry> &results, const KadId &ca
     args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
-    if (ret != 0)
+    if (ret != 0) {
+        throw SdsRpcException(ret);
         return ret;
+    }
 
-    FindResultsReply reply;
     reply.read(r);
-
-    results = reply.results;
     return ERR_NULL;
 }
 
@@ -79,25 +74,22 @@ int SdsRpcClient::newConnection()
 
     char suffix[64];
     char addr[1024];
+    memset(suffix, 0, sizeof(suffix));
+    memset(addr, 0, sizeof(addr));
     if (net_urlparse(addr, suffix, &port, this->nodeAddress.c_str())) {
         return -1;
     }
-    if (strcmp(suffix, ".onion") == 0 || this->config.force_tor_proxy) {
-        fd = socks5_connect(this->config.tor_socks5_addr, this->config.tor_socks5_port, addr, port);
-        if (fd < 1) {
-            logdebug << "error connecting to socks5 socket: " << socks5_strerror(fd);
-            return -1;
-        }
-    } else if (strcmp(suffix, ".i2p") == 0) {
+    if (strcmp(suffix, ".i2p") == 0) {
         Sam3Session ses;
         Sam3Connection *samConn = nullptr;
         if (sam3CreateSession(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, nullptr, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
+            throw std::runtime_error("i2p sam session creation error: " + std::string(ses.error));
             return -2;
         }
         if (strstr(addr, ".b32.i2p")) {
             if (sam3NameLookup(&ses, this->config.i2p_sam_addr, this->config.i2p_sam_port, addr)) {
-                logdebug << "i2p naming lookup fail:" << ses.error;
                 sam3CloseSession(&ses);
+                throw std::runtime_error("i2p sam naming lookup error: " + std::string(ses.error));
                 return -2;
             }
             samConn = sam3StreamConnect(&ses, ses.destkey);
@@ -106,14 +98,21 @@ int SdsRpcClient::newConnection()
         }
         if (!samConn) {
             sam3CloseSession(&ses);
+            throw std::runtime_error("i2p sam session creation error: " + std::string(ses.error));
             return -2;
         }
 
         fd = samConn->fd;
+    } else if (strcmp(suffix, ".onion") == 0 || this->config.force_tor_proxy) {
+        fd = socks5_connect(this->config.tor_socks5_addr, this->config.tor_socks5_port, addr, port);
+        if (fd < 1) {
+            throw std::runtime_error("error connecting to socks5 socket: " + std::string(socks5_strerror(fd)));
+            return -1;
+        }
     } else {
-        fd = net_socket_connect(addr, port, 5);
+        fd = net_socket_connect(addr, port, 10);
         if (fd <= 0) {
-            logerr << "error connecting to " << this->nodeAddress << ": " << strerror(errno);
+            throw std::runtime_error("error connecting to " + this->nodeAddress + ": " + strerror(errno));
         }
     }
 
@@ -133,8 +132,6 @@ static void fillRandIdVec(uint8_t *vec, size_t sz)
 int SdsRpcClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     int fd = this->newConnection();
-    if (fd < 0)
-        return -1;
 
     /* Send Request */
     RpcRequestHeader req = {

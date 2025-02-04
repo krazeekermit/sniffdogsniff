@@ -17,7 +17,7 @@ public:
     bool isFull();
     bool isEmpty();
 
-    bool pushNode(KadNode &kn);
+    bool pushNode(const KadNode &kn);
     bool removeNode(KadNode &kn);
     bool removeNode(const KadId &id);
 

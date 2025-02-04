@@ -191,7 +191,7 @@ void KadNode::decrementStales()
     this->stales--;
 }
 
-bool KadNode::operator==(const KadNode &kn)
+bool KadNode::operator==(const KadNode &kn) const
 {
     return this->id == kn.id;
 }

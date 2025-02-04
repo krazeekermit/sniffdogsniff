@@ -46,10 +46,10 @@ void *SdsTask::executeFunc(void *p)
         task->execute();
 
         clock_t startTime = clock();
-        do {
-          clock_t delta = clock() - startTime;
-          msec = delta * 1000 / CLOCKS_PER_SEC;
-        } while (task->running && msec <  task->delay);
+        msec = 0;
+        while (task->running && msec < task->delay) {
+            msec = (clock() - startTime) / CLOCKS_PER_SEC;
+        }
     }
 
     return nullptr;

@@ -1,6 +1,7 @@
 #ifndef SDSRPCCLIENT_H
 #define SDSRPCCLIENT_H
 
+#include "rpc_common.h"
 #include "sds_core/sds_config.h"
 #include "sds_core/searchentriesdb.h"
 
@@ -9,19 +10,19 @@
 class SdsRpcClient
 {
 public:
-    SdsRpcClient(std::string nodeAddress_, SdsConfig cfg_ = {});
+    SdsRpcClient(SdsConfig &cfg_, std::string nodeAddress_);
 
     int ping(const KadId &id, std::string address);
-    int findNode(std::map<KadId, std::string> &nearest, const KadId &callerId, std::string callerAddress, const KadId &id);
+    int findNode(FindNodeReply &reply, const KadId &callerId, std::string callerAddress, const KadId &id);
     int storeResult(const KadId &callerId, std::string callerAddress, SearchEntry se);
-    int findResults(std::vector<SearchEntry> &results, const KadId &callerId, std::string callerAddress, const char *query);
+    int findResults(FindResultsReply &reply, const KadId &callerId, std::string callerAddress, const char *query);
 
 private:
     int newConnection();
     int sendRpcRequest(uint8_t fun, SdsBytesBuf &args, SdsBytesBuf &reply);
 
-    std::string nodeAddress;
     SdsConfig config;
+    std::string nodeAddress;
 };
 
 #endif // SDSRPCCLIENT_H

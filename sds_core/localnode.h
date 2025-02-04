@@ -26,7 +26,7 @@ public:
     int ping(const KadId &id, std::string address);
     int findNode(std::map<KadId, std::string> &nearest, const KadId &id);
     int storeResult(SearchEntry se);
-    int findResults(std::vector<SearchEntry> &results, const char *query);
+    int findResults(std::map<KadId, std::string> &nearest, std::vector<SearchEntry> &results, const char *query);
     int doSearch(std::vector<SearchEntry> &results, const char *query);
 
     // used to insert new connected node into the ktable
@@ -48,6 +48,8 @@ private:
 
     void lock();
     void unlock();
+
+    int findKClosestTo(std::map<KadId, std::string> &nearest, const KadId &id);
 };
 
 #endif // LOCALNODE_H

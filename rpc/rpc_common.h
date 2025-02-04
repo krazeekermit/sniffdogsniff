@@ -17,6 +17,7 @@
 #define ERR_SERIALIZE     3
 #define ERR_NOFUNCT       4
 #define ERR_TYPE_ARGUMENT 5
+#define ERR_CONNECTION    6
 
 /* Function Codes */
 #define FUNC_PING         100
@@ -50,6 +51,8 @@ static const char *rpc_strerror(int err)
         return "error packing/unpacking function arguments";
     case ERR_TYPE_ARGUMENT:
         return "wrong arguments for function";
+    case ERR_CONNECTION:
+        return "unable to connect";
     }
     return "";
 }
@@ -65,6 +68,17 @@ packed_struct RpcResponseHeader {
     uint8_t errcode;
     uint8_t id[ID_SIZE];
     uint64_t datasize;
+};
+
+/*
+    RpcReplyException
+*/
+
+class SdsRpcException : public std::runtime_error {
+public:
+    SdsRpcException(int errcode_)
+        : std::runtime_error("p2p rpc exception: " + std::string(rpc_strerror(errcode_)))
+    {}
 };
 
 /*
@@ -154,9 +168,11 @@ struct FindResultsArgs : public ArgsBase
     void write(SdsBytesBuf &buf);
 };
 
-struct FindResultsReply : public ReplyBase
+struct FindResultsReply : public FindNodeReply
 {
     std::vector<SearchEntry> results;
+
+    bool hasResults();
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);

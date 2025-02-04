@@ -112,8 +112,15 @@ void FindResultsArgs::write(SdsBytesBuf &buf)
     buf.writeString(query);
 }
 
+bool FindResultsReply::hasResults()
+{
+    return this->results.size() > 0 && this->nearest.empty();
+}
+
 void FindResultsReply::read(SdsBytesBuf &buf)
 {
+    FindNodeReply::read(buf);
+
     int size = buf.readInt32();
     for (int i = 0; i < size; i++) {
         SearchEntry se;
@@ -124,6 +131,8 @@ void FindResultsReply::read(SdsBytesBuf &buf)
 
 void FindResultsReply::write(SdsBytesBuf &buf)
 {
+    FindNodeReply::write(buf);
+
     buf.writeInt32(results.size());
     for (auto it = results.begin(); it != results.end(); it++) {
         it->write(buf);

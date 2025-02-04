@@ -1,5 +1,6 @@
 #include "localnode.h"
 
+#include "rpc/rpc_common.h"
 #include "rpc/sdsrpcclient.h"
 #include "common/logging.h"
 #include "common/utils.h"
@@ -40,7 +41,9 @@ protected:
             }
         }
         for (i = 0; this->isRunning() && i < toLook.size(); i++) {
-            this->doNodesLookup(toLook.at(i), false);
+            int nd = this->doNodesLookup(toLook.at(i), false);
+
+            logdebug << "[" << i << "] Discovered " << nd << " closest nodes to " << toLook.at(i);
         }
         return 0;
     }
@@ -65,9 +68,9 @@ private:
         long startTime = time(nullptr);
 
         int i;
-        std::vector<std::future<std::map<KadId, std::string>>> futures;
+        std::vector<std::future<FindNodeReply>> futures;
         std::vector<KadNode> discovered;
-        std::set<KadId> probed = {};
+        std::set<KadNode> probed = {};
         std::set<KadId> failed;
 
         while (alphaClosest.size()) {
@@ -78,39 +81,34 @@ private:
                     continue;
                 }
 
-                futures.push_back(std::move(std::async(std::launch::async, [ikn, selfNodeId, selfNodeAddress, targetId]() {
-                    SdsRpcClient client(ikn.getAddress());
-                    std::map<KadId, std::string> newNodes;
+                futures.push_back(std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, targetId]() {
+                    SdsRpcClient client(this->node->configs, ikn.getAddress());
+                    FindNodeReply reply;
 
-                    if (client.findNode(newNodes, selfNodeId, selfNodeAddress, targetId) != 0) {
-                        newNodes.clear();
-                    }
-                    return newNodes;
+                    client.findNode(reply, selfNodeId, selfNodeAddress, targetId);
+                    return reply;
                 })));
             }
 
             discovered.clear();
-
-            this->node->lock();
             for (int i = 0; i < futures.size(); i++) {
                 KadNode ikn = alphaClosest[i];
-                probed.insert(ikn.getId());
+                probed.insert(ikn);
 
-                std::map<KadId, std::string> newNodes = futures[i].get();
-                if (newNodes.empty()) {
-                    this->node->ktable->removeNode(ikn);
-                    failed.insert(ikn.getId());
-                } else {
-                    this->node->ktable->pushNode(ikn);
-                    for (auto it = newNodes.begin(); it != newNodes.end(); it++) {
-                        if (probed.find(it->first) == probed.end()) {
+                try {
+                    FindNodeReply reply = futures[i].get();
+                    for (auto it = reply.nearest.begin(); it != reply.nearest.end(); it++) {
+                        KadNode kn(it->first, it->second);
+                        if (std::find(probed.begin(), probed.end(), kn) == probed.end()) {
                             nDiscovered++;
                             discovered.emplace_back(it->first, it->second);
                         }
                     }
+                } catch (std::exception &ex) {
+                    failed.insert(ikn.getId());
+                    logerr << ex.what();
                 }
             }
-            this->node->unlock();
 
             std::sort(discovered.begin(), discovered.end(), [targetId](const KadNode &a, const KadNode &b) {
                 return (a.getId() - targetId) < (b.getId() - targetId);
@@ -118,7 +116,6 @@ private:
 
             alphaClosest.clear();
             for (auto it = discovered.begin(); it != discovered.end(); it++) {
-                this->node->ktable->pushNode(*it);
                 if (alphaClosest.size() < 3) {
                     alphaClosest.push_back(*it);
                 }
@@ -129,7 +126,18 @@ private:
             }
         }
 
-        logdebug << "Discovered " << nDiscovered << " closest nodes to " << targetId;
+        this->node->lock();
+
+        for (auto it = probed.begin(); it != probed.end(); it++) {
+            if (failed.find(it->getId()) != failed.end()) {
+                this->node->ktable->removeNode(it->getId());
+            } else {
+                this->node->ktable->pushNode(*it);
+            }
+        }
+
+        this->node->unlock();
+
         return nDiscovered;
     }
 };
@@ -174,7 +182,7 @@ private:
 
         std::set<KadId> failed;
         std::set<KadNode> targetNodes;
-        std::map<KadId, std::future<int>> futures;
+        std::map<KadId, std::future<void>> futures;
 
         int i;
         for (auto rit = results.begin(); rit != results.end(); rit++) {
@@ -198,16 +206,20 @@ private:
             for (auto itn = targetNodes.begin(); itn != targetNodes.end(); itn++) {
                 if (failed.find(itn->getId()) != failed.end()) {
 
-                    futures[itn->getId()] = std::move(std::async(std::launch::async, [itn, selfNodeId, selfNodeAddress, rit]() {
-                        SdsRpcClient client(itn->getAddress());
-                        return client.storeResult(selfNodeId, selfNodeAddress, *rit);
+                    futures[itn->getId()] = std::move(std::async(std::launch::async, [this, itn, selfNodeId, selfNodeAddress, rit]() {
+                        SdsRpcClient client(this->node->configs, itn->getAddress());
+                        client.storeResult(selfNodeId, selfNodeAddress, *rit);
                     }));
 
                     if (futures.size() >= 3) {
                         for (auto fit = futures.begin(); fit != futures.end(); fit++) {
-                            int ret = fit->second.get();
-                            if (ret != 0)
+                            try {
+                                fit->second.get();
+                            } catch (std::exception &ex) {
                                 failed.insert(fit->first);
+
+                                logerr << ex.what();
+                            }
                         }
                         futures.clear();
                     }
@@ -216,8 +228,12 @@ private:
         }
 
         this->node->lock();
-        for (auto it = failed.begin(); it != failed.end(); it++) {
-            this->node->ktable->removeNode(*it);
+        for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
+            if (failed.find(it->getId()) != failed.end()) {
+                this->node->ktable->removeNode(it->getId());
+            } else {
+                this->node->ktable->pushNode(*it);
+            }
         }
         this->node->unlock();
     }
@@ -281,12 +297,6 @@ int LocalNode::ping(const KadId &id, std::string address)
 {
 
     int res = 0;
-    this->lock();
-
-    KadNode kn(address);
-    res = this->ktable->pushNode(kn);
-
-    this->unlock();
 
     return res;
 }
@@ -295,15 +305,7 @@ int LocalNode::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
 {
     this->lock();
 
-    std::vector<KadNode> nodes;
-    this->ktable->getKClosestTo(nodes, id);
-
-    int i;
-    nearest.clear();
-    for (i = 0; i < nodes.size(); i++) {
-        KadNode kn = nodes[i];
-        nearest[kn.getId()] = kn.getAddress();
-    }
+    this->findKClosestTo(nearest, id);
 
     this->unlock();
 
@@ -321,12 +323,15 @@ int LocalNode::storeResult(SearchEntry se)
     return 0;
 }
 
-int LocalNode::findResults(std::vector<SearchEntry> &results, const char *query)
+int LocalNode::findResults(std::map<KadId, std::string> &nearest, std::vector<SearchEntry> &results, const char *query)
 {
     this->lock();
 
     results.clear();
     this->searchesDB->doSearch(results, query);
+    if (results.empty()) {
+        this->findKClosestTo(nearest, SimHash(query).getId());
+    }
 
     this->unlock();
 
@@ -335,30 +340,42 @@ int LocalNode::findResults(std::vector<SearchEntry> &results, const char *query)
 
 int LocalNode::nodeConnected(const KadId &id, std::string &address)
 {
-    this->lock();
-
-    KadNode kn(id, address);
-    loginfo << "new neighbour node conected " << kn;
-    this->ktable->pushNode(kn);
-
-    this->unlock();
+    /*
+        Ping the new connected node before inserting it into k-table to avoid
+        fake node spam
+    */
+    std::async(std::launch::async, [this, id, address] () {
+        KadNode kn(id, address);
+        SdsRpcClient client(this->configs, address);
+        try {
+            client.ping(id, address);
+            loginfo << "new neighbour node conected " << kn;
+            this->lock();
+            this->ktable->pushNode(kn);
+            this->unlock();
+        }  catch (std::exception &ex) {
+            loginfo << "new neighbour node conected but seems down, discarded " << kn;
+        }
+    });
 
     return 0;
 }
 
 int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 {
-    this->lock();
-
     const KadId selfNodeId = this->ktable->getSelfNode().getId();
     const std::string selfNodeAddress = this->ktable->getSelfNode().getAddress();
 
     int i;
     std::set<KadId> probed = {};
+    std::set<KadId> probedEmpty = {};
     std::set<KadId> failed;
     std::vector<KadNode> nodes;
     std::set<KadNode> targetNodes;
     SimHash simHash(query);
+
+    this->lock();
+
     this->ktable->getKClosestTo(nodes, simHash.getId());
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
         KadId id = it->getId();
@@ -371,27 +388,36 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 
     this->unlock();
 
-    std::map<KadId, std::future<std::pair<int, std::vector<SearchEntry>>>> futures;
+    std::map<KadId, std::future<FindResultsReply>> futures;
     for (auto ikn = targetNodes.begin(); ikn != targetNodes.end(); ikn++) {
         KadId id = ikn->getId();
         if (std::find(failed.begin(), failed.end(), id) != failed.end()) {
             continue;
         }
 
-        futures[id] = std::move(std::async(std::launch::async, [ikn, selfNodeId, selfNodeAddress ,query] () {
-            SdsRpcClient client(ikn->getAddress());
-            std::vector<SearchEntry> newResults;
-            int res = client.findResults(newResults, selfNodeId, selfNodeAddress, query);
-            return std::make_pair(res, newResults);
+        futures[id] = std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, query] () {
+            SdsRpcClient client(this->configs, ikn->getAddress());
+            FindResultsReply reply;
+            client.findResults(reply, selfNodeId, selfNodeAddress, query);
+            return reply;
         }));
 
         if (futures.size() >= 3) {
             for (auto fit = futures.begin(); fit != futures.end(); fit++) {
-                std::pair<int, std::vector<SearchEntry>> r = fit->second.get();
-                if (r.first != 0) {
+                try {
+                    FindResultsReply reply = fit->second.get();
+                    if (reply.hasResults()) {
+                        results.insert(results.end(), reply.results.begin(), reply.results.end());
+                    } else {
+                        probedEmpty.insert(fit->first);
+                        for (auto irn = reply.nearest.begin(); irn != reply.nearest.end(); irn++) {
+                            KadNode kn(irn->first, irn->second);
+                            targetNodes.insert(kn);
+                        }
+                    }
+                }  catch (std::exception &ex) {
+                    logerr << ex.what();
                     failed.insert(fit->first);
-                } else {
-                    results.insert(results.end(), r.second.begin(), r.second.end());
                 }
             }
             futures.clear();
@@ -400,8 +426,12 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 
     this->lock();
 
-    for (auto it = failed.begin(); it != failed.end(); it++) {
-        this->ktable->removeNode(*it);
+    for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
+        if (failed.find(it->getId()) != failed.end()) {
+            this->ktable->removeNode(it->getId());
+        } else {
+            this->ktable->pushNode(*it);
+        }
     }
 
     this->unlock();
@@ -412,6 +442,24 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     if (results.size() == 0) {
         this->crawler->doSearch(results, query);
     }
+
+    /*
+        Republish results to the nodes that were supposed to have the results
+    */
+    std::async(std::launch::async, [this, targetNodes, probedEmpty, results, selfNodeId, selfNodeAddress] () {
+        for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
+            if (probedEmpty.find(it->getId()) != probedEmpty.end()) {
+                SdsRpcClient client(this->configs, it->getAddress());
+                try {
+                    for (auto rit = results.begin(); rit != results.end(); rit++) {
+                        client.storeResult(selfNodeId, selfNodeAddress, *rit);
+                    }
+                } catch (std::exception &ex) {
+                    logerr << ex.what();
+                }
+            }
+        }
+    });
 
     return results.size();
 }
@@ -452,4 +500,18 @@ void LocalNode::lock()
 void LocalNode::unlock()
 {
     pthread_mutex_unlock(&this->mutex);
+}
+
+int LocalNode::findKClosestTo(std::map<KadId, std::string> &nearest, const KadId &id)
+{
+    std::vector<KadNode> nodes;
+    this->ktable->getKClosestTo(nodes, id);
+
+    int i;
+    nearest.clear();
+    for (i = 0; i < nodes.size(); i++) {
+        KadNode kn = nodes[i];
+        nearest[kn.getId()] = kn.getAddress();
+    }
+    return nodes.size();
 }

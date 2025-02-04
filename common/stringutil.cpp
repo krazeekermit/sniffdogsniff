@@ -9,11 +9,12 @@ std::vector<std::string> split(const std::string &str, const char *delim)
 {
     std::vector<std::string> splitstring;
 
+    size_t seplen = strlen(delim);
     size_t begin = 0;
     size_t end = 0;
     while ((end = str.find(delim, begin)) != std::string::npos && begin <= str.length()) {
         splitstring.push_back(str.substr(begin, end - begin));
-        begin = end+1;
+        begin = end+seplen;
     }
     splitstring.push_back(str.substr(begin, end - begin));
 
@@ -60,7 +61,7 @@ std::string replaceGlobal(std::string targetString, std::string oldValue, std::s
     int pos = 0;
     std::string resultString = "";
     size_t targetPos = targetString.find( oldValue, pos );
-    while(targetPos != std::string::npos ) {
+    while (targetPos != std::string::npos ) {
         std::string preOld = targetString.substr( pos, targetPos - pos );
         resultString += preOld + newValue;
         pos = targetPos + oldValue.length();

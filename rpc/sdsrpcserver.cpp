@@ -56,7 +56,7 @@ int SdsRpcServer::findResults(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf 
     srv->localNode->nodeConnected(findArgs.callerId, findArgs.callerAddress);
 
     FindResultsReply findReply;
-    srv->localNode->findResults(findReply.results, findArgs.query.c_str());
+    srv->localNode->findResults(findReply.nearest, findReply.results, findArgs.query.c_str());
 
     findReply.write(reply);
 

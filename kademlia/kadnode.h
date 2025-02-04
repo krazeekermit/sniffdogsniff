@@ -45,7 +45,7 @@ public:
     void incrementStales();
     void decrementStales();
 
-    bool operator==(const KadNode &kn2);
+    bool operator==(const KadNode &kn2) const;
     bool operator<(const KadNode &rhs) const;
     friend std::ostream &operator<<(std::ostream &os, const KadNode &kn2);
 
