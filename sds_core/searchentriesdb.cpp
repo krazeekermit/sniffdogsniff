@@ -61,8 +61,8 @@ void SearchEntry::read(SdsBytesBuf &buf)
     this->url = buf.readString();
     this->type = static_cast<SearchEntryType>(buf.readUint8());
     this->properties.clear();
-    int propsSize = buf.readInt32();
-    for (int i = 0; i < propsSize; i++) {
+    unsigned int propsSize = buf.readUint32();
+    for (unsigned int i = 0; i < propsSize; i++) {
         uint8_t k = buf.readUint8();
         std::string val = buf.readString();
         this->properties[k] = val;
@@ -77,7 +77,7 @@ void SearchEntry::write(SdsBytesBuf &buf)
     buf.writeString(this->title);
     buf.writeString(this->url);
     buf.writeUint8(static_cast<uint8_t>(this->type));
-    buf.writeInt32(this->properties.size());
+    buf.writeUint32(this->properties.size());
     for (auto it = this->properties.begin(); it != this->properties.end(); it++) {
         buf.writeUint8(it->first);
         buf.writeString(it->second);

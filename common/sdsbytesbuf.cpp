@@ -1,5 +1,7 @@
 #include "sdsbytesbuf.h"
 
+#include <endian.h>
+
 #include <cstring>
 #include <cstdlib>
 
@@ -100,18 +102,6 @@ std::string SdsBytesBuf::readString()
     return str;
 }
 
-void SdsBytesBuf::writeInt8(int8_t n)
-{
-    this->write(&n, sizeof(int8_t));
-}
-
-int8_t SdsBytesBuf::readInt8()
-{
-    int8_t n = 0;
-    this->read(&n, sizeof(int8_t));
-    return n;
-}
-
 void SdsBytesBuf::writeUint8(uint8_t n)
 {
     this->write(&n, sizeof(uint8_t));
@@ -124,76 +114,43 @@ uint8_t SdsBytesBuf::readUint8()
     return n;
 }
 
-void SdsBytesBuf::writeInt16(int16_t n)
-{
-    this->write(&n, sizeof(int16_t));
-}
-
-int16_t SdsBytesBuf::readInt16()
-{
-    int16_t n = 0;
-    this->read(&n, sizeof(int16_t));
-    return n;
-}
-
 void SdsBytesBuf::writeUint16(uint16_t n)
 {
-    this->write(&n, sizeof(uint16_t));
+    uint16_t le = htole16(n);
+    this->write(&le, sizeof(uint16_t));
 }
 
 uint16_t SdsBytesBuf::readUint16()
 {
-    uint16_t n = 0;
-    this->read(&n, sizeof(uint16_t));
-    return n;
-}
-
-void SdsBytesBuf::writeInt32(int32_t n)
-{
-    this->write(&n, sizeof(int32_t));
-}
-
-int32_t SdsBytesBuf::readInt32()
-{
-    int32_t n = 0;
-    this->read(&n, sizeof(int32_t));
-    return n;
+    uint16_t le = 0;
+    this->read(&le, sizeof(uint16_t));
+    return le16toh(le);
 }
 
 void SdsBytesBuf::writeUint32(uint32_t n)
 {
-    this->write(&n, sizeof(uint32_t));
+    uint32_t le = htole32(n);
+    this->write(&le, sizeof(uint32_t));
 }
 
 uint32_t SdsBytesBuf::readUint32()
 {
-    uint32_t n = 0;
-    this->read(&n, sizeof(uint32_t));
-    return n;
-}
-
-void SdsBytesBuf::writeInt64(int64_t n)
-{
-    this->write(&n, sizeof(int64_t));
-}
-
-int64_t SdsBytesBuf::readInt64()
-{
-    int64_t n = 0;
-    this->read(&n, sizeof(int64_t));
-    return n;
+    uint32_t le = 0;
+    this->read(&le, sizeof(uint32_t));
+    return le32toh(le);
 }
 
 void SdsBytesBuf::writeUint64(uint64_t n)
 {
-    this->write(&n, sizeof(uint64_t));
+    uint64_t le = htole64(n);
+    this->write(&le, sizeof(uint64_t));
 }
 
 uint64_t SdsBytesBuf::readUint64()
 {
-    uint64_t n = 0;
-    this->read(&n, sizeof(uint64_t));
-    return n;
+    uint64_t le = 0;
+    this->read(&le, sizeof(uint64_t));
+    return le64toh(le);
 }
 
 void SdsBytesBuf::writeBool(bool b)

@@ -136,12 +136,13 @@ int SdsRpcClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
     /* Send Request */
     RpcRequestHeader req = {
         .funcode = funcode,
-        .datasize = args.size()
+        .datasize = htole64(args.size())
     };
     fillRandIdVec(req.id, ID_SIZE);
 
     int errcode = ERR_NULL;
 
+    uint64_t resp_sz = 0;
     RpcResponseHeader resp;
     memset(&resp, 0, sizeof(resp));
 
@@ -170,9 +171,10 @@ int SdsRpcClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
         goto rpc_fail;
     }
 
-    if (resp.datasize > 0) {
-        reply.allocate(resp.datasize);
-        if (recv(fd, reply.bufPtr(), resp.datasize, 0) != resp.datasize) {
+    resp_sz = le64toh(resp.datasize);
+    if (resp_sz > 0) {
+        reply.allocate(resp_sz);
+        if (recv(fd, reply.bufPtr(), resp_sz, 0) != resp_sz) {
             errcode = ERR_RECV_REQUEST;
             goto rpc_fail;
         }

@@ -54,8 +54,8 @@ void FindNodeArgs::write(SdsBytesBuf &buf)
 */
 void FindNodeReply::read(SdsBytesBuf &buf)
 {
-    int size = buf.readInt32();
-    for (int i = 0; i < size; i++) {
+    unsigned int size = buf.readUint32();
+    for (unsigned int i = 0; i < size; i++) {
         KadId id;
         buf.readBytes(id.id, KAD_ID_LENGTH);
 
@@ -66,7 +66,7 @@ void FindNodeReply::read(SdsBytesBuf &buf)
 
 void FindNodeReply::write(SdsBytesBuf &buf)
 {
-    buf.writeInt32(nearest.size());
+    buf.writeUint32(nearest.size());
     for (auto it = nearest.begin(); it != nearest.end(); it++) {
         buf.writeBytes(it->first.id, KAD_ID_LENGTH);
         buf.writeString(it->second);
@@ -121,8 +121,8 @@ void FindResultsReply::read(SdsBytesBuf &buf)
 {
     FindNodeReply::read(buf);
 
-    int size = buf.readInt32();
-    for (int i = 0; i < size; i++) {
+    unsigned int size = buf.readUint32();
+    for (unsigned int i = 0; i < size; i++) {
         SearchEntry se;
         se.read(buf);
         results.push_back(se);
@@ -133,7 +133,7 @@ void FindResultsReply::write(SdsBytesBuf &buf)
 {
     FindNodeReply::write(buf);
 
-    buf.writeInt32(results.size());
+    buf.writeUint32(results.size());
     for (auto it = results.begin(); it != results.end(); it++) {
         it->write(buf);
     }

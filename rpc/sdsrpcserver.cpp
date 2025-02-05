@@ -111,7 +111,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
             goto rpc_fail;
         }
 
-        recv_sz = req.datasize;
+        recv_sz = le64toh(req.datasize);
         if (recv_sz > 0) {
             argsBuf.allocate(recv_sz);
             if (recv(client_fd, argsBuf.bufPtr(), recv_sz, 0) != recv_sz) {
@@ -130,7 +130,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
             if (handler.funcode == req.funcode) {
                 reply.errcode = handler.funptr(srv, argsBuf, replyBuf);
                 if (reply.errcode == ERR_NULL) {
-                    reply.datasize = replyBuf.size();
+                    reply.datasize = htole64(replyBuf.size());
                 }
                 break;
             }
