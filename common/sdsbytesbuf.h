@@ -13,12 +13,16 @@ public:
 
     void allocate(size_t size);
     void resize(size_t size);
+    void zero();
     void rewind();
     size_t size() const;
     uint8_t *bufPtr() const;
 
     void writeBytes(const uint8_t *buffer, size_t bufferSize);
     int readBytes(uint8_t *buffer, size_t bufferSize);
+
+    void writeBytes(const char *buffer, size_t bufferSize);
+    int readBytes(char *buffer, size_t bufferSize);
 
     void writeString(const char *str);
     void writeString(std::string &str);

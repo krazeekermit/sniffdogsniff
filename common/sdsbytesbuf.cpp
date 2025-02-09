@@ -18,8 +18,7 @@ SdsBytesBuf::SdsBytesBuf(void *inp, size_t size)
 
 SdsBytesBuf::~SdsBytesBuf()
 {
-    if (this->buffer)
-        free(this->buffer);
+    this->zero();
 }
 
 void SdsBytesBuf::allocate(size_t size)
@@ -39,6 +38,17 @@ void SdsBytesBuf::resize(size_t size)
         }
     } else {
         this->allocate(size);
+    }
+}
+
+void SdsBytesBuf::zero()
+{
+    if (this->buffer) {
+        free(this->buffer);
+        this->pos = 0;
+        this->bufferSize = 0;
+
+        this->buffer = nullptr;
     }
 }
 
@@ -64,6 +74,20 @@ void SdsBytesBuf::writeBytes(const uint8_t *buffer, size_t bufferSize)
 }
 
 int SdsBytesBuf::readBytes(uint8_t *buffer, size_t bufferSize)
+{
+    if (buffer && bufferSize)
+        return this->read(buffer, bufferSize);
+
+    return 0;
+}
+
+void SdsBytesBuf::writeBytes(const char *buffer, size_t bufferSize)
+{
+    if (buffer && bufferSize)
+        this->write(buffer, bufferSize);
+}
+
+int SdsBytesBuf::readBytes(char *buffer, size_t bufferSize)
 {
     if (buffer && bufferSize)
         return this->read(buffer, bufferSize);
