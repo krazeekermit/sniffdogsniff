@@ -8,7 +8,8 @@
 #include <cstring>
 #include <poll.h>
 
-#define MAX_CLIENT_COUNT 8
+#define MAX_CLIENT_COUNT 9
+#define MAX_POLL_FD_COUNT (MAX_CLIENT_COUNT+1)
 
 static std::string httpUnescape(const char *ss)
 {
@@ -206,18 +207,22 @@ void *acceptFun(void *cls)
         int client_fd;
         struct sockaddr_in address;
         socklen_t addrlen = sizeof(address);
-        int clientsCount = 0;
-        pollfd wait_fds[1+MAX_CLIENT_COUNT];
+        int clients_count = 0;
+        pollfd wait_fds[MAX_POLL_FD_COUNT];
         wait_fds[0].fd = srv->server_fd;
         wait_fds[0].events = POLLIN | POLLPRI;
         while (srv->running) {
-            if (poll(wait_fds, clientsCount + 1, 3000) > 0) {
+            if (poll(wait_fds, MAX_POLL_FD_COUNT, 3000) > 0) {
                 int i;
-                if (wait_fds[0].revents & POLLIN) {
+                if ((wait_fds[0].revents & POLLIN)) {
+                    if (clients_count >= MAX_CLIENT_COUNT) {
+                        continue;
+                    }
+
                     client_fd = accept(srv->server_fd, (struct sockaddr*) &address, &addrlen);
-                    for (i = 1; i < MAX_CLIENT_COUNT; i++) {
+                    for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
                         if (wait_fds[i].fd == 0) {
-                            clientsCount++;
+                            clients_count++;
                             wait_fds[i].fd = client_fd;
                             wait_fds[i].events = POLLIN | POLLPRI;
                             break;
@@ -225,7 +230,7 @@ void *acceptFun(void *cls)
                     }
                 }
 
-                for (i = 1; i < MAX_CLIENT_COUNT; i++) {
+                for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
                     client_fd = wait_fds[i].fd;
                     short int revents = wait_fds[i].revents;
                     if (client_fd > 0 && revents > 0) {
@@ -237,11 +242,9 @@ void *acceptFun(void *cls)
 
                         wait_fds[i].fd = 0;
                         wait_fds[i].revents = 0;
-                        clientsCount--;
+                        clients_count--;
                     }
                 }
-            } else {
-
             }
         }
     }
@@ -275,7 +278,7 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
     if (bind(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         return -2;
     }
-    if (listen(fd, 3) < 0) {
+    if (listen(fd, 5) < 0) {
         return -2;
     }
 

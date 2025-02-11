@@ -468,7 +468,7 @@ void LocalNode::startTasks()
 {
     this->nodesLookupTask->start();
     this->entriesPublishTask->start();
-    this->crawler->startCrawling();
+//    this->crawler->startCrawling();
 }
 
 void LocalNode::shutdown()
@@ -476,7 +476,7 @@ void LocalNode::shutdown()
     loginfo << "stopping tasks...";
     this->nodesLookupTask->stop();
     this->entriesPublishTask->stop();
-    this->crawler->stopCrawling();
+//    this->crawler->stopCrawling();
 
     this->lock();
 

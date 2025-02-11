@@ -58,8 +58,9 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
                     }
                 }
 
-                logdebug << "new result " << rlink;
-                entries.emplace_back(title, rlink, SearchEntryType::SITE);
+                if (title.size() > 0) {
+                    entries.emplace_back(title, rlink, SearchEntryType::SITE);
+                }
             }
         }
     }

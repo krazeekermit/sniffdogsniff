@@ -28,6 +28,7 @@
 #define RESULT_TITLE_PROPERTY               "result_title_property"
 #define PROVIDED_DATA_TYPE                  "provided_data_type"
 #define WEB_UI_BIND_ADDR                    "web_ui_bind_addr"
+#define WEB_UI_BIND_PORT                    "web_ui_bind_port"
 #define PROXY_SETTINGS                      "proxy_settings"
 #define FORCE_TOR_PROXY                     "force_tor_proxy"
 #define TOR_SOCKS5_ADDR                     "tor_socks5_addr"
@@ -287,6 +288,9 @@ int sds_config_parse_file(SdsConfig *cfg, const char *path)
 
     cfg->p2p_server_bind_port = lookup_int(root, P2P_BIND_PORT, 4111);
     cfg->p2p_server_bind_addr = lookup_string(root, P2P_BIND_ADDR, "127.0.0.1");
+
+    cfg->web_ui_bind_port = lookup_int(root, WEB_UI_BIND_PORT, 8081);
+    cfg->web_ui_bind_addr = lookup_string(root, WEB_UI_BIND_ADDR, "127.0.0.1");
 
     std::vector<cfgentry*> entries;
     lookups(root, entries, EXTERNAL_SEARCH_ENGINE);

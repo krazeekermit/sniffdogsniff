@@ -9,7 +9,8 @@
 /*
     Handlers
 */
-class WebUiHandler : public HttpRequestHandler {
+class WebUiHandler : public HttpRequestHandler
+{
 public:
     WebUiHandler(LocalNode *node_, std::string &path)
         : node(node_)
@@ -38,7 +39,8 @@ protected:
     Jinja2CppLight::Template *templ;
 };
 
-class FileHandler : public HttpRequestHandler {
+class FileHandler : public HttpRequestHandler
+{
 
 public:
     FileHandler(std::string &resourcesDir_, std::string contentType_)
@@ -46,7 +48,6 @@ public:
 
     virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
-
         char path[1024];
         sprintf(path, "%s/static/%s", this->resourcesDir.c_str(), request.url.c_str());
         FILE *fp = fopen(path, "rb");
@@ -71,7 +72,8 @@ private:
     std::string contentType;
 };
 
-class IndexHandler : public WebUiHandler {
+class IndexHandler : public WebUiHandler
+{
 
 public:
     IndexHandler(LocalNode *node_, std::string path)
@@ -85,7 +87,8 @@ public:
     }
 };
 
-class ResultsViewHandler : public WebUiHandler {
+class ResultsViewHandler : public WebUiHandler
+{
 
 public:
     ResultsViewHandler(LocalNode *node_, std::string path)
@@ -144,9 +147,9 @@ SdsWebUiServer::~SdsWebUiServer()
 void SdsWebUiServer::createHandlers()
 {
     this->addHandler("/", new IndexHandler(this->node, this->resourcesDir + "/templates/index.html"));
+    this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/results_links.html"));
+
     this->addHandler("/style.css", new FileHandler(this->resourcesDir, "text/css"));
     this->addHandler("/sds_logo.png", new FileHandler(this->resourcesDir, "image/png"));
     this->addHandler("/sds_header.png", new FileHandler(this->resourcesDir, "image/png"));
-
-    this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/result_links.html"));
 }
