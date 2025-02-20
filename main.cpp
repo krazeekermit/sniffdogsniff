@@ -236,5 +236,8 @@ int main(int argc, char **argv)
     delete rpcSrv;
     delete webSrv;
     delete node;
+
+    loginfo << "shutdown complete, goodbye!";
+
     return 0;
 }

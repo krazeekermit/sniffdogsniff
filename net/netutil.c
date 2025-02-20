@@ -63,17 +63,15 @@ int net_socket_connect(const char *addr, int port, long timeout)
                     return -1;
                 }
             } else {
+                if (fcntl(fd, F_SETFL, opt) < 0) {
+                    return -1;
+                }
                 return fd;
             }
         }
-        close(fd);
-        errno = ETIMEDOUT;
-        return -1;
     }
 
-    if (fcntl(fd, F_SETFL, opt) < 0) {
-        return -1;
-    }
-
-    return fd;
+    close(fd);
+    errno = ETIMEDOUT;
+    return -1;
 }
