@@ -110,7 +110,7 @@ int SdsRpcClient::newConnection()
             return -1;
         }
     } else {
-        fd = net_socket_connect(addr, port, 10);
+        fd = net_socket_connect(addr, port, 3000);
         if (fd <= 0) {
             throw std::runtime_error("error connecting to " + this->nodeAddress + ": " + strerror(errno));
         }

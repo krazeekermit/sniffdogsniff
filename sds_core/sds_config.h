@@ -37,6 +37,9 @@ struct SdsConfig {
     char *i2p_sam_user;
     char *i2p_sam_password;
 
+    char *stun_server_addr;
+    int stun_server_port;
+
     std::vector<SearchEngineConfigs> search_engines;
 };
 

@@ -48,6 +48,8 @@
 #define I2P_SAM_PASSWORD                    "i2p_sam_password"
 #define P2P_BIND_ADDR                       "p2p_bind_addr"
 #define P2P_BIND_PORT                       "p2p_bind_port"
+#define STUN_SERVER_ADDR                    "stun_server_addr"
+#define STUN_SERVER_PORT                    "stun_server_port"
 
 #define DEFAULT_LOG_FILE_NAME               "sds.log"
 
@@ -263,6 +265,11 @@ int sds_config_parse_file(SdsConfig *cfg, const char *path)
         cfg->i2p_sam_port = lookup_int(root, I2P_SAM_PORT, 0);
         cfg->i2p_sam_user = lookup_string(root, I2P_SAM_USER, nullptr);
         cfg->i2p_sam_password = lookup_string(root, I2P_SAM_PASSWORD, nullptr);
+    }
+
+    cfg->stun_server_addr = lookup_string(root, STUN_SERVER_ADDR, nullptr);
+    if (cfg->stun_server_addr) {
+        cfg->stun_server_port = lookup_int(root, STUN_SERVER_PORT, 3478);
     }
 
     cfgentry *e = lookup(root, PEERS);
