@@ -22,28 +22,32 @@ std::vector<std::string> split(const std::string &str, const char *delim)
 
 std::string trim(const std::string &target, const char *cutset)
 {
+    if (strlen(cutset) == 0) {
+        return target;
+    }
 
-   size_t origlen = target.size();
-   size_t startpos = -1;
-   for(size_t i = 0; i < origlen; i++) {
-      if(!strchr(cutset, target[i])) {
-         startpos = i;
-         break;
-      }
-   }
+    size_t origlen = target.size();
+    size_t startpos = -1;
+    for(size_t i = 0; i < origlen; i++) {
+        if(!strchr(cutset, target[i])) {
+            startpos = i;
+            break;
+        }
+    }
 
-   size_t endpos = -1;
-   for(size_t i = origlen - 1; i >= 0; i--) {
-      if(!strchr(cutset, target[i])) {
-         endpos = i;
-         break;
-      }      
-   }
+    size_t endpos = -1;
+    for(size_t i = origlen - 1; i >= 0; i--) {
+        if(!strchr(cutset, target[i])) {
+            endpos = i;
+            break;
+        }
+    }
 
-   if(startpos == -1 || endpos == -1) {
-      return "";
-   }
-   return target.substr(startpos, endpos-startpos + 1);
+    if(startpos == -1 || endpos == -1) {
+        return "";
+    }
+
+    return target.substr(startpos, endpos - startpos + 1);
 }
 
 std::string replace(std::string targetString, std::string oldValue, std::string newValue)
@@ -81,16 +85,23 @@ std::vector<std::string> tokenize(const std::string &str, const char *delimsset,
 {
     std::vector<std::string> tokens;
     std::string lowerStr = toLower(str);
-    long begin = -1;
-    size_t i;
-    for (i = 0; i < lowerStr.length(); i++) {
-        if (strchr(delimsset, lowerStr[i])) {
-            tokens.push_back(trim(lowerStr.substr(begin, i - begin), cutset));
-            begin = -1;
-        } else if (begin < 0) {
-            begin = i;
+    size_t i = 0;
+    while (i < lowerStr.size()) {
+        while (strchr(delimsset, lowerStr[i]) && i < lowerStr.size()) {
+            i++;
         }
+
+        if (i >= lowerStr.size()) {
+            break;
+        }
+
+        std::string tok = "";
+        while (strchr(delimsset, lowerStr[i]) == nullptr && i < lowerStr.size()) {
+            tok += lowerStr[i];
+            i++;
+        }
+        tokens.push_back(trim(tok, cutset));
     }
-    tokens.push_back(trim(lowerStr.substr(begin, i - begin), cutset));
+
     return tokens;
 }

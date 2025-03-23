@@ -15,6 +15,7 @@
 struct KadId
 {
     KadId();
+    KadId(const uint8_t *id_);
 
     int height();
 

@@ -7,7 +7,17 @@
 */
 
 KadId::KadId()
+    : KadId(nullptr)
 {}
+
+KadId::KadId(const uint8_t *id_)
+{
+    if (!id_) {
+        return;
+    }
+
+    memcpy(this->id, id_, KAD_ID_LENGTH);
+}
 
 int KadId::height()
 {

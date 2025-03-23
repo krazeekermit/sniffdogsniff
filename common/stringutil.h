@@ -39,7 +39,7 @@ std::string replace(std::string targetString, std::string oldValue, std::string 
 std::string replaceGlobal(std::string targetString, std::string oldValue, std::string newValue);
 
 std::string toLower(std::string in);
-std::vector<std::string> tokenize(const std::string &str, const char *delimsset = " ", const char *cutset = " \r\n");
+std::vector<std::string> tokenize(const std::string &str, const char *delimsset = " \r\n", const char *cutset = "");
 
 #endif // STRINGUTIL_H
 

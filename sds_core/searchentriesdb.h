@@ -10,7 +10,7 @@
 #include <vector>
 #include <array>
 #include <openssl/sha.h>
-#include <db.h>
+#include <db5.3/db.h>
 
 #define MAX_SEARCH_ENTRY_SZ 1104
 #define METRICS_LEN       4

@@ -2,12 +2,21 @@ cmake_minimum_required(VERSION 3.5)
 
 project(sniffdogsniffd LANGUAGES C CXX)
 
-link_libraries(pthread crypto db gumbo curl)
+link_libraries(pthread crypto db-5.3 gumbo curl)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(sniffdogsniffd main.cpp)
+if (SDS_TESTING)
+    enable_testing()
+
+    add_executable(sniffdogsniffd test.cpp)
+    target_link_libraries(sniffdogsniffd gtest)
+
+    add_test(sniffdogsniffd sniffdogsniffd)
+else()
+    add_executable(sniffdogsniffd main.cpp)
+endif()
 
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")
 add_subdirectory(common)

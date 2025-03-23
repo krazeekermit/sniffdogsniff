@@ -10,7 +10,10 @@ sniffdogsniffd
 cmake_install.cmake
 Makefile
 */Makefile
+CTestTestfile.cmake
+*/CTestTestfile.cmake
 
 #build dir
 build/
 CMakeFiles/
+Testing/
