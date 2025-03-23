@@ -11,8 +11,13 @@
 #include <map>
 #include <vector>
 
+class NodesLookupTask;
+
 class LocalNode
 {
+friend class NodesLookupTask;
+friend class EntriesPublishTask;
+
 public:
     LocalNode(SdsConfig &cfgs);
     ~LocalNode();
@@ -21,12 +26,12 @@ public:
     int ping(const KadId &id, std::string address);
     int findNode(std::map<KadId, std::string> &nearest, const KadId &id);
     int storeResult(SearchEntry se);
-    int findResults(std::vector<SearchEntry> &results, const char *query);
+    int findResults(std::map<KadId, std::string> &nearest, std::vector<SearchEntry> &results, const char *query);
     int doSearch(std::vector<SearchEntry> &results, const char *query);
 
     // used to insert new connected node into the ktable
     // usually called by the rpc request handler
-    int nodeConnected(const unsigned char *id, const char *address);
+    int nodeConnected(const KadId &id, std::string &address);
     // checkNode(id kademlia.KadId, addr string) bool
 
     void startTasks();
@@ -38,11 +43,13 @@ private:
     KadRoutingTable *ktable;
     SearchEntriesDB *searchesDB;
     WebCrawler *crawler;
-    SdsTask *syncNodesTask;
-    SdsTask *broadcastResultsTask;
+    SdsTask *nodesLookupTask;
+    SdsTask *entriesPublishTask;
 
-    int doNodesLookup(const KadId targetId, bool check);
-    void publishResults(const std::vector<SearchEntry> &results);
+    void lock();
+    void unlock();
+
+    int findKClosestTo(std::map<KadId, std::string> &nearest, const KadId &id);
 };
 
 #endif // LOCALNODE_H

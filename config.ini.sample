@@ -19,18 +19,19 @@ tor_socks5_port = 9050
 # i2p_sam_user = user
 # i2p_sam_password = test1234
 
-web_ui_bind_addr = 127.0.0.1:8081 # Web Ui bind address and port
-
 ## To configure hidden services 
 # p2p_hidden_service = tor # or i2p or none
 # for i2p service p2p_bind_port is not needed
 p2p_bind_addr = 127.0.0.1
 p2p_bind_port = 4225
 
+## Web Ui bind address and port
+web_ui_bind_port = 8081
+web_ui_bind_addr = 127.0.0.1
+
 [peers]
 address = tereiuhuygftfrdggggy665fff.onion:4221
-address = 10.10.0.34:4222
-address = yftftftftftf5re5r5erdffg78uj88j8j8j.onion:56778
+address = tftf5re5r5erdffg78uj88j8j8j.b32.i2p:4221
 
 [blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion
@@ -46,6 +47,6 @@ results_container_element = .w-gl
 result_container_element = .result
 result_url_element = .result-link
 result_url_property = href
-result_title_element = .css-yum8zr
+result_title_element = .wgl-title
 # result_title_property = text
 

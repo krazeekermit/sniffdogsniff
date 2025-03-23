@@ -65,22 +65,17 @@ int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, i
     size_t buf_sz = 0;
     unsigned char address_sz;
     unsigned char addrType = 0x01;
-    void *addrp = NULL;
 
     buf[buf_sz++] = 0x05; // version = 5
     buf[buf_sz++] = 0x01; // connect
     buf[buf_sz++] = 0x00; // reserved
 
-    in_addr_t baddr = inet_addr(addr);
-    if (baddr != INADDR_NONE) {
+    struct sockaddr_in baddr;
+    if (inet_pton(AF_INET, addr, &baddr.sin_addr) > 0) {
         buf[buf_sz++] = addrType = 0x01; // addr type (ipv4)
-        address_sz = sizeof(baddr);
-        addrp = &baddr;
     } else {
         buf[buf_sz++] = addrType = 0x03; // addr type (domain)
-        address_sz = strlen(addr);
-        buf[buf_sz++] = address_sz;
-        addrp = (void*) addr;
+        buf[buf_sz++] = strlen(addr);
     }
 
     if (send(fd, buf, buf_sz, 0) != buf_sz) {
@@ -88,9 +83,17 @@ int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, i
         return -1;
     }
 
-    if (send(fd, addrp, address_sz, 0) != address_sz) {
-        close(fd);
-        return -1;
+    if (addrType == 0x01) {
+        if (send(fd, &baddr.sin_addr, sizeof(baddr.sin_addr), 0) != 1) {
+            close(fd);
+            return -1;
+        }
+    } else if (addrType == 0x03) {
+        size_t addr_len = strlen(addr);
+        if (send(fd, addr, sizeof(char) * addr_len, 0) != addr_len) {
+            close(fd);
+            return -1;
+        }
     }
 
     uint16_t nsport = htons(port);

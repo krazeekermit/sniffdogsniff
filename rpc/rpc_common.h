@@ -2,7 +2,6 @@
 #define RPC_COMMON_H
 
 #include "common/sdsbytesbuf.h"
-#include "kademlia/kadbucket.h"
 #include "sds_core/searchentriesdb.h"
 
 #include <cstdint>
@@ -18,6 +17,7 @@
 #define ERR_SERIALIZE     3
 #define ERR_NOFUNCT       4
 #define ERR_TYPE_ARGUMENT 5
+#define ERR_CONNECTION    6
 
 /* Function Codes */
 #define FUNC_PING         100
@@ -51,6 +51,8 @@ static const char *rpc_strerror(int err)
         return "error packing/unpacking function arguments";
     case ERR_TYPE_ARGUMENT:
         return "wrong arguments for function";
+    case ERR_CONNECTION:
+        return "unable to connect";
     }
     return "";
 }
@@ -69,36 +71,65 @@ packed_struct RpcResponseHeader {
 };
 
 /*
-    Ping
+    RpcReplyException
 */
-struct PingArgs {
-    KadId id;
-    std::string address;
 
-    PingArgs();
-    PingArgs(const KadId &id_, std::string address_);
-
-    int read(SdsBytesBuf &buf);
-    void write(SdsBytesBuf &buf);
-};
-
-struct PingReply {
+class SdsRpcException : public std::runtime_error {
+public:
+    SdsRpcException(int errcode_)
+        : std::runtime_error("p2p rpc exception: " + std::string(rpc_strerror(errcode_)))
+    {}
 };
 
 /*
-    FindNode
+    Rpc Args
 */
-struct FindNodeArgs {
-    KadId id;
+struct ArgsBase
+{
+    KadId callerId;
+    std::string callerAddress;
 
-    FindNodeArgs();
-    FindNodeArgs(const KadId &id_);
+    ArgsBase() = default;
+    ArgsBase(const KadId &id_, std::string address_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct FindNodeReply {
+struct ReplyBase
+{
+};
+
+/*
+    Ping
+*/
+struct PingArgs : public ArgsBase
+{
+
+    PingArgs() = default;
+    PingArgs(const KadId &callerId_, std::string callerAddress_);
+};
+
+struct PingReply : public ReplyBase
+{
+};
+
+/*
+    FindNode
+*/
+struct FindNodeArgs : public ArgsBase
+{
+    KadId targetId;
+
+    FindNodeArgs() = default;
+    FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_);
+
+    void read(SdsBytesBuf &buf);
+    void write(SdsBytesBuf &buf);
+};
+
+struct FindNodeReply : public ReplyBase
+{
     std::map<KadId, std::string> nearest;
 
     void read(SdsBytesBuf &buf);
@@ -108,34 +139,40 @@ struct FindNodeReply {
 /*
     StoreResult
 */
-struct StoreResultArgs {
+struct StoreResultArgs : public ArgsBase
+{
     SearchEntry se;
 
     StoreResultArgs() = default;
-    StoreResultArgs(SearchEntry se_);
+    StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct StoreResultReply {
+struct StoreResultReply : public ReplyBase
+{
 };
 
 /*
     FindResults
 */
-struct FindResultsArgs {
+struct FindResultsArgs : public ArgsBase
+{
     std::string query;
 
     FindResultsArgs() = default;
-    FindResultsArgs(std::string query_);
+    FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct FindResultsReply {
+struct FindResultsReply : public FindNodeReply
+{
     std::vector<SearchEntry> results;
+
+    bool hasResults();
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);

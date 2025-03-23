@@ -1,12 +1,10 @@
 #include "sdstask.h"
 
-SdsTask::SdsTask(std::function<void (SdsTask *timer)> task_, time_t delay_, bool detach_)
-    : task(task_), delay(delay_), run(true), detach(detach_)
+#include "common/logging.h"
+
+SdsTask::SdsTask(time_t delay_, bool detach_)
+    : delay(delay_), running(false), detach(detach_)
 {
-    if (this->detach)
-        pthread_create(&this->tthread, nullptr, &SdsTask::runTask, this);
-    else
-        SdsTask::runTask(this);
 }
 
 SdsTask::~SdsTask()
@@ -16,30 +14,42 @@ SdsTask::~SdsTask()
 
 bool SdsTask::isRunning()
 {
-    return this->run;
+    return this->running;
+}
+
+void SdsTask::start()
+{
+    if (!this->running) {
+        this->running = true;
+        if (this->detach) {
+            pthread_create(&this->tthread, nullptr, &SdsTask::executeFunc, this);
+        } else {
+            SdsTask::executeFunc(this);
+        }
+    }
 }
 
 void SdsTask::stop()
 {
-    this->run = false;
+    this->running = false;
     if (this->detach) {
         pthread_join(this->tthread, nullptr);
     }
 }
 
-void *SdsTask::runTask(void *p)
+void *SdsTask::executeFunc(void *p)
 {
-    SdsTask *timer = static_cast<SdsTask*>(p);
+    SdsTask *task = static_cast<SdsTask*>(p);
     time_t msec;
 
-    while (timer->run) {
-        timer->task(timer);
+    while (task->running) {
+        task->execute();
 
         clock_t startTime = clock();
-        do {
-          clock_t delta = clock() - startTime;
-          msec = delta * 1000 / CLOCKS_PER_SEC;
-        } while (timer->run && msec <  timer->delay);
+        msec = 0;
+        while (task->running && msec < task->delay) {
+            msec = (clock() - startTime) / CLOCKS_PER_SEC;
+        }
     }
 
     return nullptr;

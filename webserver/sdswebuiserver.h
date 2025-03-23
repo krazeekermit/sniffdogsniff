@@ -10,24 +10,14 @@
 
 class SdsWebUiServer : public HttpServer
 {
-    friend class IndexHandler;
-    friend class FileHandler;
-    friend class ResultsViewHandler;
-    friend class InserResultsHandler;
-
 public:
     SdsWebUiServer(LocalNode *node_, std::string resourcesDir_);
     ~SdsWebUiServer();
 
-protected:
-    virtual int handleRequest(HttpRequest &request, HttpResponse &response) override;
-
 private:
     LocalNode *node;
     std::string resourcesDir;
-    std::map<std::string, Jinja2CppLight::Template*> templates;
 
-    void loadTemplates();
     void createHandlers();
 };
 

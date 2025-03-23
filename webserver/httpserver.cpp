@@ -6,8 +6,10 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <poll.h>
 
-#define THREAD_POOL_SZ 1
+#define MAX_CLIENT_COUNT 9
+#define MAX_POLL_FD_COUNT (MAX_CLIENT_COUNT+1)
 
 static std::string httpUnescape(const char *ss)
 {
@@ -68,51 +70,51 @@ static int parseHttpAttrs(HttpRequest &req, char *valssp)
     return 0;
 }
 
-static int parseHttpFirstLine(HttpRequest &req, char *line)
+static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
 {
     char *linestart = nullptr;
     char *lineend = nullptr;
     char *lineend2 = nullptr;
     linestart = strtok_r(line, " ", &lineend);
-    if (strcmp(linestart, "GET") == 0) {
-        req.method = HttpMethod::HTTP_GET;
+    if (strcmp(linestart, "GET") == 0 || strcmp(linestart, "HEAD")) {
+        req.method = strcmp(linestart, "GET") ? HttpMethod::HTTP_GET : HttpMethod::HTTP_HEAD;
         linestart = strtok_r(nullptr, " ", &lineend);
         linestart = strtok_r(linestart, "?", &lineend2);
         req.url = linestart;
         if (parseHttpAttrs(req, lineend2))
-            return -1;
+            return HttpCode::HTTP_BAD_REQUEST;
 
     } else if (strcmp(linestart, "POST") == 0) {
         req.method = HttpMethod::HTTP_POST;
         req.url = strtok_r(nullptr, " ", &lineend);
+    } else {
+        return HttpCode::HTTP_NOT_IMPLEMENTED;
     }
 
     req.version = strtok_r(nullptr, " ", &lineend);
 
-    return 0;
+    return HttpCode::HTTP_OK;
 }
 
-static int parseHttpReqest(HttpRequest &req, std::string &ss)
+static HttpCode parseHttpReqest(HttpRequest &req, SdsBytesBuf &sbuffer)
 {
-    int ret = 0;
-    size_t slen = ss.length();
-    char *parsep = new char[slen + 1];
+    HttpCode ret = HttpCode::HTTP_OK;
 
     size_t i;
     size_t parsep_len = 0;
-    for (i = 0; i < slen; i++) {
-        if (ss[i] != '\r')
-            parsep[parsep_len++] = ss[i];
+    for (i = 0; i < sbuffer.size(); i++) {
+        if (sbuffer.bufPtr()[i] != '\r')
+            sbuffer.bufPtr()[parsep_len++] = sbuffer.bufPtr()[i];
     }
-    parsep[parsep_len] = '\0';
+//    parsep[parsep_len] = '\0';
 
     char *linestart = nullptr;
     char *lineend = nullptr;
     char *keyp = nullptr;
     char *valuep = nullptr;
-    linestart = strtok_r(parsep, "\n", &lineend);
-    if (parseHttpFirstLine(req, linestart)) {
-        ret = -1;
+    linestart = strtok_r((char*) sbuffer.bufPtr(), "\n", &lineend);
+    ret = parseHttpFirstLine(req, linestart);
+    if (ret != HttpCode::HTTP_OK) {
         goto parse_end;
     }
 
@@ -126,42 +128,37 @@ static int parseHttpReqest(HttpRequest &req, std::string &ss)
 
     if (req.method == HttpMethod::HTTP_POST) {
         if (parseHttpAttrs(req, lineend)) {
-            ret = -1;
+            ret = HttpCode::HTTP_BAD_REQUEST;
             goto parse_end;
         }
     }
 
-    ret = 0;
-
 parse_end:
-    delete[] parsep;
     return ret;
 }
 
-static int createResponse(HttpResponse &resp, std::string &body)
+static int createResponse(HttpResponse &resp, SdsBytesBuf &sbuffer)
 {
+    std::string body = "";
     body.clear();
-    body += "HTTP/1.1 " + std::to_string(resp.code) + " Created\r\n";
+    body += "HTTP/1.1 " + std::to_string(resp.code) + "\r\n";
     for (auto it = resp.headers.begin(); it != resp.headers.end(); it++)
         body += it->first + ":" + it->second + "\r\n";
 
-    body += "\r\n\r\n";
-    body += resp.ss;
+    body += "\r\n";
+    sbuffer.writeBytes(body.c_str(), body.size());
+    sbuffer.writeBytes(resp.buffer.bufPtr(), resp.buffer.size());
     return 0;
 }
 
 HttpServer::HttpServer()
     : detach(false), defaultContentType("text/html")
 {
-    pthread_mutex_init(&this->mutex, nullptr);
-    pthread_cond_init(&this->cond, nullptr);
 }
 
 HttpServer::~HttpServer()
 {
     this->shutdown();
-    pthread_mutex_destroy(&this->mutex);
-    pthread_cond_destroy(&this->cond);
 
     for (auto it = this->handlers.begin(); it != this->handlers.end(); it++)
         delete it->second;
@@ -169,52 +166,38 @@ HttpServer::~HttpServer()
     this->handlers.clear();
 }
 
-void *accessHandlerCallback(void *cls) {
-    HttpServer *srv = static_cast<HttpServer*>(cls);
-    int client_fd;
+
+int HttpServer::handleConnection(int client_fd)
+{
     int previous_error = 0;
-    if (srv) {
-        while (srv->running) {
-            pthread_mutex_lock(&srv->mutex);
-            while (srv->clientsQueue.empty()) {
-                if (!srv->running) {
-                    pthread_mutex_unlock(&srv->mutex);
-                    return nullptr;
-                }
-                pthread_cond_wait(&srv->cond, &srv->mutex);
-            }
-            client_fd = srv->clientsQueue.front();
-            srv->clientsQueue.pop_front();
-            pthread_mutex_unlock(&srv->mutex);
-
-            char buf[512];
-            size_t nrecv = 0;
-            size_t trecv = 0;
-            std::string ss;
-            while ((nrecv = recv(client_fd, buf, sizeof(buf), 0))) {
-                trecv += nrecv;
-                ss.append(buf, nrecv);
-                if (nrecv < sizeof(buf))
-                    break;
-            }
-            ss.append("\0");
-
-            HttpRequest request;
-            HttpResponse response;
-            if (parseHttpReqest(request, ss)) {
-
-            }
-
-            previous_error = srv->handleRequest(request, response);
-
-            std::string respBody = "";
-            createResponse(response, respBody);
-
-            send(client_fd, respBody.data(), respBody.length(), 0);
-            close(client_fd);
-        }
+    unsigned char buf[512];
+    size_t nrecv = 0;
+    size_t trecv = 0;
+    SdsBytesBuf sbuffer;
+    while ((nrecv = recv(client_fd, buf, sizeof(buf), 0))) {
+        trecv += nrecv;
+        sbuffer.writeBytes(buf, nrecv);
+        if (nrecv < sizeof(buf))
+            break;
     }
-    return 0;
+    sbuffer.writeUint8('\0');
+
+    HttpRequest request;
+    HttpResponse response;
+    HttpCode ret = parseHttpReqest(request, sbuffer);
+    if (ret == HttpCode::HTTP_OK) {
+        this->handleRequest(request, response);
+    } else {
+        this->handleError(request, response, ret);
+    }
+
+    sbuffer.zero();
+    createResponse(response, sbuffer);
+
+    send(client_fd, sbuffer.bufPtr(), sbuffer.size(), 0);
+    close(client_fd);
+
+    return previous_error;
 }
 
 void *acceptFun(void *cls)
@@ -224,11 +207,45 @@ void *acceptFun(void *cls)
         int client_fd;
         struct sockaddr_in address;
         socklen_t addrlen = sizeof(address);
-        while ((client_fd = accept(srv->server_fd, (struct sockaddr*)&address, &addrlen)) > -1) {
-            pthread_mutex_lock(&srv->mutex);
-            srv->clientsQueue.push_back(client_fd);
-            pthread_cond_signal(&srv->cond);
-            pthread_mutex_unlock(&srv->mutex);
+        int clients_count = 0;
+        pollfd wait_fds[MAX_POLL_FD_COUNT];
+        wait_fds[0].fd = srv->server_fd;
+        wait_fds[0].events = POLLIN | POLLPRI;
+        while (srv->running) {
+            if (poll(wait_fds, MAX_POLL_FD_COUNT, 3000) > 0) {
+                int i;
+                if ((wait_fds[0].revents & POLLIN)) {
+                    if (clients_count >= MAX_CLIENT_COUNT) {
+                        continue;
+                    }
+
+                    client_fd = accept(srv->server_fd, (struct sockaddr*) &address, &addrlen);
+                    for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
+                        if (wait_fds[i].fd == 0) {
+                            clients_count++;
+                            wait_fds[i].fd = client_fd;
+                            wait_fds[i].events = POLLIN | POLLPRI;
+                            break;
+                        }
+                    }
+                }
+
+                for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
+                    client_fd = wait_fds[i].fd;
+                    short int revents = wait_fds[i].revents;
+                    if (client_fd > 0 && revents > 0) {
+                        if ((revents & POLLHUP) || (revents & POLLERR)) {
+                            close(wait_fds[i].fd);
+                        } else if (revents & POLLIN) {
+                            srv->handleConnection(client_fd);
+                        }
+
+                        wait_fds[i].fd = 0;
+                        wait_fds[i].revents = 0;
+                        clients_count--;
+                    }
+                }
+            }
         }
     }
 
@@ -261,17 +278,12 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
     if (bind(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         return -2;
     }
-    if (listen(fd, 3) < 0) {
+    if (listen(fd, 5) < 0) {
         return -2;
     }
 
     this->server_fd = fd;
-    if (!this->threadPool) {
-        this->threadPool = new pthread_t[THREAD_POOL_SZ];
-        for (i = 0; i < THREAD_POOL_SZ; i++) {
-            pthread_create(&this->threadPool[i], nullptr, &accessHandlerCallback, this);
-        }
-    }
+    this->running = true;
 
     if (detach) {
         pthread_create(&this->acceptThread, nullptr, &acceptFun, this);
@@ -284,24 +296,8 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
 
 int HttpServer::shutdown()
 {
-    if (this->threadPool) {
-        pthread_mutex_lock(&this->mutex);
-        this->running = false;
-        pthread_cond_broadcast(&this->cond);
-        pthread_mutex_unlock(&this->mutex);
-
-        int i;
-        void *dummy = nullptr;
-        for (i = 0; i < THREAD_POOL_SZ; i++) {
-            pthread_join(this->threadPool[i], &dummy);
-        }
-
-        close(this->server_fd);
-        pthread_cancel(this->acceptThread);
-
-        delete[] this->threadPool;
-        this->threadPool = nullptr;
-    }
+    this->running = false;
+    pthread_join(this->acceptThread, nullptr);
     return 0;
 }
 
@@ -320,31 +316,39 @@ bool HttpServer::hasHandlerFor(std::string u)
     return this->handlers.find(u) != this->handlers.end();
 }
 
-int HttpServer::handleRequest(HttpRequest &request, HttpResponse &response)
+HttpCode HttpServer::handleRequest(HttpRequest &request, HttpResponse &response)
 {
-    int code = 201;
+    HttpCode code = HttpCode::HTTP_OK;
 
     response.headers["Content-Type"] = this->defaultContentType;
     if (this->hasHandlerFor(request.url)) {
         code = this->handlers[request.url]->handleRequest(request, response);
     } else {
-        code = this->handleError(request, response, 404);
+        code = this->handleError(request, response, HttpCode::HTTP_NOT_FOUND);
     }
 
     return code;
 }
 
-int HttpServer::handleError(HttpRequest &request, HttpResponse &response, int errorCode)
+HttpCode HttpServer::handleError(HttpRequest &request, HttpResponse &response, HttpCode errorCode)
 {
-    response.ss += "<html><body>";
-    response.ss += "<h2> Error " + std::to_string(errorCode) + "</h2>";
+    std::string ss;
+    ss += "<html><body>";
+    ss += "<h2> Error " + std::to_string(errorCode) + "</h2>";
     switch (errorCode) {
-    case 404:
-        response.ss += "<h4>" + request.url + " not found" + "</h4>";
+    case HttpCode::HTTP_NOT_FOUND:
+        ss += "<h4>" + request.url + " Not Found" + "</h4>";
+        break;
+    case HttpCode::HTTP_INTERNAL_ERROR:
+        ss += "<h4> Internal Server Error </h4>";
+        break;
+    case HttpCode::HTTP_NOT_IMPLEMENTED:
+        ss += "<h4> Method Not Implemented </h4>";
         break;
     default:
         break;
     }
-    response.ss + "</body></html>";
+    ss + "</body></html>";
+    response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.size());
     return errorCode;
 }

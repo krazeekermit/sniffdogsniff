@@ -8,4 +8,6 @@ target_sources(sniffdogsniffd
     ${CMAKE_CURRENT_LIST_DIR}/libsam3.c
     ${CMAKE_CURRENT_LIST_DIR}/tor.h
     ${CMAKE_CURRENT_LIST_DIR}/tor.c
+    ${CMAKE_CURRENT_LIST_DIR}/stun.c
+    ${CMAKE_CURRENT_LIST_DIR}/stun.h
 )

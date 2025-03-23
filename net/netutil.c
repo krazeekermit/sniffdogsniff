@@ -2,8 +2,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 int net_socket_connect(const char *addr, int port, long timeout)
 {
@@ -21,46 +24,54 @@ int net_socket_connect(const char *addr, int port, long timeout)
         return -1;
     }
 
-    if (fcntl(fd, F_SETFL, opt | O_NONBLOCK) < 0) {
-        return -1;
+    if (timeout > 0) {
+        if (fcntl(fd, F_SETFL, opt | O_NONBLOCK) < 0) {
+            return -1;
+        }
     }
 
     if (inet_pton(AF_INET, addr, &address.sin_addr) <= 0) {
-        return -1;
+        struct hostent *host_ent = NULL;
+
+        host_ent = gethostbyname(addr);
+        if (!host_ent) {
+            return -1;
+        }
+        int i = 0;
+        if (host_ent->h_addr_list[0] != NULL) {
+            memcpy(&address.sin_addr, host_ent->h_addr_list[0], sizeof(struct in_addr));
+        }
     }
 
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
 
-    struct timeval timeout_val;
-    timeout_val.tv_sec = timeout;
-    timeout_val.tv_usec = 0;
-
-    fd_set fd_wait;
+    struct pollfd wait_fds[1];
+    wait_fds[0].fd = fd;
+    wait_fds[0].events = POLLIN | POLLPRI;
     if (connect(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        FD_ZERO(&fd_wait);
-        FD_SET(fd, &fd_wait);
+        while (poll(wait_fds, 1, timeout) > 0) {
+            if ((wait_fds[0].revents & POLLHUP) || (wait_fds[0].revents & POLLERR)) {
+                addrlen = sizeof(err);
+                if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &addrlen) < 0) {
+                    return -1;
+                }
 
-        err = select(fd + 1, NULL, &fd_wait, NULL, &timeout_val);
-        if (err == 0) {
-            errno = ETIMEDOUT;
-            return -1;
-        } else {
-            addrlen = sizeof(err);
-            if (getsockopt (fd, SOL_SOCKET, SO_ERROR, &err, &addrlen) < 0) {
-                return -1;
-            }
-
-            if (err) {
-                errno = err;
+                if (err) {
+                    close(fd);
+                    errno = err;
+                    return -1;
+                }
+            } else {
+                if (fcntl(fd, F_SETFL, opt) < 0) {
+                    return -1;
+                }
+                return fd;
             }
         }
-        return -1;
     }
 
-    if (fcntl(fd, F_SETFL, opt) < 0) {
-        return -1;
-    }
-
-    return fd;
+    close(fd);
+    errno = ETIMEDOUT;
+    return -1;
 }

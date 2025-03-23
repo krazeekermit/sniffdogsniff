@@ -16,6 +16,7 @@ struct SdsConfig {
     int db_cache_sz;
     int allow_result_invalidate;
     char *web_ui_bind_addr;
+    int web_ui_bind_port;
     std::vector<char*> known_peers;
     std::vector<char*> blacklisted_peers;
     int force_tor_proxy;
@@ -35,6 +36,9 @@ struct SdsConfig {
     char i2p_sam_port;
     char *i2p_sam_user;
     char *i2p_sam_password;
+
+    char *stun_server_addr;
+    int stun_server_port;
 
     std::vector<SearchEngineConfigs> search_engines;
 };

@@ -1,50 +1,52 @@
 #include "rpc_common.h"
 
 /*
+    ArgsBase
+*/
+
+ArgsBase::ArgsBase(const KadId &id_, std::string address_)
+    : callerId(id_), callerAddress(address_)
+{
+}
+
+void ArgsBase::read(SdsBytesBuf &buf)
+{
+    callerAddress = buf.readString();
+    buf.readBytes(callerId.id, KAD_ID_LENGTH);
+}
+
+void ArgsBase::write(SdsBytesBuf &buf)
+{
+    buf.writeString(callerAddress);
+    buf.writeBytes(callerId.id, KAD_ID_LENGTH);
+}
+
+/*
     PingArgs
 */
-PingArgs::PingArgs()
-    : address("")
+PingArgs::PingArgs(const KadId &callerId_, std::string callerAddress_)
+    : ArgsBase(callerId_, callerAddress_)
 {
-    memset(this->id.id, 0, KAD_ID_LENGTH);
-}
-
-PingArgs::PingArgs(const KadId &id_, std::string address_)
-    : address(address_), id(id_)
-{}
-
-int PingArgs::read(SdsBytesBuf &buf)
-{
-    address = buf.readString();
-    return buf.readBytes(id.id, KAD_ID_LENGTH) == KAD_ID_LENGTH;
-}
-
-void PingArgs::write(SdsBytesBuf &buf)
-{
-    buf.writeString(address);
-    buf.writeBytes(id.id, KAD_ID_LENGTH);
 }
 
 /*
     FindNodeArgs
 */
-FindNodeArgs::FindNodeArgs()
+FindNodeArgs::FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_)
+    : ArgsBase(callerId_, callerAddress_), targetId(targetId_)
 {
-    memset(this->id.id, 0, KAD_ID_LENGTH);
 }
-
-FindNodeArgs::FindNodeArgs(const KadId &id_)
-    : id(id_)
-{}
 
 void FindNodeArgs::read(SdsBytesBuf &buf)
 {
-    buf.readBytes(id.id, KAD_ID_LENGTH);
+    ArgsBase::read(buf);
+    buf.readBytes(targetId.id, KAD_ID_LENGTH);
 }
 
 void FindNodeArgs::write(SdsBytesBuf &buf)
 {
-    buf.writeBytes(id.id, KAD_ID_LENGTH);
+    ArgsBase::write(buf);
+    buf.writeBytes(targetId.id, KAD_ID_LENGTH);
 }
 
 /*
@@ -52,8 +54,8 @@ void FindNodeArgs::write(SdsBytesBuf &buf)
 */
 void FindNodeReply::read(SdsBytesBuf &buf)
 {
-    int size = buf.readInt32();
-    for (int i = 0; i < size; i++) {
+    unsigned int size = buf.readUint32();
+    for (unsigned int i = 0; i < size; i++) {
         KadId id;
         buf.readBytes(id.id, KAD_ID_LENGTH);
 
@@ -64,7 +66,7 @@ void FindNodeReply::read(SdsBytesBuf &buf)
 
 void FindNodeReply::write(SdsBytesBuf &buf)
 {
-    buf.writeInt32(nearest.size());
+    buf.writeUint32(nearest.size());
     for (auto it = nearest.begin(); it != nearest.end(); it++) {
         buf.writeBytes(it->first.id, KAD_ID_LENGTH);
         buf.writeString(it->second);
@@ -74,42 +76,53 @@ void FindNodeReply::write(SdsBytesBuf &buf)
 /*
     StoreResultArgs
 */
-StoreResultArgs::StoreResultArgs(SearchEntry se_)
-    : se(se_)
+StoreResultArgs::StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_)
+    : ArgsBase(callerId_, callerAddress_), se(se_)
 {}
 
 void StoreResultArgs::read(SdsBytesBuf &buf)
 {
+    ArgsBase::read(buf);
     se.read(buf);
 }
 
 void StoreResultArgs::write(SdsBytesBuf &buf)
 {
+    ArgsBase::write(buf);
     se.write(buf);
 }
 
 /*
     FindResults
 */
-FindResultsArgs::FindResultsArgs(std::string query_)
-    : query(query_)
+FindResultsArgs::FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_)
+    : ArgsBase(callerId_, callerAddress_), query(query_)
 {
 }
 
 void FindResultsArgs::read(SdsBytesBuf &buf)
 {
+    ArgsBase::read(buf);
     query = buf.readString();
 }
 
 void FindResultsArgs::write(SdsBytesBuf &buf)
 {
+    ArgsBase::write(buf);
     buf.writeString(query);
+}
+
+bool FindResultsReply::hasResults()
+{
+    return this->results.size() > 0 && this->nearest.empty();
 }
 
 void FindResultsReply::read(SdsBytesBuf &buf)
 {
-    int size = buf.readInt32();
-    for (int i = 0; i < size; i++) {
+    FindNodeReply::read(buf);
+
+    unsigned int size = buf.readUint32();
+    for (unsigned int i = 0; i < size; i++) {
         SearchEntry se;
         se.read(buf);
         results.push_back(se);
@@ -118,7 +131,9 @@ void FindResultsReply::read(SdsBytesBuf &buf)
 
 void FindResultsReply::write(SdsBytesBuf &buf)
 {
-    buf.writeInt32(results.size());
+    FindNodeReply::write(buf);
+
+    buf.writeUint32(results.size());
     for (auto it = results.begin(); it != results.end(); it++) {
         it->write(buf);
     }

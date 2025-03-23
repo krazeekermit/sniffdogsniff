@@ -20,7 +20,7 @@ int SdsRpcServer::ping(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &reply)
     PingArgs pingArgs;
     pingArgs.read(args);
 
-    srv->localNode->ping(pingArgs.id, pingArgs.address.c_str());
+    srv->localNode->ping(pingArgs.callerId, pingArgs.callerAddress.c_str());
 
     return ERR_NULL;
 }
@@ -29,9 +29,10 @@ int SdsRpcServer::findNode(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf &re
 {
     FindNodeArgs findArgs;
     findArgs.read(args);
+    srv->localNode->nodeConnected(findArgs.callerId, findArgs.callerAddress);
 
     FindNodeReply findReply;
-    srv->localNode->findNode(findReply.nearest, findArgs.id);
+    srv->localNode->findNode(findReply.nearest, findArgs.targetId);
 
     findReply.write(reply);
     return ERR_NULL;
@@ -42,6 +43,7 @@ int SdsRpcServer::storeResult(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf 
     StoreResultArgs storeArgs;
     storeArgs.read(args);
 
+    srv->localNode->nodeConnected(storeArgs.callerId, storeArgs.callerAddress);
     srv->localNode->storeResult(storeArgs.se);
 
     return ERR_NULL;
@@ -51,10 +53,10 @@ int SdsRpcServer::findResults(SdsRpcServer *srv, SdsBytesBuf &args, SdsBytesBuf 
 {
     FindResultsArgs findArgs;
     findArgs.read(args);
+    srv->localNode->nodeConnected(findArgs.callerId, findArgs.callerAddress);
 
     FindResultsReply findReply;
-
-    srv->localNode->findResults(findReply.results, findArgs.query.c_str());
+    srv->localNode->findResults(findReply.nearest, findReply.results, findArgs.query.c_str());
 
     findReply.write(reply);
 
@@ -109,7 +111,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
             goto rpc_fail;
         }
 
-        recv_sz = req.datasize;
+        recv_sz = le64toh(req.datasize);
         if (recv_sz > 0) {
             argsBuf.allocate(recv_sz);
             if (recv(client_fd, argsBuf.bufPtr(), recv_sz, 0) != recv_sz) {
@@ -127,6 +129,9 @@ void *SdsRpcServer::handleRequest(void *srvp)
             RequestHandler handler = handlers[i];
             if (handler.funcode == req.funcode) {
                 reply.errcode = handler.funptr(srv, argsBuf, replyBuf);
+                if (reply.errcode == ERR_NULL) {
+                    reply.datasize = htole64(replyBuf.size());
+                }
                 break;
             }
         }
@@ -134,7 +139,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
 rpc_fail:
         send(client_fd, &reply, sizeof(reply), 0);
 
-        if (replyBuf.size() > 0) {
+        if (replyBuf.size() > 0 && reply.errcode == ERR_NULL) {
             send(client_fd, replyBuf.bufPtr(), replyBuf.size(), 0);
         }
         close(client_fd);

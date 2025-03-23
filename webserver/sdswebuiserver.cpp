@@ -1,79 +1,100 @@
 #include "sdswebuiserver.h"
 
+#include "common/logging.h"
+
 #include "dirent.h"
 
 #include <vector>
 
-static int loadFile(const char *path, std::string &ss)
-{
-    FILE *fp = fopen(path, "rb");
-    if (!fp)
-        return -1;
-
-    char buf[1024];
-    size_t nread = 0;
-    while ((nread = fread(buf, sizeof(char), 1024, fp)) > 0) {
-        ss.append(buf, nread);
-    }
-
-    fclose(fp);
-    return 0;
-}
-
 /*
     Handlers
 */
-class WebUiHandler : public HttpRequestHandler {
+class WebUiHandler : public HttpRequestHandler
+{
 public:
-    WebUiHandler(SdsWebUiServer *srv_)
-        : srv(srv_) {}
+    WebUiHandler(LocalNode *node_, std::string &path)
+        : node(node_)
+    {
+        FILE *fp = fopen(path.c_str(), "rb");
+        if (fp) {
+            std::string ss = "";
+            char buf[1024];
+            size_t nread = 0;
+            while ((fgets(buf, sizeof(buf), fp) != nullptr)) {
+                ss += buf;
+            }
+
+            this->templ = new Jinja2CppLight::Template(ss);
+            fclose(fp);
+        }
+    }
+
+    ~WebUiHandler()
+    {
+        delete templ;
+    }
 
 protected:
-    SdsWebUiServer *srv;
+    LocalNode *node;
+    Jinja2CppLight::Template *templ;
 };
 
-class IndexHandler : public WebUiHandler {
+class FileHandler : public HttpRequestHandler
+{
 
 public:
-    IndexHandler(SdsWebUiServer *srv_)
-        : WebUiHandler(srv_) {}
+    FileHandler(std::string &resourcesDir_, std::string contentType_)
+        : resourcesDir(resourcesDir_), contentType(contentType_) {}
 
-    virtual int handleRequest(HttpRequest &request, HttpResponse &response) override
-    {
-        response.ss = this->srv->templates["index.html"]->render();
-        return 201;
-    }
-};
-
-class FileHandler : public WebUiHandler {
-
-public:
-    FileHandler(SdsWebUiServer *srv_, std::string contentType_)
-        : WebUiHandler(srv_), contentType(contentType_) {}
-
-    virtual int handleRequest(HttpRequest &request, HttpResponse &response) override
+    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
         char path[1024];
-        sprintf(path, "%s/static/%s", this->srv->resourcesDir.c_str(), request.url.c_str());
-        response.headers["Content-Type"] = contentType;
-        if (loadFile(path, response.ss))
-            return 404;
+        sprintf(path, "%s/static/%s", this->resourcesDir.c_str(), request.url.c_str());
+        FILE *fp = fopen(path, "rb");
+        if (!fp)
+            return HttpCode::HTTP_NOT_FOUND;
 
-        return 201;
+        uint8_t buf[1024];
+        size_t nread = 0;
+        while ((nread = fread(buf, sizeof(uint8_t), 1024, fp)) > 0) {
+            response.buffer.writeBytes(buf, nread);
+        }
+
+        fclose(fp);
+
+        response.headers["Content-Type"] = contentType;
+        response.headers["Content-Length"] = std::to_string(response.buffer.size());
+        return HttpCode::HTTP_OK;
     }
 
 private:
+    std::string resourcesDir;
     std::string contentType;
 };
 
-
-class ResultsViewHandler : public WebUiHandler {
+class IndexHandler : public WebUiHandler
+{
 
 public:
-    ResultsViewHandler(SdsWebUiServer *srv_)
-        : WebUiHandler(srv_) {}
+    IndexHandler(LocalNode *node_, std::string path)
+        : WebUiHandler(node_, path) {}
 
-    virtual int handleRequest(HttpRequest &request, HttpResponse &response) override
+    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
+    {
+        std::string ss = this->templ->render();
+        response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.length());
+        return HttpCode::HTTP_CREATED;
+    }
+};
+
+class ResultsViewHandler : public WebUiHandler
+{
+
+public:
+    ResultsViewHandler(LocalNode *node_, std::string path)
+        : WebUiHandler(node_, path) {}
+
+    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
         //q=Search+something...&link_filter=all&data_type=links
         std::string query = request.values["q"];
@@ -84,8 +105,8 @@ public:
             this->dataType = request.values["data_type"];
         }
         std::vector<SearchEntry> results;
-        this->srv->node->doSearch(results, query.c_str());
-        Jinja2CppLight::Template *templ = this->srv->templates["results_links.html"];
+        this->node->doSearch(results, query.c_str());
+        Jinja2CppLight::Template *templ = this->templ;
 
         templ->setValue("q", query);
 
@@ -96,12 +117,14 @@ public:
         templ->setValue("results", ress);
 
         try {
-            response.ss = templ->render();
-        } catch (Jinja2CppLight::render_error &ex) {
-            std::cerr << "template error ::::" << ex.what();
+            std::string ss = templ->render();
+            response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.length());
+        } catch (std::exception &ex) {
+            logerr << "webui template error: " << ex.what();
+            return HttpCode::HTTP_INTERNAL_ERROR;
         }
 
-        return 201;
+        return HttpCode::HTTP_CREATED;
     }
 
 private:
@@ -114,48 +137,19 @@ private:
 SdsWebUiServer::SdsWebUiServer(LocalNode *node_, std::string resourcesDir_)
     : node(node_), resourcesDir(resourcesDir_)
 {
-    this->loadTemplates();
     this->createHandlers();
 }
 
 SdsWebUiServer::~SdsWebUiServer()
 {
-    for (auto it = this->templates.begin(); it != this->templates.end(); it++)
-        delete it->second;
-
-    this->templates.clear();
-}
-
-void SdsWebUiServer::loadTemplates()
-{
-    char path[1024];
-    sprintf(path, "%s/templates/", this->resourcesDir.c_str());
-
-    DIR *dir;
-    struct dirent *ent;
-    if ((dir = opendir(path))) {
-        while ((ent = readdir(dir))) {
-            std::string ss = "";
-            sprintf(path, "%s/templates/%s", this->resourcesDir.c_str(), ent->d_name);
-
-            if (loadFile(path, ss)) {
-                continue;
-            }
-
-            this->templates[ent->d_name] = new Jinja2CppLight::Template(ss);
-        }
-    }
 }
 
 void SdsWebUiServer::createHandlers()
 {
-    this->addHandler("/", new IndexHandler(this));
-    this->addHandler("/style.css", new FileHandler(this, "text/css"));
+    this->addHandler("/", new IndexHandler(this->node, this->resourcesDir + "/templates/index.html"));
+    this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/results_links.html"));
 
-    this->addHandler("/search", new ResultsViewHandler(this));
-}
-
-int SdsWebUiServer::handleRequest(HttpRequest &request, HttpResponse &response)
-{
-    return HttpServer::handleRequest(request, response);
+    this->addHandler("/style.css", new FileHandler(this->resourcesDir, "text/css"));
+    this->addHandler("/sds_logo.png", new FileHandler(this->resourcesDir, "image/png"));
+    this->addHandler("/sds_header.png", new FileHandler(this->resourcesDir, "image/png"));
 }

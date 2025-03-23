@@ -202,8 +202,8 @@ int main(int argc, char **argv)
     node->startTasks();
 
     SdsWebUiServer *webSrv = new SdsWebUiServer(node, "./res");
-    loginfo << "started web ui server on ";
-    webSrv->startListening("127.0.0.1", 8081, true);
+    loginfo << "started web ui server on " << cfg.web_ui_bind_addr << ":" << cfg.web_ui_bind_port;
+    webSrv->startListening(cfg.web_ui_bind_addr, cfg.web_ui_bind_port, true);
 
     rpcSrv = new SdsRpcServer(node);
 
@@ -236,5 +236,8 @@ int main(int argc, char **argv)
     delete rpcSrv;
     delete webSrv;
     delete node;
+
+    loginfo << "shutdown complete, goodbye!";
+
     return 0;
 }

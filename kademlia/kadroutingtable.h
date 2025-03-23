@@ -17,7 +17,7 @@ public:
     bool isFull();
     bool isEmpty();
 
-    bool pushNode(KadNode &kn);
+    bool pushNode(const KadNode &kn);
     bool removeNode(KadNode &kn);
     bool removeNode(const KadId &id);
 
@@ -26,7 +26,7 @@ public:
     const KadNode &getNodeAtHeight(int height, int index);
 
     int readFile(const char *path);
-    int writeFile(FILE *fp);
+    int writeFile(const char *path);
 
     friend std::ostream &operator<<(std::ostream &os, const KadRoutingTable &kt2);
 

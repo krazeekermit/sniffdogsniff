@@ -17,17 +17,13 @@ struct KadId
     KadId();
     KadId(const uint8_t *id_);
 
-    int height();
+    int height() const;
 
     KadId operator-(const KadId &id2) const;
     bool operator==(const KadId &id2) const;
     bool operator<(const KadId& id2) const;
 
-    friend std::ostream &operator<<(std::ostream &os, const KadId &id2)
-    {
-        STREAM_HEX(os, id2.id, KAD_ID_LENGTH);
-        return os;
-    };
+    friend std::ostream &operator<<(std::ostream &os, const KadId &id2);
 
     static KadId randomId();
     static KadId idNbitsFarFrom(const KadId &id1, int bdist);
@@ -50,8 +46,7 @@ public:
     void incrementStales();
     void decrementStales();
 
-    bool operator==(const KadNode &kn2);
-    bool operator==(const KadNode *kn2);
+    bool operator==(const KadNode &kn2) const;
     bool operator<(const KadNode &rhs) const;
     friend std::ostream &operator<<(std::ostream &os, const KadNode &kn2);
 

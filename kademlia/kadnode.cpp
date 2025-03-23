@@ -19,7 +19,12 @@ KadId::KadId(const uint8_t *id_)
     memcpy(this->id, id_, KAD_ID_LENGTH);
 }
 
-int KadId::height()
+/*
+    Most significant byte is the 16th
+    Most significant bit is the first
+    in the last non zero byte.
+*/
+int KadId::height() const
 {
     int i, d = KAD_ID_BIT_LENGTH - 1;
     for (i = KAD_ID_LENGTH - 1; i >= 0 && id[i] == 0; i--) {
@@ -60,18 +65,38 @@ KadId KadId::operator-(const KadId &id2) const
 
 bool KadId::operator==(const KadId &id2) const
 {
-    return memcmp(id, id2.id, KAD_ID_LENGTH) == 0;
+    return  this->id[0]  == id2.id[0] &&
+            this->id[1]  == id2.id[1] &&
+            this->id[2]  == id2.id[2] &&
+            this->id[3]  == id2.id[3] &&
+            this->id[4]  == id2.id[4] &&
+            this->id[5]  == id2.id[5] &&
+            this->id[6]  == id2.id[6] &&
+            this->id[7]  == id2.id[7] &&
+            this->id[8]  == id2.id[8] &&
+            this->id[9]  == id2.id[9] &&
+            this->id[10] == id2.id[10] &&
+            this->id[11] == id2.id[11] &&
+            this->id[12] == id2.id[12] &&
+            this->id[13] == id2.id[13] &&
+            this->id[14] == id2.id[14] &&
+            this->id[15] == id2.id[15];
 }
 
 bool KadId::operator<(const KadId &id2) const
 {
-    int i;
-    for (i = 0; i < KAD_ID_LENGTH; i++)
-        if (id[i] < id2.id[i])
-            return true;
+    int i = KAD_ID_LENGTH-1;
+    while (i>= 0 && id[i] == id2.id[i])
+        i--;
 
-    return false;
+    return id[i] < id2.id[i];
 }
+
+std::ostream &operator<<(std::ostream &os, const KadId &id2)
+{
+    STREAM_HEX_REVERSE(os, id2.id, KAD_ID_LENGTH);
+    return os;
+};
 
 KadId KadId::randomId()
 {
@@ -176,14 +201,9 @@ void KadNode::decrementStales()
     this->stales--;
 }
 
-bool KadNode::operator==(const KadNode &kn)
+bool KadNode::operator==(const KadNode &kn) const
 {
     return this->id == kn.id;
-}
-
-bool KadNode::operator==(const KadNode *kn)
-{
-    return this->id == kn->id;
 }
 
 bool KadNode::operator<(const KadNode &kn) const

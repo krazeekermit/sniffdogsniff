@@ -224,7 +224,5 @@ GumboOutput *downloadWebDucument(const char *url, const char *userAgent)
         return nullptr;
     }
 
-    logdebug << "parse ok for __ " << url;
-
     return output;
 }
