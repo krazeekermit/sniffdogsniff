@@ -98,31 +98,43 @@ bool KadBucket::isFull()
     return this->nodes.size() == KAD_BUCKET_MAX;
 }
 
-//std::vector<KadNode*> KadBucket::getNodes() const
-//{
-//    return nodes;
-//}
+size_t KadBucket::getNodesCount()
+{
+    return this->nodes.size();
+}
 
-//std::vector<KadNode*> KadBucket::getReplacementNodes() const
-//{
-//    return replacementNodes;
-//}
+size_t KadBucket::getReplacementCount()
+{
+    return this->replacementNodes.size();
+}
+
+KadNode KadBucket::getNode(const KadId id) const
+{
+    for (auto it = this->nodes.begin(); it != this->nodes.end(); it++) {
+        if (it->getId() == id) {
+            return *it;
+        }
+    }
+
+    return nullptr;
+}
+
+KadNode KadBucket::getReplacement(const KadId id) const
+{
+    for (auto it = this->replacementNodes.begin(); it != this->replacementNodes.end(); it++) {
+        if (it->getId() == id) {
+            return *it;
+        }
+    }
+
+    return nullptr;
+}
 
 void KadBucket::reorder()
 {
     std::sort(this->nodes.begin(), this->nodes.end());
     std::sort(this->replacementNodes.begin(), this->replacementNodes.end());
 }
-
-//KadNode *KadBucket::getNode(KadNode *kn)
-//{
-//    return getNode_(this->nodes, kn);
-//}
-
-//KadNode *KadBucket::getReplacementNode(KadNode *kn)
-//{
-//    return getNode_(this->replacementNodes, kn);
-//}
 
 std::ostream &operator<<(std::ostream &os, const KadBucket &kb2)
 {
