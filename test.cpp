@@ -1,4 +1,5 @@
 #include "common/stringutil.h"
+#include "kademlia/kadbucket.h"
 #include "kademlia/kadnode.h"
 
 #include <gtest/gtest.h>
@@ -130,8 +131,85 @@ TEST(test_kademlia, test_knode_create1)
 
     ASSERT_EQ(kn.getAddress(), "sniffdogsniff.net:4225");
 
-    const uint8_t idBytes[] = {0xc9, 0x1c, 0xb0, 0xc1, 0x3f, 0x27, 0x04, 0x7b, 0x81, 0x48, 0xf0, 0xb3, 0x10, 0xa2, 0x92, 0xfa};
-    //ASSERT_STREQ((char*) kn.getId().id, (char*) idBytes);
+    const KadId id = kn.getId();
+    ASSERT_EQ(id.id[0], 0xed);
+    ASSERT_EQ(id.id[1], 0x12);
+    ASSERT_EQ(id.id[2], 0x68);
+    ASSERT_EQ(id.id[3], 0xfb);
+    ASSERT_EQ(id.id[4], 0x6b);
+    ASSERT_EQ(id.id[5], 0x2c);
+    ASSERT_EQ(id.id[6], 0xaf);
+    ASSERT_EQ(id.id[7], 0x81);
+    ASSERT_EQ(id.id[8], 0x82);
+    ASSERT_EQ(id.id[9], 0x9d);
+    ASSERT_EQ(id.id[10], 0x52);
+    ASSERT_EQ(id.id[11], 0x77);
+    ASSERT_EQ(id.id[12], 0x1c);
+    ASSERT_EQ(id.id[13], 0x97);
+    ASSERT_EQ(id.id[14], 0x34);
+    ASSERT_EQ(id.id[15], 0xa3);
+}
+
+TEST(test_kademlia, test_kbucket_addnodes)
+{
+    KadBucket bucket(1);
+
+    int i;
+    for (i = 0; i < 25; i++) {
+        KadNode kn(KadId::randomId(), "");
+        bucket.pushNode(kn);
+    }
+
+    ASSERT_EQ(bucket.getNodesCount(), 20);
+    ASSERT_EQ(bucket.getReplacementCount(), 5);
+}
+
+TEST(test_kademlia, test_kbucket_stales)
+{
+    KadBucket bucket(1);
+
+    const uint8_t idBytes1[] = {0x87, 0x37, 0xfa, 0x6d, 0x7b, 0x6c, 0xf5, 0x6b, 0xa5, 0x1b, 0x26, 0xe5, 0x00, 0x16, 0x81, 0x91};
+    KadId id1(idBytes1);
+    KadNode kn1(id1, "a");
+    bucket.pushNode(kn1);
+
+    const uint8_t idBytes2[] = {0x78, 0xa5, 0x76, 0x64, 0x29, 0x66, 0x0f, 0x3b, 0x81, 0x6d, 0xb5, 0xba, 0xde, 0x87, 0x5d, 0x0c};
+    KadId id2(idBytes2);
+    KadNode kn2(id2, "b");
+    bucket.pushNode(kn2);
+
+    const uint8_t idBytes3[] = {0x00, 0xaa, 0x00, 0xbb, 0x22, 0x64, 0xcc, 0x3c, 0x8a, 0x4d, 0x2f, 0x9e, 0xb4, 0x81, 0x49, 0x1c};
+    KadId id3(idBytes3);
+    KadNode kn3(id3, "c");
+    bucket.pushNode(kn3);
+
+    const uint8_t idBytes4[] = {0x01, 0xa5, 0x30, 0x12, 0x44, 0x00, 0xce, 0xcc, 0xaa, 0xdd, 0xff, 0xee, 0xcc, 0x8d, 0x43, 0x06};
+    KadId id4(idBytes4);
+    KadNode kn4(id4, "d");
+    bucket.pushNode(kn4);
+
+    const uint8_t idBytes5[] = {0x29, 0x16, 0x91, 0xe5, 0x24, 0x6e, 0xb2, 0x51, 0x2a, 0xf5, 0x6d, 0x00, 0x00, 0x00, 0x00, 0x00};
+    KadId id5(idBytes5);
+    KadNode kn5(id5, "e");
+    bucket.pushNode(kn5);
+
+    bucket.removeNode(kn2);
+    bucket.removeNode(kn2);
+
+    bucket.removeNode(kn3);
+    bucket.removeNode(kn3);
+    bucket.removeNode(kn3);
+
+    bucket.removeNode(kn5);
+    bucket.removeNode(kn5);
+    bucket.removeNode(kn5);
+    bucket.removeNode(kn5);
+
+    ASSERT_EQ(bucket.getNode(id1).getStales(), 0);
+    ASSERT_EQ(bucket.getNode(id2).getStales(), 2);
+    ASSERT_EQ(bucket.getNode(id3).getStales(), 3);
+    ASSERT_EQ(bucket.getNode(id4).getStales(), 0);
+    ASSERT_EQ(bucket.getNode(id5).getStales(), 4);
 }
 
 int main(int argc, char** argv)
