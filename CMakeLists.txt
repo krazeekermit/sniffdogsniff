@@ -18,6 +18,9 @@ else()
     add_executable(sniffdogsniffd main.cpp)
 endif()
 
+# ArchLinux and derivates are putting the BerkleyDB include file in a different directory
+target_include_directories(sniffdogsniffd PRIVATE "/usr/include/db5.3")
+
 target_include_directories(sniffdogsniffd PRIVATE "${PROJECT_SOURCE_DIR}")
 add_subdirectory(common)
 add_subdirectory(sds_core)
