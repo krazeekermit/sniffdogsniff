@@ -1,7 +1,7 @@
 #include "searchengine.h"
 
 #include "crawlerutils.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 
 SearchEngine::SearchEngine(SearchEngineConfigs &configs_)
     : configs(configs_)
@@ -9,7 +9,7 @@ SearchEngine::SearchEngine(SearchEngineConfigs &configs_)
 
 void SearchEngine::doSearch(std::vector<SearchEntry> &entries, const char *query)
 {
-    logdebug << "do search - " << this->configs.name;
+    LOG_F(1, "do search - ", this->configs.name);
     char searchUrl[512];
     sprintf(searchUrl, this->configs.searchQueryUrl, query);
     extractSearchResults(entries, searchUrl);

@@ -1,5 +1,7 @@
 #include "httpserver.h"
 
+#include "common/loguru.hpp"
+
 #include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -70,6 +72,8 @@ static int parseHttpAttrs(HttpRequest &req, char *valssp)
 
 static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
 {
+    LOG_F(1, "new http request: %s", line);
+
     char *linestart = nullptr;
     char *lineend = nullptr;
     char *lineend2 = nullptr;
@@ -80,6 +84,7 @@ static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
         linestart = strtok_r(linestart, "?", &lineend2);
         req.url = linestart;
         if (parseHttpAttrs(req, lineend2))
+            LOG_F(ERROR, "bad http request");
             return HttpCode::HTTP_BAD_REQUEST;
 
     } else if (strcmp(linestart, "POST") == 0) {
@@ -182,6 +187,7 @@ void *accessHandlerCallback(void *cls) {
                 }
                 pthread_cond_wait(&srv->cond, &srv->mutex);
             }
+
             client_fd = srv->clientsQueue.front();
             srv->clientsQueue.pop_front();
             pthread_mutex_unlock(&srv->mutex);
@@ -225,6 +231,7 @@ void *acceptFun(void *cls)
 
         while ((client_fd = accept(srv->server_fd, (struct sockaddr*)&address, &addrlen)) > -1) {
             pthread_mutex_lock(&srv->mutex);
+            LOG_F(1, "new connection request from %s:%d", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
             srv->clientsQueue.push_back(client_fd);
             pthread_cond_signal(&srv->cond);
             pthread_mutex_unlock(&srv->mutex);

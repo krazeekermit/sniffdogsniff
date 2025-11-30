@@ -1,7 +1,5 @@
 #include "crawlerutils.h"
 
-#include "common/logging.h"
-
 #include <cstring>
 
 GumboElementIterator::GumboElementIterator(GumboNode *parent, GumboTag tagType_)

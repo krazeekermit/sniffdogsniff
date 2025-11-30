@@ -3,7 +3,7 @@
 #include "common/stringutil.h"
 #include "common/utils.h"
 #include "common/macros.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 
 #include "searchentriesdb.h"
 
@@ -149,15 +149,15 @@ void SearchEntriesDB::open(const char *db_path)
 {
     int ret = 0;
     if ((ret = db_create(&this->dbp, nullptr, 0))) {
-        logdebug << "unable to open db file " << db_path << ": " << db_strerror(ret);
+        LOG_F(1, "unable to open db file %s: %s", db_path, db_strerror(ret));
         return;
     }
     if ((ret = this->dbp->set_cachesize(this->dbp, 0, 128 * 1024, 0)) != 0) {
-        logdebug << "unable to set db cache sz " << db_path << ": " << db_strerror(ret);
+        LOG_F(1, "unable to set db cache sz %s: %s", db_path, db_strerror(ret));
         return;
     }
     if ((ret = this->dbp->open(this->dbp, nullptr, db_path, nullptr, DB_HASH, DB_CREATE | DB_THREAD, 0664)) != 0) {
-        logerr << "unable to open db file " << db_path << ": " << db_strerror(ret);
+        LOG_F(ERROR, "unable to open db file %s: %s", db_path, db_strerror(ret));
         return;
     }
     this->modified();
@@ -165,7 +165,7 @@ void SearchEntriesDB::open(const char *db_path)
     DBT key, data;
     DBC *dbcp;
     if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
-        logerr << db_strerror(ret);
+        LOG_F(ERROR, db_strerror(ret));
         return;
     }
 
@@ -183,7 +183,7 @@ void SearchEntriesDB::open(const char *db_path)
     }
 
     if ((ret = dbcp->close(dbcp)) != 0) {
-        logerr << db_strerror(ret);
+        LOG_F(ERROR, db_strerror(ret));
     }
 }
 
@@ -239,7 +239,7 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
     DBT key, data;
     DBC *dbcp;
     if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
-        logerr << db_strerror(ret);
+        LOG_F(ERROR, db_strerror(ret));
         return;
     }
 
@@ -265,7 +265,7 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
     }
 
     if ((ret = dbcp->close(dbcp)) != 0) {
-        logerr << db_strerror(ret);
+        LOG_F(ERROR, db_strerror(ret));
     }
 
     for (int i = 0; i < candidates.size(); i++) {
@@ -283,7 +283,7 @@ void SearchEntriesDB::flush()
 
     int dberr = this->dbp->sync(this->dbp, 0);
     if (dberr) {
-        logerr << "SearchEntriesDB error: " << db_strerror(dberr);
+        LOG_F(ERROR, "SearchEntriesDB error: %s", db_strerror(dberr));
     }
 }
 
@@ -294,7 +294,7 @@ void SearchEntriesDB::close()
 
     int dberr = this->dbp->close(this->dbp, 0);
     if (dberr) {
-        logerr << "SearchEntriesDB error: " << db_strerror(dberr);
+        LOG_F(ERROR, "SearchEntriesDB error: %s", db_strerror(dberr));
     }
 }
 

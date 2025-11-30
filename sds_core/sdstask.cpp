@@ -1,7 +1,5 @@
 #include "sdstask.h"
 
-#include "common/logging.h"
-
 SdsTask::SdsTask(time_t delay_, bool detach_)
     : delay(delay_), running(false), detach(detach_)
 {

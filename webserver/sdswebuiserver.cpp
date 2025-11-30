@@ -1,7 +1,5 @@
 #include "sdswebuiserver.h"
 
-#include "common/logging.h"
-
 #include "dirent.h"
 
 #include <vector>

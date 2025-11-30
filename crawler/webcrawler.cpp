@@ -1,7 +1,7 @@
 #include "webcrawler.h"
 
 #include "crawlerutils.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 
 #include <map>
 #include <cstring>
@@ -78,7 +78,7 @@ static void scanDocument(GumboNode *parent, std::string siteUrl, std::map<std::s
 
                 SearchEntry se(title, rlink, SearchEntryType::SITE);
                 entries[rlink] = se;
-                logdebug << "crawler found " << se;
+                LOG_S(1) << "crawler found " << se;
             }
         } else {
             scanDocument(node, siteUrl, entries);
@@ -119,7 +119,7 @@ void *WebCrawler::crawlingFunc(void *p)
                         crawler->urlQueue.push_back(it->first);
                         crawler->searches.push_back(it->second);
                     }
-                    logdebug << "crawler found " << entries.size() << "new results";
+                    LOG_F(1, "crawler found %s new results", entries.size());
                     pthread_mutex_unlock(&crawler->mutex);
                 }
             }
@@ -127,7 +127,7 @@ void *WebCrawler::crawlingFunc(void *p)
     }
 crawling_end:
 
-    logdebug << "crawler shutted down!";
+    LOG_F(INFO, "crawler shutted down");
     return nullptr;
 }
 
@@ -176,5 +176,5 @@ void WebCrawler::doSearch(std::vector<SearchEntry> &entries, const char *query)
     pthread_cond_signal(&this->cond);
     pthread_mutex_unlock(&this->mutex);
 
-    logdebug << "Crawler seeded with " << entries.size() << " new urls";
+    LOG_F(1, "Crawler seeded with %d new urls", entries.size());
 }

@@ -1,7 +1,7 @@
 #include "sdsrpcserver.h"
 
 #include "rpc_common.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -88,7 +88,7 @@ void *SdsRpcServer::handleRequest(void *srvp)
         pthread_mutex_lock(&srv->mutex);
         while (srv->clientsQueue.empty()) {
             if (!srv->running) {
-                logdebug << "server thread down..." << me;
+                LOG_F(1, "server thread %d down...", me);
                 pthread_mutex_unlock(&srv->mutex);
                 return nullptr;
             }
@@ -144,7 +144,7 @@ rpc_fail:
         }
         close(client_fd);
 
-        logdebug << "rpcServer error " << reply.errcode << ": " << rpc_strerror(reply.errcode);
+        LOG_F(1, "rpcServer error %d: %s", reply.errcode, rpc_strerror(reply.errcode));
     }
 
     return nullptr;

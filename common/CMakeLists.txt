@@ -4,8 +4,8 @@ target_sources(sniffdogsniffd
     ${CMAKE_CURRENT_LIST_DIR}/stringutil.cpp
     ${CMAKE_CURRENT_LIST_DIR}/utils.h
     ${CMAKE_CURRENT_LIST_DIR}/macros.h
-    ${CMAKE_CURRENT_LIST_DIR}/logging.h
-    ${CMAKE_CURRENT_LIST_DIR}/logging.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/loguru.hpp
+    ${CMAKE_CURRENT_LIST_DIR}/loguru.cpp
     ${CMAKE_CURRENT_LIST_DIR}/sdsbytesbuf.h
     ${CMAKE_CURRENT_LIST_DIR}/sdsbytesbuf.cpp
 )

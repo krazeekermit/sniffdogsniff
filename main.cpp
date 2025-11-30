@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "common/logging.h"
+#include "common/loguru.hpp"
 #include "rpc/sdsrpcserver.h"
 #include "sds_core/localnode.h"
 #include "sds_core/sds_config.h"
@@ -40,7 +40,7 @@ SdsRpcServer *rpcSrv = nullptr;
 
 void sigintHandler(int signo)
 {
-    loginfo << "INT signal received, shutting down...";
+    LOG_F(INFO, "INT signal received, shutting down...");
     rpcSrv->shutdown();
 }
 
@@ -52,21 +52,21 @@ int main(int argc, char **argv)
     SdsConfig cfg;
     memset(&cfg, 0, sizeof(cfg));
 
+    loguru::init(argc, argv);
+
     int option_index;
     char c;
-    while ((c = getopt_long(argc, argv, "b:c:l:d", long_options, &option_index)) > -1) {
+    while ((c = getopt_long(argc, argv, "b:c:v:d", long_options, &option_index)) > -1) {
         switch (c) {
         case 'c':
             err = sds_config_parse_file(&cfg, optarg);
             if (err > 0) {
-                logfatalerr << "error parsing config file " << optarg << " at line" << err;
+                LOG_F(FATAL, "error parsing config file %s at line %d", optarg, err);
             } else if (err < 0) {
-                logfatalerr << "error parsing config file " << optarg << " wrong data" << err;
+                LOG_F(FATAL, "error parsing config file %s at line %d", optarg, err);
             }
             optconfig = 1;
             //sds_config_print(&cfg);
-            break;
-        case 'l':
             break;
         case 'd':
             optdaemon = 1;
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     }
 
     if (!optconfig) {
-        logwarn << "no configuration file submitted: using reasonable defaults";
+        LOG_F(WARNING, "no configuration file submitted: using reasonable defaults");
     }
 
     FILE *hsfp;
@@ -85,30 +85,30 @@ int main(int argc, char **argv)
         sprintf(hsfpath, "%s/%s", cfg.work_dir_path, "sds.pid");
         struct stat pidstat = {0};
         if (!stat(hsfpath, &pidstat)) {
-            logfatalerr << "Another instance of " << argv[0] << " is already running, pidfile=" << hsfpath;
+            LOG_F(FATAL, "Another instance of %s is already running, pidfile=%s", argv[0], hsfpath);
         }
         pid_t pid = fork();
         switch (pid) {
         case -1:
-           logfatalerr << "error creating child process";
+           LOG_F(FATAL, "error creating child process");
         case 0:
             cfg.log_to_file = 1;
            break;
         default:
            hsfp = fopen(hsfpath, "w");
            if (!hsfp) {
-               logfatalerr << hsfpath << ": unable to write pid file";
+               LOG_F(FATAL, "%s: unable to write pid file", hsfpath);
            }
            fprintf(hsfp, "%d", pid);
            fclose(hsfp);
-           loginfo << "started as daemon pid=" << pid;
+           LOG_F(INFO, "started as daemon pid=%d", pid);
            exit(EXIT_SUCCESS);
         }
     }
 
     if (cfg.log_to_file) {
         sprintf(hsfpath, "%s/%s", cfg.work_dir_path, cfg.log_file_name);
-        Logging::setLogFile(hsfpath);
+        loguru::add_file(hsfpath, loguru::Truncate, loguru::Verbosity_MAX);
     }
 
     LocalNode  *node = new LocalNode(cfg);
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 
             int tor_errno = tor_add_onion(&torSession, hsaddr, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port, privateKey);
             if (tor_errno) {
-                logfatalerr << "could not create tor hidden service: " << tor_strerror(tor_errno);
+                LOG_F(FATAL, "could not create tor hidden service: %s", tor_strerror(tor_errno));
             }
 
             if ((hsfp = fopen(hsfpath, "w"))) {
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
             }
 
             node->setSelfNodeAddress(hsaddr);
-            loginfo << "successfully created tor hidden service at dest " << hsaddr;
+            LOG_F(INFO, "successfully created tor hidden service at dest %s", hsaddr);
         }
         break;
     case I2P_HIDDEN_SERVICE:
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 
         if (!privateKey) {
             if (sam3GenerateKeys(&i2pSession, cfg.i2p_sam_addr, cfg.i2p_sam_port, Sam3SigType::EdDSA_SHA512_Ed25519)) {
-                logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+                LOG_F(FATAL, "could not create i2p hidden service: %s", i2pSession.error);
             }
 
             strcpy(pkbuf, i2pSession.privkey);
@@ -169,11 +169,11 @@ int main(int argc, char **argv)
         }
 
         if (sam3CreateSession(&i2pSession, cfg.i2p_sam_addr, cfg.i2p_sam_port, privateKey, Sam3SessionType::SAM3_SESSION_STREAM, Sam3SigType::EdDSA_SHA512_Ed25519, nullptr)) {
-            logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+            LOG_F(FATAL, "could not create i2p hidden service: ", i2pSession.error);
         }
 
         if (sam3StreamForward(&i2pSession, cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
-            logfatalerr << "could not create i2p hidden service: " << i2pSession.error;
+            LOG_F(FATAL, "could not create i2p hidden service: ", i2pSession.error);
         }
 
         /*
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
          */
         sprintf(hsaddr, "%s.i2p:%d", i2pSession.pubkey, cfg.p2p_server_bind_port);
         node->setSelfNodeAddress(hsaddr);
-        loginfo << "successfully created i2p hidden service at dest " << hsaddr;
+        LOG_F(INFO, "successfully created i2p hidden service at dest %s", hsaddr);
         break;
     case NO_HIDDEN_SERVICE:
     default:
@@ -198,16 +198,16 @@ int main(int argc, char **argv)
 
     }
 
-    loginfo << "started tasks...";
+    LOG_F(INFO, "started tasks...");
     node->startTasks();
 
     SdsWebUiServer *webSrv = new SdsWebUiServer(node, "./res");
-    loginfo << "started web ui server on " << cfg.web_ui_bind_addr << ":" << cfg.web_ui_bind_port;
+    LOG_F(INFO, "started web ui server on %s:%d", cfg.web_ui_bind_addr, cfg.web_ui_bind_port);
     webSrv->startListening(cfg.web_ui_bind_addr, cfg.web_ui_bind_port, true);
 
     rpcSrv = new SdsRpcServer(node);
 
-    loginfo << "starting p2p server on " << cfg.p2p_server_bind_addr << ":" << cfg.p2p_server_bind_port;
+    LOG_F(INFO, "starting p2p server on %s:%d", cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port);
     if (rpcSrv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
 
     }
@@ -217,15 +217,15 @@ int main(int argc, char **argv)
 
     switch (cfg.p2p_hidden_service) {
     case TOR_HIDDEN_SERVICE: {
-        loginfo << "deleting tor hidden service at dest " << hsaddr;
+        LOG_F(INFO, "deleting tor hidden service at dest %s", hsaddr);
         int tor_errno = tor_del_onion(&torSession);
         if (tor_errno) {
-            logfatalerr << "could not delete tor hidden service: " << tor_strerror(tor_errno);
+            LOG_F(FATAL, "could not delete tor hidden service: ", tor_strerror(tor_errno));
         }
         }
         break;
     case I2P_HIDDEN_SERVICE:
-        loginfo << "deleting i2p hidden service at dest " << hsaddr;
+        LOG_F(INFO, "deleting i2p hidden service at dest %s", hsaddr);
         sam3CloseSession(&i2pSession);
         break;
     case NO_HIDDEN_SERVICE:
@@ -237,7 +237,7 @@ int main(int argc, char **argv)
     delete webSrv;
     delete node;
 
-    loginfo << "shutdown complete, goodbye!";
+    LOG_F(INFO, "shutdown complete, goodbye!");
 
     return 0;
 }

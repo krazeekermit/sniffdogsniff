@@ -1,7 +1,7 @@
 #include "kadroutingtable.h"
 
 #include "common/macros.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 #include "common/utils.h"
 
 #include <algorithm>
@@ -123,7 +123,7 @@ int KadRoutingTable::readFile(const char *path)
 {
     FILE *fp = fopen(path, "rb");
     if (!fp) {
-        logwarn << "kadroutingtable: unable to open cache file " << path;
+        LOG_F(WARNING, "kadroutingtable: unable to open cache file %s", path);
         return -1;
     }
     int ret, i, j, nodesCount;
@@ -212,8 +212,6 @@ int KadRoutingTable::readFile(const char *path)
 end_read:
     fclose(fp);
 
-    logdebug << *this;
-
     return ret;
 }
 
@@ -221,7 +219,7 @@ int KadRoutingTable::writeFile(const char *path)
 {
     FILE *fp = fopen(path, "wb");
     if (!fp) {
-        logwarn << "kadroutingtable: unable to open cache file " << path;
+        LOG_F(WARNING, "kadroutingtable: unable to open cache file %s", path);
         return -1;
     }
     int ret, i, j, nodesCount;
@@ -291,9 +289,6 @@ int KadRoutingTable::writeFile(const char *path)
 
 end_write:
     fclose(fp);
-
-    if (ret)
-        logdebug << "error in writing ktable";
     return ret;
 }
 

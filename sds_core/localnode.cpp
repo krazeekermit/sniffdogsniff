@@ -2,7 +2,7 @@
 
 #include "rpc/rpc_common.h"
 #include "rpc/sdsrpcclient.h"
-#include "common/logging.h"
+#include "common/loguru.hpp"
 #include "common/utils.h"
 #include "simhash.h"
 
@@ -43,7 +43,7 @@ protected:
         for (i = 0; this->isRunning() && i < toLook.size(); i++) {
             int nd = this->doNodesLookup(toLook.at(i), false);
 
-            logdebug << "[" << i << "] Discovered " << nd << " closest nodes to " << toLook.at(i);
+            LOG_S(1) << "[" << i << "] Discovered " << nd << " closest nodes to " << toLook.at(i);
         }
         return 0;
     }
@@ -106,7 +106,7 @@ private:
                     }
                 } catch (std::exception &ex) {
                     failed.insert(ikn.getId());
-                    logerr << ex.what();
+                    LOG_F(ERROR, ex.what());
                 }
             }
 
@@ -218,7 +218,7 @@ private:
                             } catch (std::exception &ex) {
                                 failed.insert(fit->first);
 
-                                logerr << ex.what();
+                                LOG_F(ERROR, ex.what());
                             }
                         }
                         futures.clear();
@@ -258,7 +258,7 @@ LocalNode::LocalNode(SdsConfig &cfgs)
     this->ktable = new KadRoutingTable();
     sprintf(path, "%s/%s", cfgs.work_dir_path, "ktable.dat");
     if (this->ktable->readFile(path)) {
-        logdebug << "ktable is empty populating with known nodes from configs";
+        LOG_F(1, "ktable is empty populating with known nodes from configs");
         for (auto it = this->configs.known_peers.begin(); it != this->configs.known_peers.end(); it++) {
             KadNode kn(*it);
             this->ktable->pushNode(kn);
@@ -271,7 +271,7 @@ LocalNode::LocalNode(SdsConfig &cfgs)
     sprintf(path, "%s/%s", cfgs.work_dir_path, "crawlerseeds.dat");
     this->crawler = new WebCrawler(cfgs);
     if (this->crawler->load(path)) {
-        logwarn << "crawler is not seeded";
+        LOG_F(WARNING, "crawler is not seeded");
     }
 }
 
@@ -290,7 +290,7 @@ void LocalNode::setSelfNodeAddress(std::string address)
     KadNode self(address.c_str());
     this->ktable->setSelfNode(self);
 
-    logdebug << "self node " << self;
+    LOG_S(1) << "self node " << self;
 }
 
 int LocalNode::ping(const KadId &id, std::string address)
@@ -349,12 +349,12 @@ int LocalNode::nodeConnected(const KadId &id, std::string &address)
         SdsRpcClient client(this->configs, address);
         try {
             client.ping(id, address);
-            loginfo << "new neighbour node conected " << kn;
+            LOG_S(INFO) << "new neighbour node conected " << kn;
             this->lock();
             this->ktable->pushNode(kn);
             this->unlock();
         }  catch (std::exception &ex) {
-            loginfo << "new neighbour node conected but seems down, discarded " << kn;
+            LOG_S(INFO) << "new neighbour node conected but seems down, discarded " << kn;
         }
     });
 
@@ -416,7 +416,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
                         }
                     }
                 }  catch (std::exception &ex) {
-                    logerr << ex.what();
+                    LOG_F(ERROR, ex.what());
                     failed.insert(fit->first);
                 }
             }
@@ -455,7 +455,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
                         client.storeResult(selfNodeId, selfNodeAddress, *rit);
                     }
                 } catch (std::exception &ex) {
-                    logerr << ex.what();
+                    LOG_F(ERROR, ex.what());
                 }
             }
         }
@@ -473,7 +473,7 @@ void LocalNode::startTasks()
 
 void LocalNode::shutdown()
 {
-    loginfo << "stopping tasks...";
+    LOG_F(INFO, "stopping tasks...");
     this->nodesLookupTask->stop();
     this->entriesPublishTask->stop();
 //    this->crawler->stopCrawling();
