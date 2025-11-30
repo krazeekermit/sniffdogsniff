@@ -5,6 +5,7 @@
 #include "dirent.h"
 
 #include <vector>
+#include <ostream>
 
 /*
     Handlers
@@ -14,29 +15,45 @@ class WebUiHandler : public HttpRequestHandler
 public:
     WebUiHandler(LocalNode *node_, std::string &path)
         : node(node_)
-    {
-        FILE *fp = fopen(path.c_str(), "rb");
-        if (fp) {
-            std::string ss = "";
-            char buf[1024];
-            size_t nread = 0;
-            while ((fgets(buf, sizeof(buf), fp) != nullptr)) {
-                ss += buf;
-            }
-
-            this->templ = new Jinja2CppLight::Template(ss);
-            fclose(fp);
-        }
-    }
+    {}
 
     ~WebUiHandler()
+    {}
+
+    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
-        delete templ;
+
+
+        std::ostringstream ss;
+        ss << "<!DOCTYPE html>";
+        ss << "<html lang=\"en\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\">";
+        ss << "<head>";
+        ss << "<meta charset=\"UTF-8\"><title>SniffDigSniff - Search</title><style>";
+        ss << ".text-center{text-align:center}";
+        ss << ".container{width:100%;padding-right:15px;padding-left:15px;margin-right:auto;margin-left:auto}";
+        ss << ".btn-gradient {background: linear-gradient(45deg, #979797, #858585 70%);color: #fff;padding: 6px 7px;border: none;border-radius: 2px;cursor: pointer;}";
+        ss << ".sds-input {padding: 5px 7px;border: none;border-radius: 2px;border-style: solid;border-width: 0.5px;border-color: #858585;cursor: pointer;}";
+        ss << ".input-group{width:100%;height: 20px;display: inline-block;}";
+        ss << ".input-group-append{display: inline-block;}";
+        ss << ".sds-groupbox-first{margin-top: 15px;margin-bottom: 5px;padding-right:15px;padding-left:15px;}";
+        ss << ".sds-groupbox-spacer{margin-left: 15px;margin-right: 15px;padding: auto;display: inline-block;}";
+        ss << ".sds-groupbox-item{display: inline-block;}";
+        ss << "</style></head>";
+        ss << "<body class=\"text-center\">";
+
+        populateBody(request, ss);
+
+        ss << "</body></html>";
+
+        response.writeResponse(ss.str());
+        return HttpCode::HTTP_OK;
+
     }
 
 protected:
+    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) = 0;
+
     LocalNode *node;
-    Jinja2CppLight::Template *templ;
 };
 
 class FileHandler : public HttpRequestHandler
@@ -79,11 +96,67 @@ public:
     IndexHandler(LocalNode *node_, std::string path)
         : WebUiHandler(node_, path) {}
 
-    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
+    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
-        std::string ss = this->templ->render();
-        response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.length());
-        return HttpCode::HTTP_CREATED;
+        ss << "<nav class=\"navbar navbar-light bg-light\">";
+        ss << "<a class=\"navbar-brand\" href=\"/insert_link\">Insert link</a>";
+        ss << "</nav>";
+        ss << "<div class=\"container\">";
+        ss << "<div class=\"py-5 text-center\">";
+        ss << "<img class=\"d-block mx-auto mb-4\" src=\"sds_header.png\" alt=\"\">";
+        ss << "</div>";
+        ss << "<form action=\"/search\" method=\"get\">";
+        ss << "<div class=\"input-group\">";
+        ss << "<input type=\"search\" class=\"sds-input\" placeholder=\"Search\" aria-label=\"Search\" aria-describedby=\"search-addon\" name=\"q\" value=\"Search something...\" style=\"width:50%\"/>";
+        ss << "<div class=\"input-group-append\">";
+        ss << "<button class=\"btn-gradient\" type=\"submit\">Search</button>";
+        ss << "</div>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-first\">";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<label>Search on:</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio1\" value=\"all\" checked>";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio1\">All links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio2\" value=\"clearnet\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio2\">Clear web links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio3\" value=\"onion\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio3\">Onion links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio4\" value=\"i2p\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio4\">I2P links</label>";
+        ss << "</div>";
+        ss << "<div  class=\"sds-groupbox-spacer\">";
+        ss << "<label>|</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<label>Category:</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio1\" value=\"all\" checked>";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio1\">All</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio2\" value=\"links\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio2\">Links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio3\" value=\"images\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio3\">Images</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio4\" value=\"videos\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio4\">Videos</label>";
+        ss << "</div>";
+        ss << "</div>";
+        ss << "<input type=\"hidden\" name=\"data_type\" value=\"links\"/>";
+        ss << "</form>";
     }
 };
 
@@ -94,9 +167,8 @@ public:
     ResultsViewHandler(LocalNode *node_, std::string path)
         : WebUiHandler(node_, path) {}
 
-    virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
+    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
-        //q=Search+something...&link_filter=all&data_type=links
         std::string query = request.values["q"];
         if (request.values["link_filter"] != this->linkFilter) {
             this->linkFilter = request.values["link_filter"];
@@ -106,25 +178,89 @@ public:
         }
         std::vector<SearchEntry> results;
         this->node->doSearch(results, query.c_str());
-        Jinja2CppLight::Template *templ = this->templ;
 
-        templ->setValue("q", query);
+        ss << "<div class=\"fixed-top \">";
+        ss << "<nav class=\"navbar navbar-light bg-light\">";
+        ss << "<form action=\"/search\" method=\"get\">";
+        ss << "<a class=\"navbar-brand\" href=\"/\">";
+        ss << "<img src=\"sds_logo.png\" width=\"40\" height=\"40\"> SniffDogSniff </a>";
+        ss << "<div class=\"input-group\">";
+        ss << "<input type=\"search\" class=\"sds-input\" placeholder=\"Search\" aria-label=\"Search\" aria-describedby=\"search-addon\" name=\"q\" value=\"Search something...\" style=\"width:50%\"/>";
+        ss << "<div class=\"input-group-append\">";
+        ss << "<button class=\"btn-gradient\" type=\"submit\">Search</button>";
+        ss << "</div></div>";
+        ss << "<div class=\"sds-groupbox-first\">";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<label>Search on:</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio1\" value=\"all\" checked>";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio1\">All links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio2\" value=\"clearnet\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio2\">Clear web links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio3\" value=\"onion\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio3\">Onion links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"link_filter\" id=\"inlineRadio4\" value=\"i2p\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio4\">I2P links</label>";
+        ss << "</div>";
+        ss << "<div  class=\"sds-groupbox-spacer\">";
+        ss << "<label>|</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<label>Category:</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio1\" value=\"all\" checked>";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio1\">All</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio2\" value=\"links\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio2\">Links</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio3\" value=\"images\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio3\">Images</label>";
+        ss << "</div>";
+        ss << "<div class=\"sds-groupbox-item\">";
+        ss << "<input class=\"form-check-input\" type=\"radio\" name=\"category\" id=\"inlineRadio4\" value=\"videos\">";
+        ss << "<label class=\"form-check-label\" for=\"inlineRadio4\">Videos</label>";
+        ss << "</div>";
+        ss << "</div>";
+        ss << "<input type=\"hidden\" name=\"data_type\" value=\"links\"/>";
+        ss << "</form>";
+        ss << "</nav>";
+        ss << "</div>";
+        ss << "<hr/>";
+        ss << "<main class=\"container\">";
+        ss << "<div class=\"col-14 mx-auto\">";
+        ss << "<ul class=\"list-group list-group-flush\">";
 
-        Jinja2CppLight::TupleValue ress;
-        for (auto it = results.begin(); it != results.end(); it++)
-            ress.addValue(Jinja2CppLight::TupleValue::create(it->getTitle(), it->getUrl(), ""));
-
-        templ->setValue("results", ress);
-
-        try {
-            std::string ss = templ->render();
-            response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.length());
-        } catch (std::exception &ex) {
-            logerr << "webui template error: " << ex.what();
-            return HttpCode::HTTP_INTERNAL_ERROR;
+        for (auto rit = results.begin(); rit < results.end(); rit++) {
+            ss << "<li class=\"list-group-item\">";
+            ss << "<div>";
+            ss << "<small class=\"disabled\">" << rit->getUrl() << "</small>";
+            ss << "<small class=\"float-right\">";
+            // ss << "<a class=\"btn btn btn-outline-secondary btn-sm\" role=\"button\" href=\"/invalidate?hash=\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"Mark link for removal: if in your opinion this link contains offensive content (see offensive.md) you can mark it for removal\">":
+            ss << "Mark for removal";
+            ss << "</a>";
+            ss << "</small>";
+            ss << "<br/>";
+            ss << "<img src=\"\" width=\"16\" height=\"16\">";
+            ss << "<a href=\"" << rit->getUrl() << "\">" << rit->getTitle() << "</a>";
+            ss << "<p class=\"mb-1\">" /* << rit->getProperty(DESCRIPTION) */<< "</p>";
+            ss << "</div>";
+            ss << "</li>";
         }
 
-        return HttpCode::HTTP_CREATED;
+        ss << "</ul>";
+        ss << "</div>";
+        ss << "</main>";
     }
 
 private:
@@ -149,7 +285,6 @@ void SdsWebUiServer::createHandlers()
     this->addHandler("/", new IndexHandler(this->node, this->resourcesDir + "/templates/index.html"));
     this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/results_links.html"));
 
-    this->addHandler("/style.css", new FileHandler(this->resourcesDir, "text/css"));
     this->addHandler("/sds_logo.png", new FileHandler(this->resourcesDir, "image/png"));
     this->addHandler("/sds_header.png", new FileHandler(this->resourcesDir, "image/png"));
 }

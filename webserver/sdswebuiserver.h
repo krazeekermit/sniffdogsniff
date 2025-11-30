@@ -2,7 +2,6 @@
 #define SDSWEBUISERVER_H
 
 #include "httpserver.h"
-#include "Jinja2CppLight.h"
 
 #include "sds_core/localnode.h"
 
