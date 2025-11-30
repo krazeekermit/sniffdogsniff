@@ -94,12 +94,15 @@ private:
     bool detach;
     bool running;
     pthread_t acceptThread;
+    pthread_t *threadPool;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    std::deque<int> clientsQueue;
     std::map<std::string, HttpRequestHandler*> handlers;
     int server_fd;
     std::string defaultContentType;
 
-    int handleConnection(int client_fd);
-
+    friend void *accessHandlerCallback(void *cls);
     friend void *acceptFun(void *cls);
 };
 

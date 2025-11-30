@@ -6,10 +6,8 @@
 #include <unistd.h>
 
 #include <cstring>
-#include <poll.h>
 
-#define MAX_CLIENT_COUNT 9
-#define MAX_POLL_FD_COUNT (MAX_CLIENT_COUNT+1)
+#define THREAD_POOL_SZ 1
 
 static std::string httpUnescape(const char *ss)
 {
@@ -154,11 +152,15 @@ static int createResponse(HttpResponse &resp, SdsBytesBuf &sbuffer)
 HttpServer::HttpServer()
     : detach(false), defaultContentType("text/html")
 {
+    pthread_mutex_init(&this->mutex, nullptr);
+    pthread_cond_init(&this->cond, nullptr);
 }
 
 HttpServer::~HttpServer()
 {
     this->shutdown();
+    pthread_mutex_destroy(&this->mutex);
+    pthread_cond_destroy(&this->cond);
 
     for (auto it = this->handlers.begin(); it != this->handlers.end(); it++)
         delete it->second;
@@ -166,38 +168,51 @@ HttpServer::~HttpServer()
     this->handlers.clear();
 }
 
-
-int HttpServer::handleConnection(int client_fd)
-{
+void *accessHandlerCallback(void *cls) {
+    HttpServer *srv = static_cast<HttpServer*>(cls);
+    int client_fd;
     int previous_error = 0;
-    unsigned char buf[512];
-    size_t nrecv = 0;
-    size_t trecv = 0;
-    SdsBytesBuf sbuffer;
-    while ((nrecv = recv(client_fd, buf, sizeof(buf), 0))) {
-        trecv += nrecv;
-        sbuffer.writeBytes(buf, nrecv);
-        if (nrecv < sizeof(buf))
-            break;
+    if (srv) {
+        while (srv->running) {
+            pthread_mutex_lock(&srv->mutex);
+            while (srv->clientsQueue.empty()) {
+                if (!srv->running) {
+                    pthread_mutex_unlock(&srv->mutex);
+                    return nullptr;
+                }
+                pthread_cond_wait(&srv->cond, &srv->mutex);
+            }
+            client_fd = srv->clientsQueue.front();
+            srv->clientsQueue.pop_front();
+            pthread_mutex_unlock(&srv->mutex);
+
+            char buf[512];
+            size_t nrecv = 0;
+            size_t trecv = 0;
+            SdsBytesBuf ss;
+            while ((nrecv = recv(client_fd, buf, sizeof(buf), 0))) {
+                trecv += nrecv;
+                ss.writeBytes(buf, nrecv);
+                if (nrecv < sizeof(buf))
+                    break;
+            }
+
+            HttpRequest request;
+            HttpResponse response;
+            if (parseHttpReqest(request, ss)) {
+
+            }
+
+            previous_error = srv->handleRequest(request, response);
+
+            SdsBytesBuf respBody;
+            createResponse(response, respBody);
+
+            send(client_fd, respBody.bufPtr(), respBody.size(), 0);
+            close(client_fd);
+        }
     }
-    sbuffer.writeUint8('\0');
-
-    HttpRequest request;
-    HttpResponse response;
-    HttpCode ret = parseHttpReqest(request, sbuffer);
-    if (ret == HttpCode::HTTP_OK) {
-        this->handleRequest(request, response);
-    } else {
-        this->handleError(request, response, ret);
-    }
-
-    sbuffer.zero();
-    createResponse(response, sbuffer);
-
-    send(client_fd, sbuffer.bufPtr(), sbuffer.size(), 0);
-    close(client_fd);
-
-    return previous_error;
+    return 0;
 }
 
 void *acceptFun(void *cls)
@@ -207,45 +222,12 @@ void *acceptFun(void *cls)
         int client_fd;
         struct sockaddr_in address;
         socklen_t addrlen = sizeof(address);
-        int clients_count = 0;
-        pollfd wait_fds[MAX_POLL_FD_COUNT];
-        wait_fds[0].fd = srv->server_fd;
-        wait_fds[0].events = POLLIN | POLLPRI;
-        while (srv->running) {
-            if (poll(wait_fds, MAX_POLL_FD_COUNT, 3000) > 0) {
-                int i;
-                if ((wait_fds[0].revents & POLLIN)) {
-                    if (clients_count >= MAX_CLIENT_COUNT) {
-                        continue;
-                    }
 
-                    client_fd = accept(srv->server_fd, (struct sockaddr*) &address, &addrlen);
-                    for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
-                        if (wait_fds[i].fd == 0) {
-                            clients_count++;
-                            wait_fds[i].fd = client_fd;
-                            wait_fds[i].events = POLLIN | POLLPRI;
-                            break;
-                        }
-                    }
-                }
-
-                for (i = 1; i <= MAX_POLL_FD_COUNT; i++) {
-                    client_fd = wait_fds[i].fd;
-                    short int revents = wait_fds[i].revents;
-                    if (client_fd > 0 && revents > 0) {
-                        if ((revents & POLLHUP) || (revents & POLLERR)) {
-                            close(wait_fds[i].fd);
-                        } else if (revents & POLLIN) {
-                            srv->handleConnection(client_fd);
-                        }
-
-                        wait_fds[i].fd = 0;
-                        wait_fds[i].revents = 0;
-                        clients_count--;
-                    }
-                }
-            }
+        while ((client_fd = accept(srv->server_fd, (struct sockaddr*)&address, &addrlen)) > -1) {
+            pthread_mutex_lock(&srv->mutex);
+            srv->clientsQueue.push_back(client_fd);
+            pthread_cond_signal(&srv->cond);
+            pthread_mutex_unlock(&srv->mutex);
         }
     }
 
@@ -283,7 +265,13 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
     }
 
     this->server_fd = fd;
-    this->running = true;
+    if (!this->threadPool) {
+        this->running = true;
+        this->threadPool = new pthread_t[THREAD_POOL_SZ];
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_create(&this->threadPool[i], nullptr, &accessHandlerCallback, this);
+        }
+    }
 
     if (detach) {
         pthread_create(&this->acceptThread, nullptr, &acceptFun, this);
@@ -296,8 +284,24 @@ int HttpServer::startListening(const char *addrstr, int port, bool detach)
 
 int HttpServer::shutdown()
 {
-    this->running = false;
-    pthread_join(this->acceptThread, nullptr);
+    if (this->threadPool) {
+        pthread_mutex_lock(&this->mutex);
+        this->running = false;
+        pthread_cond_broadcast(&this->cond);
+        pthread_mutex_unlock(&this->mutex);
+
+        int i;
+        void *dummy = nullptr;
+        for (i = 0; i < THREAD_POOL_SZ; i++) {
+            pthread_join(this->threadPool[i], &dummy);
+        }
+
+        close(this->server_fd);
+        pthread_cancel(this->acceptThread);
+
+        delete[] this->threadPool;
+        this->threadPool = nullptr;
+    }
     return 0;
 }
 
