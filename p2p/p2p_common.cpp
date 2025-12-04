@@ -1,4 +1,4 @@
-#include "rpc_common.h"
+#include "p2p_common.h"
 
 /*
     ArgsBase

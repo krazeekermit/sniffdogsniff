@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "common/loguru.hpp"
-#include "rpc/sdsrpcserver.h"
+#include "p2p/sdsp2pserver.h"
 #include "sds_core/localnode.h"
 #include "sds_core/sds_config.h"
 
@@ -26,22 +26,12 @@ static struct option long_options[] = {
    {0,              0,                 0,  0   }
 };
 
-struct SdsMainCtx {
-    LocalNode *node;
-    SdsRpcServer *rpcSrv;
-    SdsWebUiServer *webSrv;
-
-    int p2p_hidden_service;
-    TorControlSession *torSession;
-    Sam3Session *i2pSession;
-};
-
-SdsRpcServer *rpcSrv = nullptr;
+SdsP2PServer *p2pSrv = nullptr;
 
 void sigintHandler(int signo)
 {
     LOG_F(INFO, "INT signal received, shutting down...");
-    rpcSrv->shutdown();
+    p2pSrv->shutdown();
 }
 
 int main(int argc, char **argv)
@@ -205,10 +195,10 @@ int main(int argc, char **argv)
     LOG_F(INFO, "started web ui server on %s:%d", cfg.web_ui_bind_addr, cfg.web_ui_bind_port);
     webSrv->startListening(cfg.web_ui_bind_addr, cfg.web_ui_bind_port, true);
 
-    rpcSrv = new SdsRpcServer(node);
+    p2pSrv = new SdsP2PServer(node);
 
     LOG_F(INFO, "starting p2p server on %s:%d", cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port);
-    if (rpcSrv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
+    if (p2pSrv->startListening(cfg.p2p_server_bind_addr, cfg.p2p_server_bind_port)) {
 
     }
 
@@ -233,7 +223,7 @@ int main(int argc, char **argv)
         break;
     }
 
-    delete rpcSrv;
+    delete p2pSrv;
     delete webSrv;
     delete node;
 

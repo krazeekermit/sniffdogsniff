@@ -1,0 +1,9 @@
+target_sources(sniffdogsniffd
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/p2p_common.h
+        ${CMAKE_CURRENT_LIST_DIR}/p2p_common.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sdsp2pserver.h
+        ${CMAKE_CURRENT_LIST_DIR}/sdsp2pserver.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sdsp2pclient.h
+        ${CMAKE_CURRENT_LIST_DIR}/sdsp2pclient.cpp
+)

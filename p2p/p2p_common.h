@@ -1,5 +1,5 @@
-#ifndef RPC_COMMON_H
-#define RPC_COMMON_H
+#ifndef P2P_COMMON_H
+#define P2P_COMMON_H
 
 #include "common/sdsbytesbuf.h"
 #include "sds_core/searchentriesdb.h"
@@ -7,8 +7,6 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
-
-#define ID_SIZE           24
 
 /* Errors Codes */
 #define ERR_NULL          0
@@ -25,7 +23,7 @@
 #define FUNC_STORE_RESULT 102
 #define FUNC_FIND_RESULTS 103
 
-static const char *rpc_strfunction(int fun)
+static const char *p2p_strfunction(int fun)
 {
     switch (fun) {
     case FUNC_PING:
@@ -40,7 +38,7 @@ static const char *rpc_strfunction(int fun)
     return "";
 }
 
-static const char *rpc_strerror(int err)
+static const char *p2p_strerror(int err)
 {
     switch (err) {
     case ERR_RECV_REQUEST:
@@ -57,16 +55,16 @@ static const char *rpc_strerror(int err)
     return "";
 }
 
-packed_struct RpcRequestHeader {
+packed_struct MessageRequestHeader {
     uint8_t funcode;
-    uint8_t id[ID_SIZE];
+    uint64_t id;
     uint64_t datasize;
 };
 
-packed_struct RpcResponseHeader {
+packed_struct MessageResponseHeader {
     uint8_t funcode;
     uint8_t errcode;
-    uint8_t id[ID_SIZE];
+    uint64_t id;
     uint64_t datasize;
 };
 
@@ -74,10 +72,10 @@ packed_struct RpcResponseHeader {
     RpcReplyException
 */
 
-class SdsRpcException : public std::runtime_error {
+class SdsP2PException : public std::runtime_error {
 public:
-    SdsRpcException(int errcode_)
-        : std::runtime_error("p2p rpc exception: " + std::string(rpc_strerror(errcode_)))
+    SdsP2PException(int errcode_)
+        : std::runtime_error("p2p exception: " + std::string(p2p_strerror(errcode_)))
     {}
 };
 
@@ -178,4 +176,4 @@ struct FindResultsReply : public FindNodeReply
     void write(SdsBytesBuf &buf);
 };
 
-#endif // RPC_COMMON_H
+#endif // P2P_COMMON_H

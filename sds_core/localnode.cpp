@@ -1,7 +1,7 @@
 #include "localnode.h"
 
-#include "rpc/rpc_common.h"
-#include "rpc/sdsrpcclient.h"
+#include "p2p/p2p_common.h"
+#include "p2p/sdsp2pclient.h"
 #include "common/loguru.hpp"
 #include "common/utils.h"
 #include "simhash.h"
@@ -82,7 +82,7 @@ private:
                 }
 
                 futures.push_back(std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, targetId]() {
-                    SdsRpcClient client(this->node->configs, ikn.getAddress());
+                    SdsP2PClient client(this->node->configs, ikn.getAddress());
                     FindNodeReply reply;
 
                     client.findNode(reply, selfNodeId, selfNodeAddress, targetId);
@@ -207,7 +207,7 @@ private:
                 if (failed.find(itn->getId()) != failed.end()) {
 
                     futures[itn->getId()] = std::move(std::async(std::launch::async, [this, itn, selfNodeId, selfNodeAddress, rit]() {
-                        SdsRpcClient client(this->node->configs, itn->getAddress());
+                        SdsP2PClient client(this->node->configs, itn->getAddress());
                         client.storeResult(selfNodeId, selfNodeAddress, *rit);
                     }));
 
@@ -346,7 +346,7 @@ int LocalNode::nodeConnected(const KadId &id, std::string &address)
     */
     std::async(std::launch::async, [this, id, address] () {
         KadNode kn(id, address);
-        SdsRpcClient client(this->configs, address);
+        SdsP2PClient client(this->configs, address);
         try {
             client.ping(id, address);
             LOG_S(INFO) << "new neighbour node conected " << kn;
@@ -396,7 +396,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
         }
 
         futures[id] = std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, query] () {
-            SdsRpcClient client(this->configs, ikn->getAddress());
+            SdsP2PClient client(this->configs, ikn->getAddress());
             FindResultsReply reply;
             client.findResults(reply, selfNodeId, selfNodeAddress, query);
             return reply;
@@ -449,7 +449,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     std::async(std::launch::async, [this, targetNodes, probedEmpty, results, selfNodeId, selfNodeAddress] () {
         for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
             if (probedEmpty.find(it->getId()) != probedEmpty.end()) {
-                SdsRpcClient client(this->configs, it->getAddress());
+                SdsP2PClient client(this->configs, it->getAddress());
                 try {
                     for (auto rit = results.begin(); rit != results.end(); rit++) {
                         client.storeResult(selfNodeId, selfNodeAddress, *rit);

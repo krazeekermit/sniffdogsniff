@@ -1,16 +1,16 @@
-#ifndef SDSRPCCLIENT_H
-#define SDSRPCCLIENT_H
+#ifndef SDSP2PCLIENT_H
+#define SDSP2PCLIENT_H
 
-#include "rpc_common.h"
+#include "p2p_common.h"
 #include "sds_core/sds_config.h"
 #include "sds_core/searchentriesdb.h"
 
 #include <map>
 
-class SdsRpcClient
+class SdsP2PClient
 {
 public:
-    SdsRpcClient(SdsConfig &cfg_, std::string nodeAddress_);
+    SdsP2PClient(SdsConfig &cfg_, std::string nodeAddress_);
 
     int ping(const KadId &id, std::string address);
     int findNode(FindNodeReply &reply, const KadId &callerId, std::string callerAddress, const KadId &id);
@@ -25,4 +25,4 @@ private:
     std::string nodeAddress;
 };
 
-#endif // SDSRPCCLIENT_H
+#endif // SDSP2PCLIENT_H
