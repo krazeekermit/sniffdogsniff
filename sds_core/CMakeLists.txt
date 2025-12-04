@@ -4,6 +4,8 @@ target_sources(sniffdogsniffd
     ${CMAKE_CURRENT_LIST_DIR}/fnv128.c
     ${CMAKE_CURRENT_LIST_DIR}/sds_config.h
     ${CMAKE_CURRENT_LIST_DIR}/sds_config.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/searchentry.h
+    ${CMAKE_CURRENT_LIST_DIR}/searchentry.cpp
     ${CMAKE_CURRENT_LIST_DIR}/searchentriesdb.h
     ${CMAKE_CURRENT_LIST_DIR}/searchentriesdb.cpp
     ${CMAKE_CURRENT_LIST_DIR}/simhash.h

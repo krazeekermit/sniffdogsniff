@@ -7,135 +7,7 @@
 
 #include "searchentriesdb.h"
 
-/*****************************************************************
-
-        SearchEntry
-
-*****************************************************************/
-
-SearchEntry::SearchEntry()
-    : SearchEntry("", "", SITE, {})
-{}
-
-SearchEntry::SearchEntry(const std::string title, const std::string url, SearchEntryType type, std::map<uint8_t, std::string> properties)
-    : simHash(title), title(title), url(url), type(type), properties(properties)
-{
-    this->hash = {};
-    reHash();
-
-    evaluateDistances();
-}
-
-SearchEntry::~SearchEntry()
-{
-}
-
-void SearchEntry::addProperty(uint8_t idx, const std::string value)
-{
-    this->properties[idx] = value;
-}
-
-const std::string SearchEntry::getProperty(uint8_t idx)
-{
-    return this->properties[idx];
-}
-
-void SearchEntry::removeProperty(uint8_t idx)
-{
-    this->properties.erase(idx);
-}
-
-/* Calculate the SHA256 of the URL */
-void SearchEntry::reHash()
-{    
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, this->url.c_str(), this->url.length());
-    SHA256_Final(this->hash.data(), &ctx);
-}
-
-void SearchEntry::read(SdsBytesBuf &buf)
-{
-    this->simHash.read(buf);
-    this->title = buf.readString();
-    this->url = buf.readString();
-    this->type = static_cast<SearchEntryType>(buf.readUint8());
-    this->properties.clear();
-    unsigned int propsSize = buf.readUint32();
-    for (unsigned int i = 0; i < propsSize; i++) {
-        uint8_t k = buf.readUint8();
-        std::string val = buf.readString();
-        this->properties[k] = val;
-    }
-
-    this->reHash();
-}
-
-void SearchEntry::write(SdsBytesBuf &buf)
-{
-    this->simHash.write(buf);
-    buf.writeString(this->title);
-    buf.writeString(this->url);
-    buf.writeUint8(static_cast<uint8_t>(this->type));
-    buf.writeUint32(this->properties.size());
-    for (auto it = this->properties.begin(); it != this->properties.end(); it++) {
-        buf.writeUint8(it->first);
-        buf.writeString(it->second);
-    }
-}
-
-SearchEntryHash256 SearchEntry::getHash() const
-{
-    return hash;
-}
-
-SimHash SearchEntry::getSimHash() const
-{
-    return this->simHash;
-}
-
-std::string SearchEntry::getTitle() const
-{
-    return title;
-}
-
-std::string SearchEntry::getUrl() const
-{
-    return url;
-}
-
-std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
-{
-    int i;
-    os << "SearchEntry["
-       << "hash=";
-
-    STREAM_HEX(os, se.hash, SHA256_DIGEST_LENGTH);
-
-    os << ", simHash=" << se.simHash
-       << ", title=" << se.title
-       << ", url=" << se.url
-       << ", type=" << (int) se.type
-       << ", properties=[";
-
-    for (auto it = se.properties.begin(); it != se.properties.end(); it++) {
-        os << (int) it->first <<"=" << it->second << ", ";
-    }
-    os << "]" << "]";
-
-    return os;
-}
-
-void SearchEntry::evaluateDistances()
-{
-    //SearchEntry::evaluateMetrics(this->metrics, this->title.c_str());
-}
-
-/*****************************************************************
-
-        SearchEntryDB
-
-*****************************************************************/
+#define MINIMUM_SIMHASH_DISTANCE 48
 
 SearchEntriesDB::SearchEntriesDB()
     : timestamps({}), dbp(nullptr)
@@ -226,13 +98,6 @@ int SearchEntriesDB::getEntriesForBroadcast(std::vector<SearchEntry> &list)
     return list.size();
 }
 
-static int similarTo(SearchEntry &se, std::vector<std::string> &tokens)
-{
-    // to be implemented...
-    int count = 0;
-    return count + 1;
-}
-
 void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string query)
 {
     int ret = 0;
@@ -249,14 +114,13 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
     std::vector<std::string> queryTokens = tokenize(query, " \n\r", ".:,;()[]{}#@");
     SimHash queryHash(queryTokens);
 
-    std::vector<SearchEntry> candidates;
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
         SearchEntry se;
         SdsBytesBuf buf(data.data, data.size);
         se.read(buf);
 
-        if (se.getSimHash().distance(queryHash) < 48) {
-            candidates.push_back(se);
+        if (se.getSimHash().distance(queryHash) < MINIMUM_SIMHASH_DISTANCE && se.matchesQuery(queryTokens)) {
+            entries.push_back(se);
         }
     }
 
@@ -266,13 +130,6 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
 
     if ((ret = dbcp->close(dbcp)) != 0) {
         LOG_F(ERROR, db_strerror(ret));
-    }
-
-    for (int i = 0; i < candidates.size(); i++) {
-        SearchEntry candidate = candidates[i];
-        if (similarTo(candidate, queryTokens)) {
-            entries.push_back(candidate);
-        }
     }
 }
 
