@@ -1,6 +1,7 @@
 #include "common/stringutil.h"
 #include "kademlia/kadbucket.h"
 #include "kademlia/kadnode.h"
+#include "sds_core/simhash.h"
 
 #include <gtest/gtest.h>
 
@@ -210,6 +211,33 @@ TEST(test_kademlia, test_kbucket_stales)
     ASSERT_EQ(bucket.getNode(id3).getStales(), 3);
     ASSERT_EQ(bucket.getNode(id4).getStales(), 0);
     ASSERT_EQ(bucket.getNode(id5).getStales(), 4);
+}
+
+TEST(test_simhash, test_generate)
+{
+    std::vector<std::string> wlist = {"amused", "anaerobic", "anagram", "anatomist", "excretory" ,"excursion"};
+    SimHash sm1(wlist);
+
+    std::cerr << sm1 << "\n";
+    //d2388049708129b84383d94f0a402b04
+
+    const KadId id = sm1.getId();
+    ASSERT_EQ(id.id[0], 0x04);
+    ASSERT_EQ(id.id[1], 0x2b);
+    ASSERT_EQ(id.id[2], 0x40);
+    ASSERT_EQ(id.id[3], 0x0a);
+    ASSERT_EQ(id.id[4], 0x4f);
+    ASSERT_EQ(id.id[5], 0xd9);
+    ASSERT_EQ(id.id[6], 0x83);
+    ASSERT_EQ(id.id[7], 0x43);
+    ASSERT_EQ(id.id[8], 0xb8);
+    ASSERT_EQ(id.id[9], 0x29);
+    ASSERT_EQ(id.id[10], 0x81);
+    ASSERT_EQ(id.id[11], 0x70);
+    ASSERT_EQ(id.id[12], 0x49);
+    ASSERT_EQ(id.id[13], 0x80);
+    ASSERT_EQ(id.id[14], 0x38);
+    ASSERT_EQ(id.id[15], 0xd2);
 }
 
 int main(int argc, char** argv)

@@ -15,7 +15,7 @@
 
 #define STREAM_HEX_REVERSE(O, A, L) \
 { \
-    for (int i = L-1; i; i--) { \
+    for (int i = L-1; i >= 0; i--) { \
         uint8_t hi = (A[i] >> 4) & 0x0f; \
         uint8_t lo = (A[i] & 0x0f); \
         O << (char) (hi > 9 ? ('a' + (hi - 10)) : ('0' + hi)); \

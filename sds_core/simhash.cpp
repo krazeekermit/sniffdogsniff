@@ -61,16 +61,15 @@ void SimHash::init(std::vector<std::string> &tokens)
     int i, j;
     std::map<std::string, wordhash> tokenMults;
     for (i = 0; i < tokens.size(); i++) {
-        std::string tok = tokens[i];
-        if (tokenMults.find(tok) == tokenMults.end()) {
+        if (tokenMults.find(tokens[i]) == tokenMults.end()) {
             unsigned char *hash = new unsigned char[KAD_ID_LENGTH];
 
-            FNV128string(tok.c_str(), hash);
+            FNV128string(tokens[i].c_str(), hash);
 
-            tokenMults[tok].weight = 0;
-            tokenMults[tok].hash = hash;
+            tokenMults[tokens[i]].weight = 0;
+            tokenMults[tokens[i]].hash = hash;
         }
-        tokenMults[tok].weight += 1;
+        tokenMults[tokens[i]].weight += 1;
     }
 
     char simWeights[KAD_ID_BIT_LENGTH];
