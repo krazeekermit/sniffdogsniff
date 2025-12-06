@@ -3,17 +3,36 @@
 #include "common/sdsbytesbuf.h"
 #include "common/stringutil.h"
 
+/*
+ * SearchEntry::Hash
+ */
+SearchEntry::Hash::Hash()
+{
+    memset(this->hash, 0, SHA256_DIGEST_LENGTH);
+}
+
+SearchEntry::Hash::Hash(uint8_t *_data)
+    : Hash()
+{
+    if (_data) memcpy(this->hash, _data, SHA256_DIGEST_LENGTH);
+}
+
+bool SearchEntry::Hash::operator<(const Hash &hash2) const
+{
+    return *((uint64_t*) this->hash) < *((uint64_t*) hash2.hash);
+}
+
+/*
+ * SearchEntry
+ */
 SearchEntry::SearchEntry()
     : SearchEntry("", "", SITE, {})
 {}
 
-SearchEntry::SearchEntry(const std::string title, const std::string url, SearchEntryType type, std::map<uint8_t, std::string> properties)
+SearchEntry::SearchEntry(const std::string title, const std::string url, SearchEntry::Type type, std::map<uint8_t, std::string> properties)
     : simHash(title), title(title), url(url), type(type), properties(properties)
 {
-    this->hash = {};
     reHash();
-
-    evaluateDistances();
 }
 
 SearchEntry::~SearchEntry()
@@ -38,10 +57,7 @@ void SearchEntry::removeProperty(uint8_t idx)
 /* Calculate the SHA256 of the URL */
 void SearchEntry::reHash()
 {
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, this->url.c_str(), this->url.length());
-    SHA256_Final(this->hash.data(), &ctx);
+    SHA256((unsigned char*) this->title.data(), this->title.length(), this->hash.hash);
 }
 
 void SearchEntry::read(SdsBytesBuf &buf)
@@ -49,13 +65,12 @@ void SearchEntry::read(SdsBytesBuf &buf)
     this->simHash.read(buf);
     this->title = buf.readString();
     this->url = buf.readString();
-    this->type = static_cast<SearchEntryType>(buf.readUint8());
+    this->type = static_cast<SearchEntry::Type>(buf.readUint8());
     this->properties.clear();
     unsigned int propsSize = buf.readUint32();
     for (unsigned int i = 0; i < propsSize; i++) {
         uint8_t k = buf.readUint8();
-        std::string val = buf.readString();
-        this->properties[k] = val;
+        this->properties[k] = buf.readString();
     }
 
     this->reHash();
@@ -77,7 +92,6 @@ void SearchEntry::write(SdsBytesBuf &buf)
 bool SearchEntry::matchesQuery(std::vector<std::string> tokens)
 {
     int nmatches = 0;
-
     std::string lowerTitle = toLower(this->title);
     for (auto it = tokens.begin(); it != tokens.end(); it++) {
         if (lowerTitle.find(*it) != std::string::npos) {
@@ -106,7 +120,7 @@ bool SearchEntry::matchesQuery(std::vector<std::string> tokens)
     return nmatches;
 }
 
-SearchEntryHash256 SearchEntry::getHash() const
+SearchEntry::Hash SearchEntry::getHash() const
 {
     return hash;
 }
@@ -114,6 +128,11 @@ SearchEntryHash256 SearchEntry::getHash() const
 SimHash SearchEntry::getSimHash() const
 {
     return this->simHash;
+}
+
+SearchEntry::Type SearchEntry::getType() const
+{
+    return type;
 }
 
 std::string SearchEntry::getTitle() const
@@ -128,27 +147,34 @@ std::string SearchEntry::getUrl() const
 
 std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 {
-    int i;
     os << "SearchEntry["
        << "hash=";
 
-    STREAM_HEX(os, se.hash, SHA256_DIGEST_LENGTH);
+    STREAM_HEX(os, se.hash.hash, SHA256_DIGEST_LENGTH);
 
     os << ", simHash=" << se.simHash
        << ", title=" << se.title
-       << ", url=" << se.url
-       << ", type=" << (int) se.type
-       << ", properties=[";
+       << ", url=" << se.url;
 
+    switch (se.type) {
+    case SearchEntry::Type::SITE:
+        os << ", type=SITE";
+        break;
+    case SearchEntry::Type::IMAGE:
+        os << ", type=IMAGE";
+        break;
+    case SearchEntry::Type::VIDEO:
+        os << ", type=VIDEO";
+        break;
+    default:
+        break;
+    }
+
+    os << ", properties=[";
     for (auto it = se.properties.begin(); it != se.properties.end(); it++) {
         os << (int) it->first <<"=" << it->second << ", ";
     }
     os << "]" << "]";
 
     return os;
-}
-
-void SearchEntry::evaluateDistances()
-{
-    //SearchEntry::evaluateMetrics(this->metrics, this->title.c_str());
 }

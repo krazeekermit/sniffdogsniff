@@ -76,7 +76,7 @@ static void scanDocument(GumboNode *parent, std::string siteUrl, std::map<std::s
                     rlink = siteUrl + rlink;
                 }
 
-                SearchEntry se(title, rlink, SearchEntryType::SITE);
+                SearchEntry se(title, rlink, SearchEntry::Type::SITE);
                 entries[rlink] = se;
                 LOG_S(1) << "crawler found " << se;
             }

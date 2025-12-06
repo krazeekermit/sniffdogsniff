@@ -115,13 +115,10 @@ std::string SdsBytesBuf::readString()
         if (cursor[len] == '\0')
             break;
     }
-    len++;
 
     std::string str(cursor, cursor + len);
-    this->pos += len;
 
-    if (len == (this->bufferSize - this->pos))
-        str += '\0';
+    this->pos += len + 1;
 
     return str;
 }

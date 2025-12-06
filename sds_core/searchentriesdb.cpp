@@ -15,6 +15,7 @@ SearchEntriesDB::SearchEntriesDB()
 
 SearchEntriesDB::~SearchEntriesDB()
 {
+    this->dbp = nullptr;
 }
 
 void SearchEntriesDB::open(const char *db_path)
@@ -45,9 +46,7 @@ void SearchEntriesDB::open(const char *db_path)
     memset(&data, 0, sizeof(data));
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
-        std::array<uint8_t, SHA256_DIGEST_LENGTH> hash;
-        memcpy(hash.data(), key.data, key.size);
-        this->timestamps[hash] = time(nullptr);
+        this->timestamps[SearchEntry::Hash((uint8_t*) key.data)] = time(nullptr);
     }
 
     if (ret != DB_NOTFOUND) {
@@ -67,7 +66,7 @@ void SearchEntriesDB::insertResult(SearchEntry &se)
     this->timestamps[se.getHash()] = time(nullptr);    
 
     DBT key, data;
-    key.data = se.getHash().data();
+    key.data = se.getHash().hash;
     key.size = SHA256_DIGEST_LENGTH;
 
     SdsBytesBuf buf;
@@ -155,14 +154,14 @@ void SearchEntriesDB::close()
     }
 }
 
-SearchEntry SearchEntriesDB::getByHash(const SearchEntryHash256 &hash)
+SearchEntry SearchEntriesDB::getByHash(const SearchEntry::Hash &hash)
 {
     DBT key, data;
     SearchEntry se;
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
 
-    key.data = (unsigned char*) hash.data();
+    key.data = (void*) hash.hash;
     key.size = SHA256_DIGEST_LENGTH;
 
     int ret = dbp->get(dbp, nullptr, &key, &data, 0);
@@ -181,7 +180,7 @@ void SearchEntriesDB::modified()
 
     for (auto it = this->timestamps.begin(); it != this->timestamps.end();) {
         if ((now - it->second) >= UNIX_DAY) {
-            key.data = (unsigned char*) it->first.data();
+            key.data = (void*) it->first.hash;
             this->dbp->del(this->dbp, nullptr, &key, 0);
             this->timestamps.erase(it);
         } else {

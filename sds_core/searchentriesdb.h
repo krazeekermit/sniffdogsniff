@@ -29,10 +29,10 @@ public:
     void close();
 
 private:
-    std::map<SearchEntryHash256, time_t> timestamps;
+    std::map<SearchEntry::Hash, time_t> timestamps;
     DB *dbp;
 
-    SearchEntry getByHash(const SearchEntryHash256 &hash);
+    SearchEntry getByHash(const SearchEntry::Hash &hash);
     void modified();
 };
 

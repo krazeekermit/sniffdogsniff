@@ -2,6 +2,7 @@
 #include "kademlia/kadbucket.h"
 #include "kademlia/kadnode.h"
 #include "sds_core/simhash.h"
+#include "sds_core/searchentry.h"
 
 #include <gtest/gtest.h>
 
@@ -218,9 +219,6 @@ TEST(test_simhash, test_generate)
     std::vector<std::string> wlist = {"amused", "anaerobic", "anagram", "anatomist", "excretory" ,"excursion"};
     SimHash sm1(wlist);
 
-    std::cerr << sm1 << "\n";
-    //d2388049708129b84383d94f0a402b04
-
     const KadId id = sm1.getId();
     ASSERT_EQ(id.id[0], 0x04);
     ASSERT_EQ(id.id[1], 0x2b);
@@ -238,6 +236,33 @@ TEST(test_simhash, test_generate)
     ASSERT_EQ(id.id[13], 0x80);
     ASSERT_EQ(id.id[14], 0x38);
     ASSERT_EQ(id.id[15], 0xd2);
+}
+
+TEST(test_search_entry, test_read_write)
+{
+    SearchEntry se1("ExampleDotCom", "http://site.example.com", SearchEntry::Type::IMAGE);
+    se1.addProperty(1, "aaaa");
+    se1.addProperty(3, "bbbb");
+    se1.addProperty(5, "cccc");
+    se1.addProperty(7, "dddd");
+
+    std::cerr << se1 << "\n";
+
+    SdsBytesBuf bb;
+    se1.write(bb);
+
+    bb.rewind();
+
+    SearchEntry se2("empty", "");
+    se2.read(bb);
+
+    ASSERT_EQ(se2.getSimHash().getId(), se1.getSimHash().getId());
+    ASSERT_EQ(se2.getTitle(), "ExampleDotCom");
+    ASSERT_EQ(se2.getUrl(), "http://site.example.com");
+    ASSERT_EQ(se2.getProperty(1), "aaaa");
+    ASSERT_EQ(se2.getProperty(3), "bbbb");
+    ASSERT_EQ(se2.getProperty(5), "cccc");
+    ASSERT_EQ(se2.getProperty(7), "dddd");
 }
 
 int main(int argc, char** argv)

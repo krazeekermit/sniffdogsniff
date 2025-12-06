@@ -59,7 +59,7 @@ int SearchEngine::extractSearchResults(std::vector<SearchEntry> &entries, const 
                 }
 
                 if (title.size() > 0) {
-                    entries.emplace_back(title, rlink, SearchEntryType::SITE);
+                    entries.emplace_back(title, rlink, SearchEntry::Type::SITE);
                 }
             }
         }
