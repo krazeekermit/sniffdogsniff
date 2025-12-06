@@ -1,7 +1,5 @@
 target_sources(sniffdogsniffd
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/fnv128.h
-    ${CMAKE_CURRENT_LIST_DIR}/fnv128.c
     ${CMAKE_CURRENT_LIST_DIR}/sds_config.h
     ${CMAKE_CURRENT_LIST_DIR}/sds_config.cpp
     ${CMAKE_CURRENT_LIST_DIR}/searchentry.h

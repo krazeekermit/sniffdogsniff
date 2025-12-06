@@ -3,6 +3,16 @@
 
 #define packed_struct struct __attribute__((__packed__))
 
+#ifdef __OpenBSD__
+#if BYTE_ORDER == BIG_ENDIAN
+#define SDS_BIG_ENDIAN
+#endif
+#else
+#if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define SDS_BIG_ENDIAN
+#endif
+#endif
+
 #define STREAM_HEX(O, A, L) \
 { \
     for (int i = 0; i < L; i++) { \
