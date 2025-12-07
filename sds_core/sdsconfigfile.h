@@ -40,7 +40,7 @@ public:
     Section *lookupSection(const char *name);
     void lookupSections(const char *name, std::vector<Section*> &list);
 
-    int parse(const char *path);
+    void parse(const char *path);
 
     friend std::ostream &operator<<(std::ostream &os, const SdsConfigFile *cfg);
 

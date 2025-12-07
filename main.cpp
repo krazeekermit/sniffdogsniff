@@ -36,7 +36,6 @@ void sigintHandler(int signo)
 
 int main(int argc, char **argv)
 {
-    int err;
     int optdaemon = 0;
     int optconfig = 0;
     SdsConfigFile *cfgFile = new SdsConfigFile();
@@ -47,11 +46,10 @@ int main(int argc, char **argv)
     while ((c = getopt_long(argc, argv, "b:c:v:d", long_options, &option_index)) > -1) {
         switch (c) {
         case 'c':
-            err = cfgFile->parse(optarg);
-            if (err > 0) {
-                LOG_F(FATAL, "error parsing config file %s at line %d", optarg, err);
-            } else if (err < 0) {
-                LOG_F(FATAL, "error parsing config file %s at line %d", optarg, err);
+            try {
+                cfgFile->parse(optarg);
+            } catch(std::exception &ex) {
+                LOG_F(FATAL, "error reading config file %s: %s", optarg, ex.what());
             }
 
             LOG_S(1) << "configuration file: " << cfgFile;

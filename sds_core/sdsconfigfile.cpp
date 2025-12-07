@@ -180,15 +180,16 @@ static char *strlrtrim(char *s)
     return s;
 }
 
-int SdsConfigFile::parse(const char *path)
+void SdsConfigFile::parse(const char *path)
 {
     int lineno = 0;
     char buf[512];
-    char *keyp = nullptr, *valuep = nullptr;
+    char *keyp = nullptr, *valuep = nullptr, *sepp = nullptr;
 
     FILE *fp = fopen(path, "r");
-    if (!fp)
-        return -1;
+    if (!fp) {
+        throw std::runtime_error(strerror(errno));
+    }
 
     SdsConfigFile::Section *section = this->defaultSection;
 
@@ -205,18 +206,35 @@ int SdsConfigFile::parse(const char *path)
         valuep = strchr(buf, ']');
         if (keyp && valuep) {
             *valuep = '\0';
+            if (!strlen(keyp + 1)) {
+                throw std::runtime_error("parse error: invalid section name at line " + std::to_string(lineno));
+            }
+
             section = new SdsConfigFile::Section(keyp + 1);
             this->sections.push_back(section);
         } else {
-            keyp = strtok_r(buf, "=", &valuep);
-            if (keyp && valuep) {
-                section->values.push_back(std::make_pair(strlrtrim(keyp), strlrtrim(valuep)));
-            } else {
-                return lineno;
+            sepp = strchr(buf, '=');
+            if (!sepp) {
+                throw std::runtime_error("parse error: invalid syntax at line " + std::to_string(lineno));
             }
+
+            *sepp = '\0';
+            keyp = buf;
+            valuep = sepp + 1;
+
+            char *k = strlrtrim(keyp);
+            if (!strlen(k)) {
+                throw std::runtime_error("parse error: invalid syntax at line " + std::to_string(lineno));
+            }
+
+            char *v = strlrtrim(valuep);
+            if (!strlen(v)) {
+                throw std::runtime_error("parse error: empty value for key \"" + std::string(k) + "\" at line " + std::to_string(lineno));
+            }
+
+            section->values.push_back(std::make_pair(k, v));
         }
     }
-    return 0;
 }
 
 SdsConfigFile::Section *SdsConfigFile::getDefaultSection() const
