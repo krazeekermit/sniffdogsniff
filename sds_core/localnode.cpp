@@ -82,7 +82,7 @@ private:
                 }
 
                 futures.push_back(std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, targetId]() {
-                    SdsP2PClient client(this->node->configs, ikn.getAddress());
+                    SdsP2PClient client(this->node->configFile, ikn.getAddress());
                     FindNodeReply reply;
 
                     client.findNode(reply, selfNodeId, selfNodeAddress, targetId);
@@ -207,7 +207,7 @@ private:
                 if (failed.find(itn->getId()) != failed.end()) {
 
                     futures[itn->getId()] = std::move(std::async(std::launch::async, [this, itn, selfNodeId, selfNodeAddress, rit]() {
-                        SdsP2PClient client(this->node->configs, itn->getAddress());
+                        SdsP2PClient client(this->node->configFile, itn->getAddress());
                         client.storeResult(selfNodeId, selfNodeAddress, *rit);
                     }));
 
@@ -245,32 +245,36 @@ private:
 
 *************************************************************************************************************************/
 
-LocalNode::LocalNode(SdsConfig &cfgs)
-    : configs(cfgs)
+LocalNode::LocalNode(SdsConfigFile *configFile_)
+    : configFile(configFile_)
 {
     pthread_mutex_init(&this->mutex, nullptr);
-    char path[1024];
 
     this->searchesDB = new SearchEntriesDB();
-    sprintf(path, "%s/%s", cfgs.work_dir_path, "searches.db");
-    this->searchesDB->open(path);
+    std::string path = this->configFile->getDefaultSection()->lookupString("work_dir_path") + "/searches.db";
+    this->searchesDB->open(path.c_str());
 
+    path = this->configFile->getDefaultSection()->lookupString("work_dir_path") + "/ktable.dat";
     this->ktable = new KadRoutingTable();
-    sprintf(path, "%s/%s", cfgs.work_dir_path, "ktable.dat");
-    if (this->ktable->readFile(path)) {
-        LOG_F(1, "ktable is empty populating with known nodes from configs");
-        for (auto it = this->configs.known_peers.begin(); it != this->configs.known_peers.end(); it++) {
-            KadNode kn(*it);
-            this->ktable->pushNode(kn);
+    if (this->ktable->readFile(path.c_str())) {
+        LOG_F(WARNING, "ktable is empty populating with known nodes from configuration file");
+        SdsConfigFile::Section *peers = this->configFile->lookupSection("peers");
+        if (peers) {
+            std::vector<std::string> knownPeers;
+            peers->lookupStrings("address", knownPeers);
+            for (auto it = knownPeers.begin(); it != knownPeers.end(); it++) {
+                KadNode kn(*it);
+                this->ktable->pushNode(kn);
+            }
         }
     }
 
     this->nodesLookupTask = new NodesLookupTask(this);
     this->entriesPublishTask = new EntriesPublishTask(this);
 
-    sprintf(path, "%s/%s", cfgs.work_dir_path, "crawlerseeds.dat");
-    this->crawler = new WebCrawler(cfgs);
-    if (this->crawler->load(path)) {
+    path = this->configFile->getDefaultSection()->lookupString("work_dir_path") + "/crawlerseeds.dat";
+    this->crawler = new WebCrawler(this->configFile);
+    if (this->crawler->load(path.c_str())) {
         LOG_F(WARNING, "crawler is not seeded");
     }
 }
@@ -346,7 +350,7 @@ int LocalNode::nodeConnected(const KadId &id, std::string &address)
     */
     std::async(std::launch::async, [this, id, address] () {
         KadNode kn(id, address);
-        SdsP2PClient client(this->configs, address);
+        SdsP2PClient client(this->configFile, address);
         try {
             client.ping(id, address);
             LOG_S(INFO) << "new neighbour node conected " << kn;
@@ -396,7 +400,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
         }
 
         futures[id] = std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, query] () {
-            SdsP2PClient client(this->configs, ikn->getAddress());
+            SdsP2PClient client(this->configFile, ikn->getAddress());
             FindResultsReply reply;
             client.findResults(reply, selfNodeId, selfNodeAddress, query);
             return reply;
@@ -449,7 +453,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     std::async(std::launch::async, [this, targetNodes, probedEmpty, results, selfNodeId, selfNodeAddress] () {
         for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
             if (probedEmpty.find(it->getId()) != probedEmpty.end()) {
-                SdsP2PClient client(this->configs, it->getAddress());
+                SdsP2PClient client(this->configFile, it->getAddress());
                 try {
                     for (auto rit = results.begin(); rit != results.end(); rit++) {
                         client.storeResult(selfNodeId, selfNodeAddress, *rit);
@@ -480,14 +484,13 @@ void LocalNode::shutdown()
 
     this->lock();
 
-    char path[1024];
     this->searchesDB->close();
 
-    sprintf(path, "%s/%s", this->configs.work_dir_path, "ktable.dat");
-    this->ktable->writeFile(path);
+    std::string path = this->configFile->getDefaultSection()->lookupString("work_dir_path") + "/ktable.dat";
+    this->ktable->writeFile(path.c_str());
 
-    sprintf(path, "%s/%s", this->configs.work_dir_path, "crawlerseeds.dat");
-    this->crawler->save(path);
+    path = this->configFile->getDefaultSection()->lookupString("work_dir_path") + "/crawlerseeds.dat";
+    this->crawler->save(path.c_str());
 
     this->unlock();
 }

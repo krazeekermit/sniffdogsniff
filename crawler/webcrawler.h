@@ -3,7 +3,7 @@
 
 #include "searchengine.h"
 
-#include "sds_core/sds_config.h"
+#include "sds_core/sdsconfigfile.h"
 
 #include <pthread.h>
 
@@ -12,7 +12,7 @@
 class WebCrawler
 {
 public:
-    WebCrawler(SdsConfig &cfg);
+    WebCrawler(SdsConfigFile *configFile);
     ~WebCrawler();
 
     int load(const char *path);

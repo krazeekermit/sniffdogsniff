@@ -1,7 +1,7 @@
 #ifndef LOCALNODE_H
 #define LOCALNODE_H
 
-#include "sds_config.h"
+#include "sdsconfigfile.h"
 
 #include "crawler/webcrawler.h"
 #include "kademlia/kadroutingtable.h"
@@ -19,7 +19,7 @@ friend class NodesLookupTask;
 friend class EntriesPublishTask;
 
 public:
-    LocalNode(SdsConfig &cfgs);
+    LocalNode(SdsConfigFile *configFile_);
     ~LocalNode();
 
     void setSelfNodeAddress(std::string address);
@@ -38,7 +38,8 @@ public:
     void shutdown();
 
 private:
-    SdsConfig configs;
+    SdsConfigFile *configFile; // do not delete!
+
     pthread_mutex_t mutex;
     KadRoutingTable *ktable;
     SearchEntriesDB *searchesDB;

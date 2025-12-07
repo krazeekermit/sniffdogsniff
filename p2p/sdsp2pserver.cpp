@@ -132,12 +132,11 @@ rpc_fail:
 
 SdsP2PServer::SdsP2PServer(LocalNode *node)
     : running(true), localNode(node)
-{
-}
+{}
 
 SdsP2PServer::~SdsP2PServer()
 {
-    this->shutdown();
+    close(this->server_fd);
 }
 
 int SdsP2PServer::startListening(const char *addrstr, int port)
@@ -171,7 +170,6 @@ int SdsP2PServer::startListening(const char *addrstr, int port)
     }
 
     this->server_fd = fd;
-
 
     int clients_count = 0;
     pollfd wait_fds[MAX_POLL_FD_COUNT];
@@ -221,6 +219,4 @@ int SdsP2PServer::startListening(const char *addrstr, int port)
 void SdsP2PServer::shutdown()
 {
     this->running = false;
-
-    close(this->server_fd);
 }

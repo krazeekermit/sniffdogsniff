@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    char *control_addr;
+    char control_addr[64];
     int control_port;
     int auth_cookie;
     char password[512];
@@ -17,7 +17,7 @@ typedef struct {
 
 char *tor_strerror(int tor_errno);
 
-int tor_control_session_init(TorControlSession *ctx, char *addr, int port, int auth_cookie, char *pass);
+int tor_control_session_init(TorControlSession *ctx, const char *addr, int port, int auth_cookie, const char *pass);
 
 int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, int bport, const char *privkey);
 int tor_del_onion(TorControlSession *ctx);

@@ -6,13 +6,15 @@
 #include <map>
 #include <cstring>
 
-WebCrawler::WebCrawler(SdsConfig &cfg)
+WebCrawler::WebCrawler(SdsConfigFile *configFile)
 {
     pthread_mutex_init(&this->mutex, nullptr);
     pthread_cond_init(&this->cond, nullptr);
 
-    for (int i = 0; i < cfg.search_engines.size(); i++) {
-        this->searchEngines.emplace_back(cfg.search_engines[i]);
+    std::vector<SdsConfigFile::Section*> sections;
+    configFile->lookupSections("external_search_engine", sections);
+    for (int i = 0; i < sections.size(); i++) {
+        this->searchEngines.emplace_back(sections[i]);
     }
 }
 

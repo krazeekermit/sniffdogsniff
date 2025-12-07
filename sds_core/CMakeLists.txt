@@ -1,7 +1,7 @@
 target_sources(sniffdogsniffd
     PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/sds_config.h
-    ${CMAKE_CURRENT_LIST_DIR}/sds_config.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sdsconfigfile.h
+    ${CMAKE_CURRENT_LIST_DIR}/sdsconfigfile.cpp
     ${CMAKE_CURRENT_LIST_DIR}/searchentry.h
     ${CMAKE_CURRENT_LIST_DIR}/searchentry.cpp
     ${CMAKE_CURRENT_LIST_DIR}/searchentriesdb.h

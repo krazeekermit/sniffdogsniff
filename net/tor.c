@@ -244,10 +244,10 @@ char *tor_strerror(int tor_errno)
     }
 }
 
-int tor_control_session_init(TorControlSession *ctx, char *addr, int port, int auth_cookie, char *pass)
+int tor_control_session_init(TorControlSession *ctx, const char *addr, int port, int auth_cookie, const char *pass)
 {
     ctx->auth_cookie = auth_cookie;
-    ctx->control_addr = addr;
+    strncpy(ctx->control_addr, addr, sizeof(ctx->control_addr));
     ctx->control_port = port;
     memset(ctx->privkey, 0, sizeof(ctx->privkey));
     memset(ctx->service_id, 0, sizeof(ctx->service_id));

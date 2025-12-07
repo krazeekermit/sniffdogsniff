@@ -3,10 +3,6 @@
 
 #include "sds_core/localnode.h"
 
-#include <pthread.h>
-
-#include <deque>
-
 class SdsP2PServer
 {
 public:
@@ -26,7 +22,6 @@ private:
     bool running;
 
     LocalNode *localNode;
-    std::deque<int> clientsQueue;
     int server_fd;
 };
 

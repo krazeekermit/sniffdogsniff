@@ -5,23 +5,28 @@ db_cache_size = 512000
 min_search_results_threshold = 50
 allow_results_invalidation = no 
 
-## Tor and I2P 
+## Tor Socks5 proxy 
 force_tor_proxy = yes
 tor_socks5_addr = 127.0.0.1
 tor_socks5_port = 9050
 
-# tor_control_addr = 127.0.0.1
-# tor_control_port = 9051
-# tor_control_password = test1234
-# tor_control_auth_cookie = true
+## I2P sam addr, port, user
 # i2p_sam_addr = 127.0.0.1
 # i2p_sam_port = 7656
 # i2p_sam_user = user
 # i2p_sam_password = test1234
 
-## To configure hidden services 
-# p2p_hidden_service = tor # or i2p or none
-# for i2p service p2p_bind_port is not needed
+## To configure tor hidden services 
+# tor_hidden_service=yes;
+# tor_control_addr = 127.0.0.1
+# tor_control_port = 9051
+# tor_control_password = test1234
+# tor_control_auth_cookie = yes 
+
+## To configure i2p hidden services 
+# i2p_hidden_service=no
+
+## Configure p2p bind address and port
 p2p_bind_addr = 127.0.0.1
 p2p_bind_port = 4225
 
