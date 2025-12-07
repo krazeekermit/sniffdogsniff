@@ -3,6 +3,20 @@
 #include <unistd.h>
 #include <string.h>
 
+#define SOCKS_VERSION 0x05
+
+#define CONNECT_CMD 0x01
+#define BIND_CMD 0x02
+
+#define METHOD_NO_AUTH_REQUIRED 0x00
+#define NO_ACCEPTABLE_METHODS 0xff
+
+#define ADDR_IP_V4 0x01
+#define ADDR_DOMAIN 0x03
+#define ADDR_IP_V6 0x04 // note: as of now ipv6 is not implemented
+
+#define NO_ERROR 0x00
+
 const char *socks5_strerror(int n)
 {
     switch (-n) {
@@ -29,13 +43,9 @@ const char *socks5_strerror(int n)
 
 int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, int port)
 {
-    int i, fd;
-    int opt = 0;
-    size_t valread;
+    int fd;
     struct sockaddr_in address;
-    socklen_t addrlen = sizeof(address);
-
-    unsigned char buf[512];
+    unsigned char buf[256];
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0)
@@ -53,29 +63,55 @@ int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, i
     }
 
     // refs https://www.rfc-editor.org/rfc/rfc1928
-    buf[0] = 0x05;
+    /*
+     * +----+----------+----------+
+     * |VER | NMETHODS | METHODS  |
+     * +----+----------+----------+
+     * | 1  |    1     | 1 to 255 |
+     * +----+----------+----------+
+     */
+
+    buf[0] = SOCKS_VERSION;
     buf[1] = 0x01;
-    buf[2] = 0x00;
+    buf[2] = METHOD_NO_AUTH_REQUIRED;
 
     if (send(fd, buf, 3, 0) != 3) {
         close(fd);
         return -1;
     }
 
-    size_t buf_sz = 0;
-    unsigned char address_sz;
-    unsigned char addrType = 0x01;
+    memset(buf, 0, sizeof(buf));
+    if (recv(fd, buf, 2, 0) != 2) {
+        close(fd);
+        return -1;
+    }
 
-    buf[buf_sz++] = 0x05; // version = 5
-    buf[buf_sz++] = 0x01; // connect
+    if (buf[0] != SOCKS_VERSION || buf[1] == NO_ACCEPTABLE_METHODS) {
+        close(fd);
+        return -1;
+    }
+
+    /*
+     * +----+-----+-------+------+----------+----------+
+     * |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+     * +----+-----+-------+------+----------+----------+
+     * | 1  |  1  | X'00' |  1   | Variable |    2     |
+     * +----+-----+-------+------+----------+----------+
+    */
+
+    size_t buf_sz = 0;
+    unsigned char addr_len = 0;
+    unsigned char addr_type = ADDR_IP_V4;
+    buf[buf_sz++] = SOCKS_VERSION; // version = 5
+    buf[buf_sz++] = CONNECT_CMD; // connect
     buf[buf_sz++] = 0x00; // reserved
 
     struct sockaddr_in baddr;
     if (inet_pton(AF_INET, addr, &baddr.sin_addr) > 0) {
-        buf[buf_sz++] = addrType = 0x01; // addr type (ipv4)
+        buf[buf_sz++] = addr_type = ADDR_IP_V4; // addr type (ipv4)
     } else {
-        buf[buf_sz++] = addrType = 0x03; // addr type (domain)
-        buf[buf_sz++] = strlen(addr);
+        buf[buf_sz++] = addr_type = ADDR_DOMAIN; // addr type (domain)
+        buf[buf_sz++] = addr_len = strlen(addr);
     }
 
     if (send(fd, buf, buf_sz, 0) != buf_sz) {
@@ -83,17 +119,21 @@ int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, i
         return -1;
     }
 
-    if (addrType == 0x01) {
-        if (send(fd, &baddr.sin_addr, sizeof(baddr.sin_addr), 0) != 1) {
+    switch (addr_type) {
+    case ADDR_IP_V4:
+        if (send(fd, &baddr.sin_addr, sizeof(baddr.sin_addr), 0) != sizeof(baddr.sin_addr)) {
             close(fd);
             return -1;
         }
-    } else if (addrType == 0x03) {
-        size_t addr_len = strlen(addr);
-        if (send(fd, addr, sizeof(char) * addr_len, 0) != addr_len) {
+        break;
+    case ADDR_DOMAIN:
+        if (send(fd, addr, addr_len, 0) != addr_len) {
             close(fd);
             return -1;
         }
+        break;
+    // case ADDR_IP_V6:
+    //     break;
     }
 
     uint16_t nsport = htons(port);
@@ -102,39 +142,29 @@ int socks5_connect(const char *socks5_addr, int socks5_port, const char *addr, i
         return -1;
     }
 
+    /*
+     *  +----+-----+-------+------+----------+----------+
+     *  |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
+     *  +----+-----+-------+------+----------+----------+
+     *  | 1  |  1  | X'00' |  1   | Variable |    2     |
+     *  +----+-----+-------+------+----------+----------+
+     *
+     *  if connect 0x01 even if addr type = 0x03 -> returns 10 bytes
+     */
     memset(buf, 0, sizeof(buf));
-    if (recv(fd, buf, 4, 0) != 4) {
+    if (recv(fd, buf, 10, 0) != 10) {
         close(fd);
         return -1;
     }
 
-    if (buf[0] != 0x05) {
+    if (buf[0] != SOCKS_VERSION) {
         close(fd);
         return -1;
     }
 
-    if (buf[1] != 0x00) {
+    if (buf[1] != NO_ERROR) {
         close(fd);
         return -buf[1];
-    }
-
-    if (buf[3] != addrType) {
-        close(fd);
-        return -1;
-    }
-
-    if (recv(fd, &address_sz, 1, 0) != 1) {
-        close(fd);
-        return -1;
-    }
-    if (recv(fd, buf, address_sz, 0) != address_sz) {
-        close(fd);
-        return -1;
-    }
-
-    if (recv(fd, &nsport, sizeof(uint16_t), 0) != sizeof(uint16_t)) {
-        close(fd);
-        return -1;
     }
 
     return fd;
