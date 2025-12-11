@@ -20,7 +20,7 @@ int SdsP2PServer::ping(SdsBytesBuf &args, SdsBytesBuf &reply)
     PingArgs pingArgs;
     pingArgs.read(args);
 
-    this->localNode->ping(pingArgs.callerId, pingArgs.callerAddress.c_str());
+    this->localNode->ping(pingArgs.id, pingArgs.address.c_str());
 
     return ERR_NULL;
 }
@@ -29,7 +29,6 @@ int SdsP2PServer::findNode(SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     FindNodeArgs findArgs;
     findArgs.read(args);
-    this->localNode->nodeConnected(findArgs.callerId, findArgs.callerAddress);
 
     FindNodeReply findReply;
     this->localNode->findNode(findReply.nearest, findArgs.targetId);
@@ -43,7 +42,6 @@ int SdsP2PServer::storeResult(SdsBytesBuf &args, SdsBytesBuf &reply)
     StoreResultArgs storeArgs;
     storeArgs.read(args);
 
-    this->localNode->nodeConnected(storeArgs.callerId, storeArgs.callerAddress);
     this->localNode->storeResult(storeArgs.se);
 
     return ERR_NULL;
@@ -53,7 +51,6 @@ int SdsP2PServer::findResults(SdsBytesBuf &args, SdsBytesBuf &reply)
 {
     FindResultsArgs findArgs;
     findArgs.read(args);
-    this->localNode->nodeConnected(findArgs.callerId, findArgs.callerAddress);
 
     FindResultsReply findReply;
     this->localNode->findResults(findReply.nearest, findReply.results, findArgs.query.c_str());
@@ -173,6 +170,8 @@ int SdsP2PServer::startListening(const char *addrstr, int port)
 
     int clients_count = 0;
     pollfd wait_fds[MAX_POLL_FD_COUNT];
+    memset(&wait_fds, 0, sizeof(wait_fds));
+
     wait_fds[0].fd = this->server_fd;
     wait_fds[0].events = POLLIN | POLLPRI;
     while (this->running) {

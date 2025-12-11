@@ -1,51 +1,38 @@
 #include "p2p_common.h"
 
 /*
-    ArgsBase
-*/
-
-ArgsBase::ArgsBase(const KadId &id_, std::string address_)
-    : callerId(id_), callerAddress(address_)
-{
-}
-
-void ArgsBase::read(SdsBytesBuf &buf)
-{
-    callerAddress = buf.readString();
-    buf.readBytes(callerId.id, KAD_ID_LENGTH);
-}
-
-void ArgsBase::write(SdsBytesBuf &buf)
-{
-    buf.writeString(callerAddress);
-    buf.writeBytes(callerId.id, KAD_ID_LENGTH);
-}
-
-/*
     PingArgs
 */
-PingArgs::PingArgs(const KadId &callerId_, std::string callerAddress_)
-    : ArgsBase(callerId_, callerAddress_)
+PingArgs::PingArgs(const KadId &id_, std::string address_)
+    : id(id_), address(address_)
+{}
+
+void PingArgs::read(SdsBytesBuf &buf)
 {
+    address = buf.readString();
+    buf.readBytes(id.id, KAD_ID_LENGTH);
+}
+
+void PingArgs::write(SdsBytesBuf &buf)
+{
+    buf.writeString(address);
+    buf.writeBytes(id.id, KAD_ID_LENGTH);
 }
 
 /*
     FindNodeArgs
 */
-FindNodeArgs::FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_)
-    : ArgsBase(callerId_, callerAddress_), targetId(targetId_)
-{
-}
+FindNodeArgs::FindNodeArgs(const KadId &targetId_)
+    : targetId(targetId_)
+{}
 
 void FindNodeArgs::read(SdsBytesBuf &buf)
 {
-    ArgsBase::read(buf);
     buf.readBytes(targetId.id, KAD_ID_LENGTH);
 }
 
 void FindNodeArgs::write(SdsBytesBuf &buf)
 {
-    ArgsBase::write(buf);
     buf.writeBytes(targetId.id, KAD_ID_LENGTH);
 }
 
@@ -76,39 +63,35 @@ void FindNodeReply::write(SdsBytesBuf &buf)
 /*
     StoreResultArgs
 */
-StoreResultArgs::StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_)
-    : ArgsBase(callerId_, callerAddress_), se(se_)
+StoreResultArgs::StoreResultArgs(SearchEntry se_)
+    : se(se_)
 {}
 
 void StoreResultArgs::read(SdsBytesBuf &buf)
 {
-    ArgsBase::read(buf);
     se.read(buf);
 }
 
 void StoreResultArgs::write(SdsBytesBuf &buf)
 {
-    ArgsBase::write(buf);
     se.write(buf);
 }
 
 /*
     FindResults
 */
-FindResultsArgs::FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_)
-    : ArgsBase(callerId_, callerAddress_), query(query_)
+FindResultsArgs::FindResultsArgs(std::string query_)
+    : query(query_)
 {
 }
 
 void FindResultsArgs::read(SdsBytesBuf &buf)
 {
-    ArgsBase::read(buf);
     query = buf.readString();
 }
 
 void FindResultsArgs::write(SdsBytesBuf &buf)
 {
-    ArgsBase::write(buf);
     buf.writeString(query);
 }
 

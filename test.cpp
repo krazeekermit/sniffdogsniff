@@ -3,6 +3,7 @@
 #include "kademlia/kadnode.h"
 #include "sds_core/simhash.h"
 #include "sds_core/searchentry.h"
+#include "p2p/p2p_common.h"
 
 #include <gtest/gtest.h>
 
@@ -263,6 +264,104 @@ TEST(test_search_entry, test_read_write)
     ASSERT_EQ(se2.getProperty(3), "bbbb");
     ASSERT_EQ(se2.getProperty(5), "cccc");
     ASSERT_EQ(se2.getProperty(7), "dddd");
+}
+
+TEST(test_p2p_args_ping, test_read_write)
+{
+    PingArgs p1;
+    p1.address = "exampleexample.onion:4222";
+    p1.id = KadId::randomId();
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    PingArgs p2;
+    p2.read(bb);
+    ASSERT_EQ(p2.id, p1.id);
+    ASSERT_EQ(p2.address, p1.address);
+}
+
+TEST(test_p2p_args_find_nodes, test_read_write)
+{
+    FindNodeArgs p1;
+    p1.targetId = KadId::randomId();
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    FindNodeArgs p2;
+    p2.read(bb);
+    ASSERT_EQ(p2.targetId, p1.targetId);
+}
+
+TEST(test_p2p_reply_find_nodes, test_read_write)
+{
+    KadId id1 = KadId::randomId();
+    KadId id2 = KadId::randomId();
+
+    FindNodeReply p1;
+    p1.nearest[id1] = "exampleaaaaa.onion";
+    p1.nearest[id2] = "examplebbbbb.i2p";
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    FindNodeReply p2;
+    p2.read(bb);
+    ASSERT_EQ(p2.nearest.size(), 2);
+    ASSERT_EQ(p2.nearest[id1], "exampleaaaaa.onion");
+    ASSERT_EQ(p2.nearest[id2], "examplebbbbb.i2p");
+}
+
+TEST(test_p2p_args_find_results, test_read_write)
+{
+    FindResultsArgs p1;
+    p1.query = "example of query example hello cat dog mickey-mouse";
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    FindResultsArgs p2;
+    p2.read(bb);
+    ASSERT_EQ(p2.query, "example of query example hello cat dog mickey-mouse");
+}
+
+TEST(test_p2p_reply_find_results, test_read_write)
+{
+    FindResultsReply p1;
+    p1.results.emplace_back("FirstDotCom", "http://site.first.com", SearchEntry::Type::IMAGE);
+    p1.results.emplace_back("SecondDotCom", "http://site.second.com", SearchEntry::Type::VIDEO);
+    p1.results.emplace_back("ThirdDotCom", "http://site.third.com", SearchEntry::Type::SITE);
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    FindResultsReply p2;
+    p2.read(bb);
+
+    ASSERT_EQ(p2.results.size(), 3);
+
+    ASSERT_EQ(p2.results[0].getTitle(), "FirstDotCom");
+    ASSERT_EQ(p2.results[0].getUrl(), "http://site.first.com");
+    ASSERT_EQ(p2.results[0].getType(), SearchEntry::Type::IMAGE);
+
+    ASSERT_EQ(p2.results[1].getTitle(), "SecondDotCom");
+    ASSERT_EQ(p2.results[1].getUrl(), "http://site.second.com");
+    ASSERT_EQ(p2.results[1].getType(), SearchEntry::Type::VIDEO);
+
+    ASSERT_EQ(p2.results[2].getTitle(), "ThirdDotCom");
+    ASSERT_EQ(p2.results[2].getUrl(), "http://site.third.com");
+    ASSERT_EQ(p2.results[2].getType(), SearchEntry::Type::SITE);
 }
 
 int main(int argc, char** argv)

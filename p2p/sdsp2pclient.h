@@ -11,11 +11,14 @@ class SdsP2PClient
 {
 public:
     SdsP2PClient(SdsConfigFile *configFile, std::string nodeAddress_);
+    ~SdsP2PClient();
 
     int ping(const KadId &id, std::string address);
-    int findNode(FindNodeReply &reply, const KadId &callerId, std::string callerAddress, const KadId &id);
-    int storeResult(const KadId &callerId, std::string callerAddress, SearchEntry se);
-    int findResults(FindResultsReply &reply, const KadId &callerId, std::string callerAddress, const char *query);
+    int findNode(FindNodeReply &reply, const KadId &id);
+    int storeResult(SearchEntry se);
+    int findResults(FindResultsReply &reply, const char *query);
+
+    void closeConnection();
 
 private:
     int newConnection();
@@ -32,6 +35,8 @@ private:
     int i2pSamPort;
 
     std::string nodeAddress;
+
+    int fd;
 };
 
 #endif // SDSP2PCLIENT_H

@@ -17,8 +17,14 @@ SdsP2PClient::SdsP2PClient(SdsConfigFile *configFile, std::string nodeAddress_)
         torSocks5Port(configFile->getDefaultSection()->lookupInt("tor_socks5_port")),
         i2pSamAddr(configFile->getDefaultSection()->lookupString("i2p_sam_addr")),
         i2pSamPort(configFile->getDefaultSection()->lookupInt("i2p_sam_port")),
-        nodeAddress(nodeAddress_)
+        nodeAddress(nodeAddress_),
+        fd(-1)
 {}
+
+SdsP2PClient::~SdsP2PClient()
+{
+    this->closeConnection();
+}
 
 int SdsP2PClient::ping(const KadId &id, std::string address)
 {
@@ -29,11 +35,11 @@ int SdsP2PClient::ping(const KadId &id, std::string address)
     return sendRpcRequest(FUNC_PING, a, r);
 }
 
-int SdsP2PClient::findNode(FindNodeReply &reply, const KadId &callerId, std::string callerAddress, const KadId &id)
+int SdsP2PClient::findNode(FindNodeReply &reply, const KadId &id)
 {
     SdsBytesBuf a, r;
 
-    FindNodeArgs args(callerId, callerAddress, id);
+    FindNodeArgs args(id);
     args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
@@ -44,21 +50,21 @@ int SdsP2PClient::findNode(FindNodeReply &reply, const KadId &callerId, std::str
     return ERR_NULL;
 }
 
-int SdsP2PClient::storeResult(const KadId &callerId, std::string callerAddress, SearchEntry se)
+int SdsP2PClient::storeResult(SearchEntry se)
 {
     SdsBytesBuf a, r;
 
-    StoreResultArgs args(callerId, callerAddress, se);
+    StoreResultArgs args(se);
     args.write(a);
 
     return sendRpcRequest(FUNC_STORE_RESULT, a, r);
 }
 
-int SdsP2PClient::findResults(FindResultsReply &reply, const KadId &callerId, std::string callerAddress, const char *query)
+int SdsP2PClient::findResults(FindResultsReply &reply, const char *query)
 {
     SdsBytesBuf a, r;
 
-    FindResultsArgs args(callerId, callerAddress, query);
+    FindResultsArgs args(query);
     args.write(a);
 
     int ret = sendRpcRequest(FUNC_FIND_NODE, a, r);
@@ -68,6 +74,14 @@ int SdsP2PClient::findResults(FindResultsReply &reply, const KadId &callerId, st
 
     reply.read(r);
     return ERR_NULL;
+}
+
+void SdsP2PClient::closeConnection()
+{
+    if (this->fd > 0) {
+        close(this->fd);
+        this->fd = -1;
+    }
 }
 
 int SdsP2PClient::newConnection()
@@ -124,7 +138,7 @@ int SdsP2PClient::newConnection()
 
 int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
-    int fd = this->newConnection();
+    this->fd = this->newConnection();
 
     /* Send Request */
     MessageRequestHeader req = {
@@ -139,17 +153,17 @@ int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
     MessageResponseHeader resp;
     memset(&resp, 0, sizeof(resp));
 
-    if (send(fd, &req, sizeof(req), 0) != sizeof(req)) {
+    if (send(this->fd, &req, sizeof(req), 0) != sizeof(req)) {
         errcode = -2;
         goto rpc_fail;
     }
-    if (send(fd, args.bufPtr(), args.size(), 0) != args.size()) {
+    if (send(this->fd, args.bufPtr(), args.size(), 0) != args.size()) {
         errcode = -2;
         goto rpc_fail;
     }
 
     /* Receive Reply */
-    if (recv(fd, &resp, sizeof(resp), 0) != sizeof(resp)) {
+    if (recv(this->fd, &resp, sizeof(resp), 0) != sizeof(resp)) {
         errcode = ERR_RECV_REQUEST;
         goto rpc_fail;
     }
@@ -167,14 +181,12 @@ int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
     resp_sz = le64toh(resp.datasize);
     if (resp_sz > 0) {
         reply.allocate(resp_sz);
-        if (recv(fd, reply.bufPtr(), resp_sz, 0) != resp_sz) {
+        if (recv(this->fd, reply.bufPtr(), resp_sz, 0) != resp_sz) {
             errcode = ERR_RECV_REQUEST;
             goto rpc_fail;
         }
     }
 
 rpc_fail:
-
-    close(fd);
     return errcode;
 }

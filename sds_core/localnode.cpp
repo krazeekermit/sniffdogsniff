@@ -85,7 +85,8 @@ private:
                     SdsP2PClient client(this->node->configFile, ikn.getAddress());
                     FindNodeReply reply;
 
-                    client.findNode(reply, selfNodeId, selfNodeAddress, targetId);
+                    client.ping(selfNodeId, selfNodeAddress);
+                    client.findNode(reply, targetId);
                     return reply;
                 })));
             }
@@ -208,7 +209,7 @@ private:
 
                     futures[itn->getId()] = std::move(std::async(std::launch::async, [this, itn, selfNodeId, selfNodeAddress, rit]() {
                         SdsP2PClient client(this->node->configFile, itn->getAddress());
-                        client.storeResult(selfNodeId, selfNodeAddress, *rit);
+                        client.storeResult(*rit);
                     }));
 
                     if (futures.size() >= 3) {
@@ -401,8 +402,10 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
 
         futures[id] = std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, query] () {
             SdsP2PClient client(this->configFile, ikn->getAddress());
+            client.ping(selfNodeId, selfNodeAddress);
+
             FindResultsReply reply;
-            client.findResults(reply, selfNodeId, selfNodeAddress, query);
+            client.findResults(reply, query);
             return reply;
         }));
 
@@ -455,11 +458,12 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
             if (probedEmpty.find(it->getId()) != probedEmpty.end()) {
                 SdsP2PClient client(this->configFile, it->getAddress());
                 try {
+                    client.ping(selfNodeId, selfNodeAddress);
                     for (auto rit = results.begin(); rit != results.end(); rit++) {
-                        client.storeResult(selfNodeId, selfNodeAddress, *rit);
+                        client.storeResult(*rit);
                     }
                 } catch (std::exception &ex) {
-                    LOG_F(ERROR, ex.what());
+                    LOG_F(ERROR, "error storing results: %s", ex.what());
                 }
             }
         }

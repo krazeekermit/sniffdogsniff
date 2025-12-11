@@ -80,53 +80,39 @@ public:
 };
 
 /*
-    Rpc Args
+    Ping
 */
-struct ArgsBase
+struct PingArgs
 {
-    KadId callerId;
-    std::string callerAddress;
+    KadId id;
+    std::string address;
 
-    ArgsBase() = default;
-    ArgsBase(const KadId &id_, std::string address_);
+    PingArgs() = default;
+    PingArgs(const KadId &id_, std::string address_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct ReplyBase
-{
-};
-
-/*
-    Ping
-*/
-struct PingArgs : public ArgsBase
-{
-
-    PingArgs() = default;
-    PingArgs(const KadId &callerId_, std::string callerAddress_);
-};
-
-struct PingReply : public ReplyBase
+struct PingReply
 {
 };
 
 /*
     FindNode
 */
-struct FindNodeArgs : public ArgsBase
+struct FindNodeArgs
 {
     KadId targetId;
 
     FindNodeArgs() = default;
-    FindNodeArgs(const KadId &callerId_, std::string callerAddress_, const KadId &targetId_);
+    FindNodeArgs(const KadId &targetId_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct FindNodeReply : public ReplyBase
+struct FindNodeReply
 {
     std::map<KadId, std::string> nearest;
 
@@ -137,30 +123,29 @@ struct FindNodeReply : public ReplyBase
 /*
     StoreResult
 */
-struct StoreResultArgs : public ArgsBase
+struct StoreResultArgs
 {
     SearchEntry se;
 
     StoreResultArgs() = default;
-    StoreResultArgs(const KadId &callerId_, std::string callerAddress_, SearchEntry se_);
+    StoreResultArgs(SearchEntry se_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 };
 
-struct StoreResultReply : public ReplyBase
-{
-};
+struct StoreResultReply
+{};
 
 /*
     FindResults
 */
-struct FindResultsArgs : public ArgsBase
+struct FindResultsArgs
 {
     std::string query;
 
     FindResultsArgs() = default;
-    FindResultsArgs(const KadId &callerId_, std::string callerAddress_, std::string query_);
+    FindResultsArgs(std::string query_);
 
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
