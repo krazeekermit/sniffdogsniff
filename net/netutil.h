@@ -22,7 +22,7 @@ inline int net_urlparse(char *addr, char *suffix, int *port, const char *url)
         return -1;
 
     if (port && urlpp)
-        *port = atoi(urlpp);
+        *port = atoi(urlpp + 1);
 
     const char *supp = strrchr(addr, '.');
     if (supp && suffix) {

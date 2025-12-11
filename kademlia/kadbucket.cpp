@@ -16,10 +16,10 @@ KadBucket::~KadBucket()
 
 }
 
-//bool KadBucket::pushNode(KadNode *kn)
-//{
-//    KadNode *ikn =
-//}
+bool KadBucket::hasNode(const KadNode &kn)
+{
+    return std::find(this->nodes.begin(), this->nodes.end(), kn) != this->nodes.end();
+}
 
 bool KadBucket::pushNode(const KadNode &kn)
 {

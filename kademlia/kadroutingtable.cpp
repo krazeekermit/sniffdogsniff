@@ -45,6 +45,17 @@ bool KadRoutingTable::isFull()
     return true;
 }
 
+bool KadRoutingTable::hasNode(const KadNode &kn)
+{
+    for (int i = 0; i < KAD_ID_BIT_LENGTH; i++) {
+        if (this->buckets[i]->hasNode(kn)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool KadRoutingTable::pushNode(const KadNode &kn)
 {
     if (this->selfNode == kn)

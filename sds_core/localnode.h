@@ -29,11 +29,6 @@ public:
     int findResults(std::map<KadId, std::string> &nearest, std::vector<SearchEntry> &results, const char *query);
     int doSearch(std::vector<SearchEntry> &results, const char *query);
 
-    // used to insert new connected node into the ktable
-    // usually called by the rpc request handler
-    int nodeConnected(const KadId &id, std::string &address);
-    // checkNode(id kademlia.KadId, addr string) bool
-
     void startTasks();
     void shutdown();
 

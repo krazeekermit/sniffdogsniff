@@ -2,6 +2,7 @@
 
 #include "p2p_common.h"
 #include "common/loguru.hpp"
+#include "common/macros.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -63,6 +64,9 @@ int SdsP2PServer::findResults(SdsBytesBuf &args, SdsBytesBuf &reply)
 void SdsP2PServer::handleRequest(int client_fd)
 {
     uint64_t recv_sz;
+    uint8_t buffer[1024];
+    size_t recvi = 0;
+
     std::string errstr = "";
     MessageRequestHeader req;
     MessageResponseHeader reply;
@@ -74,16 +78,28 @@ void SdsP2PServer::handleRequest(int client_fd)
     SdsBytesBuf replyBuf;
 
     recv_sz = sizeof(req);
-    if (recv(client_fd, &req, recv_sz, 0) != recv_sz) {
+    recvi = recv(client_fd, &req, recv_sz, 0);
+    if (recvi != recv_sz) {
         //logerror or send error
         reply.errcode = ERR_RECV_REQUEST;
         goto rpc_fail;
     }
 
     recv_sz = le64toh(req.datasize);
+    LOG_F(2, "recv request id=%ld, func=%s data_sz=%ld", req.id, p2p_strfunction(req.funcode), recv_sz);
     if (recv_sz > 0) {
         argsBuf.allocate(recv_sz);
-        if (recv(client_fd, argsBuf.bufPtr(), recv_sz, 0) != recv_sz) {
+        while ((recvi = recv(client_fd, buffer, sizeof(buffer), 0)) > 0) {
+            argsBuf.writeBytes(buffer, recvi);
+            recv_sz -= recvi;
+
+            if (recv_sz == 0) {
+                break;
+            }
+        }
+
+        argsBuf.rewind();
+        if (recv_sz != 0) {
             //logerror or send error
             reply.errcode = ERR_RECV_REQUEST;
             goto rpc_fail;
@@ -200,13 +216,12 @@ int SdsP2PServer::startListening(const char *addrstr, int port)
                 if (client_fd > 0 && revents > 0) {
                     if ((revents & POLLHUP) || (revents & POLLERR)) {
                         close(wait_fds[i].fd);
+                        wait_fds[i].fd = 0;
+                        wait_fds[i].revents = 0;
+                        clients_count--;
                     } else if (revents & POLLIN) {
                         this->handleRequest(client_fd);
                     }
-
-                    wait_fds[i].fd = 0;
-                    wait_fds[i].revents = 0;
-                    clients_count--;
                 }
             }
         }

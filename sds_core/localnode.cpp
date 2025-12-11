@@ -300,10 +300,36 @@ void LocalNode::setSelfNodeAddress(std::string address)
 
 int LocalNode::ping(const KadId &id, std::string address)
 {
+    /*
+        Ping the new connected node before inserting it into k-table to avoid
+        fake node spam
+    */
+//    std::async(std::launch::async, [this, id, address] () {
+//        KadNode kn(id, address);
+//        LOG_S(INFO) << "?new neighbour node added: " << kn;
 
-    int res = 0;
+//        bool hasNode = this->ktable->hasNode(kn);
+//        KadNode selfNode = this->ktable->getSelfNode();
 
-    return res;
+//        if (hasNode) {
+//            LOG_S(1) << "ping: already have node " << kn;
+//            return;
+//        }
+
+//        SdsP2PClient client(this->configFile, address);
+//        try {
+//            client.ping(selfNode.getId(), selfNode.getAddress());
+//            this->lock();
+//            this->ktable->pushNode(kn);
+//            this->unlock();
+
+//            LOG_S(INFO) << "new neighbour node added: " << kn;
+//        }  catch (std::exception &ex) {
+//            LOG_S(WARNING) << "new neighbour node conected but seems down, discarded " << kn;
+//        }
+//    });
+
+    return 0;
 }
 
 int LocalNode::findNode(std::map<KadId, std::string> &nearest, const KadId &id)
@@ -341,29 +367,6 @@ int LocalNode::findResults(std::map<KadId, std::string> &nearest, std::vector<Se
     this->unlock();
 
     return results.size();
-}
-
-int LocalNode::nodeConnected(const KadId &id, std::string &address)
-{
-    /*
-        Ping the new connected node before inserting it into k-table to avoid
-        fake node spam
-    */
-    std::async(std::launch::async, [this, id, address] () {
-        KadNode kn(id, address);
-        SdsP2PClient client(this->configFile, address);
-        try {
-            client.ping(id, address);
-            LOG_S(INFO) << "new neighbour node conected " << kn;
-            this->lock();
-            this->ktable->pushNode(kn);
-            this->unlock();
-        }  catch (std::exception &ex) {
-            LOG_S(INFO) << "new neighbour node conected but seems down, discarded " << kn;
-        }
-    });
-
-    return 0;
 }
 
 int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)

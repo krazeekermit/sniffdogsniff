@@ -47,27 +47,31 @@ int net_socket_connect(const char *addr, int port, long timeout)
     address.sin_port = htons(port);
 
     struct pollfd wait_fds[1];
-    wait_fds[0].fd = fd;
-    wait_fds[0].events = POLLIN | POLLPRI;
-    if (connect(fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        while (poll(wait_fds, 1, timeout) > 0) {
-            if ((wait_fds[0].revents & POLLHUP) || (wait_fds[0].revents & POLLERR)) {
-                addrlen = sizeof(err);
-                if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &addrlen) < 0) {
-                    return -1;
-                }
 
-                if (err) {
-                    close(fd);
-                    errno = err;
-                    return -1;
-                }
-            } else {
-                if (fcntl(fd, F_SETFL, opt) < 0) {
-                    return -1;
-                }
-                return fd;
+    wait_fds[0].fd = fd;
+    wait_fds[0].events = POLLIN | POLLPRI | POLLOUT;
+    connect(fd, (struct sockaddr*)&address, sizeof(address));
+    if (errno != EINPROGRESS) {
+        return -1;
+    }
+
+    if (poll(wait_fds, 1, timeout) > 0) {
+        if ((wait_fds[0].revents & POLLHUP) || (wait_fds[0].revents & POLLERR)) {
+            addrlen = sizeof(err);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &addrlen) < 0) {
+                return -1;
             }
+
+            if (err) {
+                close(fd);
+                errno = err;
+                return -1;
+            }
+        } else {
+            if (fcntl(fd, F_SETFL, opt) < 0) {
+                return -1;
+            }
+            return fd;
         }
     }
 

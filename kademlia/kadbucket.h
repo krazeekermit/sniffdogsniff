@@ -16,6 +16,7 @@ public:
     KadBucket(int height);
     ~KadBucket();
 
+    bool hasNode(const KadNode &kn);
     bool pushNode(const KadNode &kn);
     bool removeNode(KadNode &kn);
     bool removeNode(const KadId &id);

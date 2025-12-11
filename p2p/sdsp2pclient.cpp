@@ -6,6 +6,9 @@
 #include "net/libsam3.h"
 #include "net/netutil.h"
 
+#include "common/loguru.hpp"
+#include "common/macros.h"
+
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -138,7 +141,9 @@ int SdsP2PClient::newConnection()
 
 int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf &reply)
 {
-    this->fd = this->newConnection();
+    if (this->fd < 0) {
+        this->fd = this->newConnection();
+    }
 
     /* Send Request */
     MessageRequestHeader req = {
@@ -149,14 +154,19 @@ int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
 
     int errcode = ERR_NULL;
 
+    uint8_t buffer[1024];
+    size_t recvi = 0;
     uint64_t resp_sz = 0;
     MessageResponseHeader resp;
     memset(&resp, 0, sizeof(resp));
+
+    LOG_F(2, "send new request id=%ld, func=%s data_sz=%ld", req.id, p2p_strfunction(funcode), args.size());
 
     if (send(this->fd, &req, sizeof(req), 0) != sizeof(req)) {
         errcode = -2;
         goto rpc_fail;
     }
+
     if (send(this->fd, args.bufPtr(), args.size(), 0) != args.size()) {
         errcode = -2;
         goto rpc_fail;
@@ -181,8 +191,19 @@ int SdsP2PClient::sendRpcRequest(uint8_t funcode, SdsBytesBuf &args, SdsBytesBuf
     resp_sz = le64toh(resp.datasize);
     if (resp_sz > 0) {
         reply.allocate(resp_sz);
-        if (recv(this->fd, reply.bufPtr(), resp_sz, 0) != resp_sz) {
-            errcode = ERR_RECV_REQUEST;
+        while ((recvi = recv(this->fd, buffer, sizeof(buffer), 0)) > 0) {
+            reply.writeBytes(buffer, recvi);
+            resp_sz -= recvi;
+
+            if (resp_sz == 0) {
+                break;
+            }
+        }
+
+        reply.rewind();
+        if (resp_sz != 0) {
+            //logerror or send error
+            resp.errcode = ERR_RECV_REQUEST;
             goto rpc_fail;
         }
     }

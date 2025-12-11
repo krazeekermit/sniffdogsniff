@@ -176,7 +176,7 @@ uint64_t SdsBytesBuf::readUint64()
 
 void SdsBytesBuf::writeBool(bool b)
 {
-    this->writeUint8(b == true ? 1 : 0);
+    this->writeUint8(b ? 1 : 0);
 }
 
 bool SdsBytesBuf::readBool()
