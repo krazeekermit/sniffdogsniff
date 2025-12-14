@@ -84,10 +84,11 @@ public:
 */
 struct PingArgs
 {
+    uint64_t nonce;
     KadId id;
     std::string address;
 
-    PingArgs() = default;
+    PingArgs();
     PingArgs(const KadId &id_, std::string address_);
 
     void read(SdsBytesBuf &buf);
@@ -96,6 +97,10 @@ struct PingArgs
 
 struct PingReply
 {
+    uint64_t nonce;
+
+    void read(SdsBytesBuf &buf);
+    void write(SdsBytesBuf &buf);
 };
 
 /*

@@ -35,7 +35,17 @@ int SdsP2PClient::ping(const KadId &id, std::string address)
     PingArgs args(id, address);
     args.write(a);
 
-    return sendRpcRequest(FUNC_PING, a, r);
+    int ret = sendRpcRequest(FUNC_PING, a, r);
+    if (ret != ERR_NULL)
+        throw SdsP2PException(ret);
+
+    PingReply reply;
+    reply.read(r);
+
+    if (reply.nonce != args.nonce)
+        throw std::runtime_error("ping reply nonce do not match");
+
+    return ret;
 }
 
 int SdsP2PClient::findNode(FindNodeReply &reply, const KadId &id)

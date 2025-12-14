@@ -1,22 +1,46 @@
 #include "p2p_common.h"
 
+#include <climits>
+
 /*
     PingArgs
 */
-PingArgs::PingArgs(const KadId &id_, std::string address_)
-    : id(id_), address(address_)
+PingArgs::PingArgs()
+    : nonce(rand() % ULONG_MAX)
 {}
+
+PingArgs::PingArgs(const KadId &id_, std::string address_)
+    : PingArgs()
+{
+    id = id_;
+    address = address_;
+}
 
 void PingArgs::read(SdsBytesBuf &buf)
 {
+    nonce = buf.readUint64();
     address = buf.readString();
     buf.readBytes(id.id, KAD_ID_LENGTH);
 }
 
 void PingArgs::write(SdsBytesBuf &buf)
 {
+    buf.writeUint64(nonce);
     buf.writeString(address);
     buf.writeBytes(id.id, KAD_ID_LENGTH);
+}
+
+/*
+    PingReply
+*/
+void PingReply::read(SdsBytesBuf &buf)
+{
+    nonce = buf.readUint64();
+}
+
+void PingReply::write(SdsBytesBuf &buf)
+{
+    buf.writeUint64(nonce);
 }
 
 /*

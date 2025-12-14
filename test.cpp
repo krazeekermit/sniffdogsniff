@@ -279,8 +279,23 @@ TEST(test_p2p_args_ping, test_read_write)
 
     PingArgs p2;
     p2.read(bb);
+    ASSERT_EQ(p2.nonce, p1.nonce);
     ASSERT_EQ(p2.id, p1.id);
     ASSERT_EQ(p2.address, p1.address);
+}
+
+TEST(test_p2p_reply_ping, test_read_write)
+{
+    PingReply p1;
+
+    SdsBytesBuf bb;
+    p1.write(bb);
+
+    bb.rewind();
+
+    PingReply p2;
+    p2.read(bb);
+    ASSERT_EQ(p2.nonce, p1.nonce);
 }
 
 TEST(test_p2p_args_find_nodes, test_read_write)

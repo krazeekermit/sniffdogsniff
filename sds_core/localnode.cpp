@@ -67,10 +67,9 @@ private:
         int nDiscovered = 0;
         long startTime = time(nullptr);
 
-        int i;
         std::vector<std::future<FindNodeReply>> futures;
         std::vector<KadNode> discovered;
-        std::set<KadNode> probed = {};
+        std::set<KadNode> probed;
         std::set<KadId> failed;
 
         while (alphaClosest.size()) {
@@ -101,13 +100,12 @@ private:
                     for (auto it = reply.nearest.begin(); it != reply.nearest.end(); it++) {
                         KadNode kn(it->first, it->second);
                         if (std::find(probed.begin(), probed.end(), kn) == probed.end()) {
-                            nDiscovered++;
                             discovered.emplace_back(it->first, it->second);
                         }
                     }
                 } catch (std::exception &ex) {
                     failed.insert(ikn.getId());
-                    LOG_F(ERROR, ex.what());
+                    LOG_F(ERROR, "error node lookup: %s", ex.what());
                 }
             }
 
@@ -133,7 +131,8 @@ private:
             if (failed.find(it->getId()) != failed.end()) {
                 this->node->ktable->removeNode(it->getId());
             } else {
-                this->node->ktable->pushNode(*it);
+                /* If node is already in table 0 otherwise ndiscovered += 1 */
+                nDiscovered += this->node->ktable->pushNode(*it) ? 0 : 1;
             }
         }
 

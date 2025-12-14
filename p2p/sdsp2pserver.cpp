@@ -23,6 +23,10 @@ int SdsP2PServer::ping(SdsBytesBuf &args, SdsBytesBuf &reply)
 
     this->localNode->ping(pingArgs.id, pingArgs.address.c_str());
 
+    PingReply pingReply;
+    pingReply.nonce = pingArgs.nonce;
+    pingReply.write(reply);
+
     return ERR_NULL;
 }
 
