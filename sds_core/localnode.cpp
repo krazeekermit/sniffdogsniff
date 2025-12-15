@@ -303,30 +303,34 @@ int LocalNode::ping(const KadId &id, std::string address)
         Ping the new connected node before inserting it into k-table to avoid
         fake node spam
     */
-//    std::async(std::launch::async, [this, id, address] () {
-//        KadNode kn(id, address);
-//        LOG_S(INFO) << "?new neighbour node added: " << kn;
+    KadNode selfNode = this->ktable->getSelfNode();
 
-//        bool hasNode = this->ktable->hasNode(kn);
-//        KadNode selfNode = this->ktable->getSelfNode();
+    if (selfNode.getId() == id) {
+        /* This should never happen */
+        LOG_F(FATAL, "ping request to to self, this is fatal!");
+        return 1;
+    }
 
-//        if (hasNode) {
-//            LOG_S(1) << "ping: already have node " << kn;
-//            return;
-//        }
+    std::thread([this, id, address, selfNode] () {
+        KadNode kn(id, address);
+        bool hasNode = this->ktable->hasNode(kn);
 
-//        SdsP2PClient client(this->configFile, address);
-//        try {
-//            client.ping(selfNode.getId(), selfNode.getAddress());
-//            this->lock();
-//            this->ktable->pushNode(kn);
-//            this->unlock();
+        if (hasNode) {
+            return;
+        }
 
-//            LOG_S(INFO) << "new neighbour node added: " << kn;
-//        }  catch (std::exception &ex) {
-//            LOG_S(WARNING) << "new neighbour node conected but seems down, discarded " << kn;
-//        }
-//    });
+        SdsP2PClient client(this->configFile, address);
+        try {
+            client.ping(selfNode.getId(), selfNode.getAddress());
+            this->lock();
+            this->ktable->pushNode(kn);
+            this->unlock();
+
+            LOG_S(INFO) << "new neighbour node added: " << kn;
+        }  catch (std::exception &ex) {
+            LOG_S(WARNING) << "new neighbour node conected but seems down, discarded " << kn;
+        }
+    }).detach();
 
     return 0;
 }
@@ -455,7 +459,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     /*
         Republish results to the nodes that were supposed to have the results
     */
-    std::async(std::launch::async, [this, targetNodes, probedEmpty, results, selfNodeId, selfNodeAddress] () {
+    std::thread([this, targetNodes, probedEmpty, results, selfNodeId, selfNodeAddress] () {
         for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
             if (probedEmpty.find(it->getId()) != probedEmpty.end()) {
                 SdsP2PClient client(this->configFile, it->getAddress());
@@ -469,7 +473,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
                 }
             }
         }
-    });
+    }).detach();
 
     return results.size();
 }
