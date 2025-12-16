@@ -13,7 +13,7 @@ public:
     void shutdown();
 
 private:
-    void handleRequest(int client_fd);
+    int handleRequest(int client_fd);
     int ping(SdsBytesBuf &args, SdsBytesBuf &reply);
     int findNode(SdsBytesBuf &args, SdsBytesBuf &reply);
     int storeResult(SdsBytesBuf &args, SdsBytesBuf &reply);

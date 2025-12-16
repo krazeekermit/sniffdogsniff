@@ -65,7 +65,7 @@ int SdsP2PServer::findResults(SdsBytesBuf &args, SdsBytesBuf &reply)
     return ERR_NULL;
 }
 
-void SdsP2PServer::handleRequest(int client_fd)
+int SdsP2PServer::handleRequest(int client_fd)
 {
     uint64_t recv_sz;
     uint8_t buffer[1024];
@@ -83,7 +83,10 @@ void SdsP2PServer::handleRequest(int client_fd)
 
     recv_sz = sizeof(req);
     recvi = recv(client_fd, &req, recv_sz, 0);
-    if (recvi != recv_sz) {
+    if (!recvi) {
+        return -1;
+    } else
+        if (recvi != recv_sz) {
         //logerror or send error
         reply.errcode = ERR_RECV_REQUEST;
         goto rpc_fail;
@@ -145,6 +148,8 @@ rpc_fail:
     // do not close conn the client will close them if needed
 
     LOG_F(1, "p2p server error %d: %s", reply.errcode, p2p_strerror(reply.errcode));
+
+    return reply.errcode;
 }
 
 SdsP2PServer::SdsP2PServer(LocalNode *node)
@@ -218,14 +223,16 @@ int SdsP2PServer::startListening(const char *addrstr, int port)
                 client_fd = wait_fds[i].fd;
                 short int revents = wait_fds[i].revents;
                 if (client_fd > 0 && revents > 0) {
-                    if ((revents & POLLHUP) || (revents & POLLERR)) {
-                        close(wait_fds[i].fd);
-                        wait_fds[i].fd = 0;
-                        wait_fds[i].revents = 0;
-                        clients_count--;
-                    } else if (revents & POLLIN) {
-                        this->handleRequest(client_fd);
+                    LOG_F(2, "revents=%x", revents);
+                    if ((revents & POLLIN) && !(revents & POLLHUP) && !(revents & POLLERR)) {
+                        if (!this->handleRequest(client_fd))
+                            continue;
                     }
+
+                    close(wait_fds[i].fd);
+                    wait_fds[i].fd = 0;
+                    wait_fds[i].revents = 0;
+                    clients_count--;
                 }
             }
         }
