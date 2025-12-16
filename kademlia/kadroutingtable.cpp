@@ -58,7 +58,7 @@ bool KadRoutingTable::hasNode(const KadNode &kn)
 
 bool KadRoutingTable::pushNode(const KadNode &kn)
 {
-    if (this->selfNode == kn)
+    if (this->selfNode == kn || this->selfNode.getAddress() == kn.getAddress())
         return false;
 
     KadId distance = this->selfNode.getId() - kn.getId();

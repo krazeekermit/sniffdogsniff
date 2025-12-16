@@ -76,10 +76,6 @@ private:
             futures.clear();
             for (int i = 0; i < alphaClosest.size(); i++) {
                 KadNode ikn = alphaClosest[i];
-                if (ikn.getId() == selfNodeId) {
-                    continue;
-                }
-
                 futures.push_back(std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, targetId]() {
                     SdsP2PClient client(this->node->configFile, ikn.getAddress());
                     FindNodeReply reply;
@@ -99,9 +95,15 @@ private:
                     FindNodeReply reply = futures[i].get();
                     for (auto it = reply.nearest.begin(); it != reply.nearest.end(); it++) {
                         KadNode kn(it->first, it->second);
-                        if (std::find(probed.begin(), probed.end(), kn) == probed.end()) {
-                            discovered.emplace_back(it->first, it->second);
+                        if (probed.find(kn) != probed.end()) {
+                            continue;
                         }
+
+                        if (selfNodeId == it->first || selfNodeAddress == it->second) {
+                            continue;
+                        }
+
+                        discovered.push_back(kn);
                     }
                 } catch (std::exception &ex) {
                     failed.insert(ikn.getId());
@@ -114,10 +116,8 @@ private:
             });
 
             alphaClosest.clear();
-            for (auto it = discovered.begin(); it != discovered.end(); it++) {
-                if (alphaClosest.size() < 3) {
-                    alphaClosest.push_back(*it);
-                }
+            for (auto it = discovered.begin(); it != discovered.end() && alphaClosest.size() < ALPHA; it++) {
+                alphaClosest.push_back(*it);
             }
 
             if (time(nullptr) - startTime > 60) {
@@ -290,7 +290,7 @@ LocalNode::~LocalNode()
 void LocalNode::setSelfNodeAddress(std::string address)
 {
     this->ktable->setSelfNodeAddress(address);
-    LOG_S(1) << "self node " << this->ktable->getSelfNode();
+    LOG_S(INFO) << "local node: " << this->ktable->getSelfNode();
 }
 
 int LocalNode::ping(const KadId &id, std::string address)
