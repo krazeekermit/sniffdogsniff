@@ -12,7 +12,7 @@ public:
     ~KadRoutingTable();
 
     KadNode getSelfNode() const;
-    void setSelfNode(KadNode &newSelfNode);
+    void setSelfNodeAddress(const std::string &address);
 
     bool isFull();
     bool isEmpty();

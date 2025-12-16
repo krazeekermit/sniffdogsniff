@@ -8,6 +8,41 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+
+size_t bytes_to_hex_string(char *out, const unsigned char *in, size_t in_sz)
+{
+    size_t i;
+    size_t h_sz = 0;
+    for (i = 0; i < in_sz; i++) {
+        unsigned char hi = (in[i] >> 4) & 0x0f;
+        unsigned char lo = (in[i] & 0x0f);
+        out[h_sz++] = (hi > 9 ? ('A' + (hi - 10)) : ('0' + hi));
+        out[h_sz++] = (lo > 9 ? ('A' + (lo - 10)) : ('0' + lo));
+    }
+    return out[h_sz] = '\0';
+}
+
+size_t hex_string_to_bytes(unsigned char *out, const char *in)
+{
+    size_t i = 0;
+    size_t h_sz = 0;
+    while (i < strlen(in)) {
+        char hi = in[i++];
+        char lo = in[i++];
+        if (hi >= '0' && hi <= '9')
+            hi = hi - '0';
+        else if (hi >= 'A' && hi <= 'F')
+            hi = hi - 'A' + 10;
+
+        if (lo >= '0' && lo <= '9')
+            lo = lo - '0';
+        else if (lo >= 'A' && lo <= 'F')
+            lo = lo - 'A' + 10;
+        out[h_sz++] = ((hi << 4) & 0xf0) | (lo & 0x0f);
+    }
+    return h_sz;
+}
+
 int net_socket_connect(const char *addr, int port, long timeout)
 {
     int fd, opt;

@@ -94,9 +94,12 @@ bool KadId::operator<(const KadId &id2) const
 
 std::ostream &operator<<(std::ostream &os, const KadId &id2)
 {
-    STREAM_HEX_REVERSE(os, id2.id, KAD_ID_LENGTH);
+    char hexString[33];
+    bytes_to_hex_string(hexString, id2.id, KAD_ID_LENGTH);
+    os << hexString;
+
     return os;
-};
+}
 
 KadId KadId::randomId()
 {
@@ -107,6 +110,15 @@ KadId KadId::randomId()
         fclose(rfp);
     } else {
         memset(newId.id, 0, KAD_ID_LENGTH);
+    }
+    return newId;
+}
+
+KadId KadId::fromHexString(const char *hexString)
+{
+    KadId newId;
+    if (hex_string_to_bytes(newId.id, hexString) != 16) {
+        throw std::runtime_error("KadId::fromHexString unable to read hex node id string length is not of 32");
     }
     return newId;
 }
@@ -133,52 +145,12 @@ KadId KadId::idNbitsFarFrom(const KadId &id1, int bdist)
 /*
     KadNode
 */
-
-KadNode::KadNode(const char *address_)
-    : KadNode(std::string(address_))
-{}
-
-KadNode::KadNode(std::string address_)
-    : address(address_), lastSeen(0), stales(0)
-{
-    if (address.size()) {
-        char addrBuf[1024];
-        address.copy(addrBuf, address.size(), 0);
-        char addr[1024];
-        /*
-            Avoid creation of infinite nodes with the same address but different ports
-        */
-        net_urlparse(addr, nullptr, nullptr, addrBuf);
-
-        /*
-            XOR the two halves of SHA256 hash to obtain an unique 128bit lenght hash,
-            this is useful because needs to match with the bit lenght of the FNV1a-128 hash
-            that is used to generate the simHash
-        */
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256((const unsigned char*) addr, strlen(addr), hash);
-
-        this->id.id[0]  = hash[0]  ^ hash[16];
-        this->id.id[1]  = hash[1]  ^ hash[17];
-        this->id.id[2]  = hash[2]  ^ hash[18];
-        this->id.id[3]  = hash[3]  ^ hash[19];
-        this->id.id[4]  = hash[4]  ^ hash[20];
-        this->id.id[5]  = hash[5]  ^ hash[21];
-        this->id.id[6]  = hash[6]  ^ hash[22];
-        this->id.id[7]  = hash[7]  ^ hash[23];
-        this->id.id[8]  = hash[8]  ^ hash[24];
-        this->id.id[9]  = hash[9]  ^ hash[25];
-        this->id.id[10] = hash[10] ^ hash[26];
-        this->id.id[11] = hash[11] ^ hash[27];
-        this->id.id[12] = hash[12] ^ hash[28];
-        this->id.id[13] = hash[13] ^ hash[29];
-        this->id.id[14] = hash[14] ^ hash[30];
-        this->id.id[15] = hash[15] ^ hash[31];
-    }
-}
-
 KadNode::KadNode(KadId id_, std::string address_)
     : id(id_), address(address_), lastSeen(0), stales(0)
+{}
+
+KadNode::KadNode()
+    : lastSeen(0), stales(0)
 {}
 
 void KadNode::seenNow()
@@ -212,9 +184,14 @@ bool KadNode::operator<(const KadNode &kn) const
     return this->lastSeen > kn.lastSeen;
 }
 
-const std::string &KadNode::getAddress() const
+const std::string KadNode::getAddress() const
 {
     return address;
+}
+
+void KadNode::setAddress(const std::string &newAddress)
+{
+    this->address = newAddress;
 }
 
 time_t KadNode::getLastSeen() const

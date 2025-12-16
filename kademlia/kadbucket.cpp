@@ -108,28 +108,6 @@ size_t KadBucket::getReplacementCount()
     return this->replacementNodes.size();
 }
 
-KadNode KadBucket::getNode(const KadId id) const
-{
-    for (auto it = this->nodes.begin(); it != this->nodes.end(); it++) {
-        if (it->getId() == id) {
-            return *it;
-        }
-    }
-
-    return nullptr;
-}
-
-KadNode KadBucket::getReplacement(const KadId id) const
-{
-    for (auto it = this->replacementNodes.begin(); it != this->replacementNodes.end(); it++) {
-        if (it->getId() == id) {
-            return *it;
-        }
-    }
-
-    return nullptr;
-}
-
 void KadBucket::reorder()
 {
     std::sort(this->nodes.begin(), this->nodes.end());

@@ -29,9 +29,6 @@ public:
     size_t getNodesCount();
     size_t getReplacementCount();
 
-    KadNode getNode(const KadId id) const;
-    KadNode getReplacement(const KadId id) const;
-
 private:
     int height;
     std::vector<KadNode> nodes;

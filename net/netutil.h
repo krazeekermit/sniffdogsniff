@@ -10,6 +10,10 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 
+size_t bytes_to_hex_string(char *out, const unsigned char *in, size_t in_sz);
+
+size_t hex_string_to_bytes(unsigned char *out, const char *in);
+
 inline int net_urlparse(char *addr, char *suffix, int *port, const char *url)
 {
     const char *urlpp = strrchr(url, ':');

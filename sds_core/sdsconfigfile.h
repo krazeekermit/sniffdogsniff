@@ -19,6 +19,7 @@ public:
         int lookupInt(const char *key, int defaultValue = 0);
 
         std::string getName() const;
+        const std::vector<std::pair<std::string, std::string>> *values();
 
         friend std::ostream &operator<<(std::ostream &os, const Section *section);
 
@@ -28,7 +29,7 @@ public:
         bool lookupValue(const char *key, std::string &value);
 
         std::string name;
-        std::vector<std::pair<std::string, std::string>> values;
+        std::vector<std::pair<std::string, std::string>> valuesList;
     };
 
     SdsConfigFile();

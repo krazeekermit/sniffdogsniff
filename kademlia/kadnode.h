@@ -26,6 +26,7 @@ struct KadId
     friend std::ostream &operator<<(std::ostream &os, const KadId &id2);
 
     static KadId randomId();
+    static KadId fromHexString(const char *hexString);
     static KadId idNbitsFarFrom(const KadId &id1, int bdist);
 
     // Member
@@ -37,8 +38,6 @@ class KadNode
     friend class KadRoutingTable;
 
 public:
-    KadNode(const char *address);
-    KadNode(std::string address);
     KadNode(KadId id_, std::string address_);
 
     void seenNow();
@@ -51,11 +50,16 @@ public:
     friend std::ostream &operator<<(std::ostream &os, const KadNode &kn2);
 
     KadId getId() const;
-    const std::string &getAddress() const;
+
+    const std::string getAddress() const;
+    void setAddress(const std::string &newAddress);
+
     time_t getLastSeen() const;
     int getStales() const;
 
 private:
+    KadNode();
+
     KadId id;
     std::string address;
     time_t lastSeen;

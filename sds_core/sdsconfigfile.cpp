@@ -58,6 +58,11 @@ std::string SdsConfigFile::Section::getName() const
     return this->name;
 }
 
+const std::vector<std::pair<std::string, std::string> > *SdsConfigFile::Section::values()
+{
+    return &this->valuesList;
+}
+
 bool SdsConfigFile::Section::hasValue(const char *key)
 {
     std::string val = "";
@@ -76,7 +81,7 @@ std::string SdsConfigFile::Section::lookupString(const char *key, const char *de
 
 void SdsConfigFile::Section::lookupStrings(const char *key, std::vector<std::string> &list)
 {
-    for (auto it = this->values.begin(); it != this->values.end(); ++it) {
+    for (auto it = this->valuesList.begin(); it != this->valuesList.end(); ++it) {
         if (it->first == key) {
             list.push_back(it->second);
         }
@@ -106,7 +111,7 @@ int SdsConfigFile::Section::lookupInt(const char *key, int defaultValue)
 std::ostream &operator<<(std::ostream &os, const SdsConfigFile::Section *section)
 {
     os << "[\n";
-    for (auto it = section->values.begin(); it != section->values.end(); ++it) {
+    for (auto it = section->valuesList.begin(); it != section->valuesList.end(); ++it) {
         os << it->first << "=" << it->second << ",\n";
     }
     os << "]";
@@ -119,7 +124,7 @@ SdsConfigFile::Section::Section(const char *_name)
 
 bool SdsConfigFile::Section::lookupValue(const char *key, std::string &value)
 {
-    for (auto it = this->values.begin(); it != this->values.end(); ++it) {
+    for (auto it = this->valuesList.begin(); it != this->valuesList.end(); ++it) {
         if (it->first == key) {
             value = it->second;
             return true;
@@ -232,7 +237,7 @@ void SdsConfigFile::parse(const char *path)
                 throw std::runtime_error("parse error: empty value for key \"" + std::string(k) + "\" at line " + std::to_string(lineno));
             }
 
-            section->values.push_back(std::make_pair(k, v));
+            section->valuesList.push_back(std::make_pair(k, v));
         }
     }
 }

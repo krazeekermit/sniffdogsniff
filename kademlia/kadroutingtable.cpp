@@ -7,7 +7,7 @@
 #include <algorithm>
 
 KadRoutingTable::KadRoutingTable()
-    : selfNode("")
+    : selfNode(KadId::randomId(), "")
 {
     this->buckets = new KadBucket*[KAD_ID_BIT_LENGTH];
 
@@ -30,9 +30,9 @@ KadNode KadRoutingTable::getSelfNode() const
     return selfNode;
 }
 
-void KadRoutingTable::setSelfNode(KadNode &newSelfNode)
+void KadRoutingTable::setSelfNodeAddress(const std::string &address)
 {
-    this->selfNode = newSelfNode;
+    this->selfNode.setAddress(address);
 }
 
 bool KadRoutingTable::isFull()
@@ -134,11 +134,16 @@ int KadRoutingTable::readFile(const char *path)
 {
     FILE *fp = fopen(path, "rb");
     if (!fp) {
-        LOG_F(WARNING, "kadroutingtable: unable to open cache file %s", path);
+        LOG_F(WARNING, "kadroutingtable: unable to open table file %s", path);
         return -1;
     }
+
     int ret, i, j, nodesCount;
     ret = 0;
+    if (fread(this->selfNode.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+        ret = -1;
+        goto end_read;
+    }
     for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i] = new KadBucket(i);
         nodesCount = 0;
@@ -147,7 +152,7 @@ int KadRoutingTable::readFile(const char *path)
             goto end_read;
         }
         for (j = 0; j < nodesCount; j++) {
-            KadNode kn("");
+            KadNode kn;
 
             if (fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
                 ret = -1;
@@ -186,7 +191,7 @@ int KadRoutingTable::readFile(const char *path)
             goto end_read;
         }
         for (j = 0; j < nodesCount; j++) {
-            KadNode kn("");
+            KadNode kn;
             if (fread(kn.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
                 ret = -1;
                 goto end_read;
@@ -233,8 +238,13 @@ int KadRoutingTable::writeFile(const char *path)
         LOG_F(WARNING, "kadroutingtable: unable to open cache file %s", path);
         return -1;
     }
+
     int ret, i, j, nodesCount;
     ret = 0;
+    if (fwrite(this->selfNode.id.id, sizeof(unsigned char), KAD_ID_LENGTH, fp) != KAD_ID_LENGTH) {
+        ret = -1;
+        goto end_write;
+    }
     for (i = 0; i < KAD_ID_BIT_LENGTH; i++) {
         KadBucket *buck = this->buckets[i];
         nodesCount = buck->nodes.size();

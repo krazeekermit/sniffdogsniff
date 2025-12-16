@@ -3,6 +3,8 @@
 #include "common/sdsbytesbuf.h"
 #include "common/stringutil.h"
 
+#include "net/netutil.h"
+
 /*
  * SearchEntry::Hash
  */
@@ -147,12 +149,12 @@ std::string SearchEntry::getUrl() const
 
 std::ostream &operator<<(std::ostream &os, const SearchEntry &se)
 {
+    char hexString[65];
+    bytes_to_hex_string(hexString, se.hash.hash, SHA256_DIGEST_LENGTH);
+
     os << "SearchEntry["
-       << "hash=";
-
-    STREAM_HEX(os, se.hash.hash, SHA256_DIGEST_LENGTH);
-
-    os << ", simHash=" << se.simHash
+       << "hash=" << hexString
+       << ", simHash=" << se.simHash
        << ", title=" << se.title
        << ", url=" << se.url;
 

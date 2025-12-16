@@ -34,9 +34,13 @@ p2p_bind_port = 4225
 web_ui_bind_port = 8081
 web_ui_bind_addr = 127.0.0.1
 
+# The list of bootstrap peers
+# <node id (16 byte hex uppercase)>=<node address>
 [peers]
-address = tereiuhuygftfrdggggy665fff.onion:4221
-address = tftf5re5r5erdffg78uj88j8j8j.b32.i2p:4221
+5E10D61586C19A403D5778A0821B3572 = exampleeepsite1.b32.i2p
+C4550B49A693DFB3599A0D6ED7C05D4A = exampleonionhiddenservice1.onion:4221
+9396E5B2281BF41C595540E0E721D8E5 = example.domain.net:4221
+D1BB4F3C69964446E003F67510AA557F = 10.0.0.25:4221
 
 [blacklist_peers]
 address = exampleeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.onion

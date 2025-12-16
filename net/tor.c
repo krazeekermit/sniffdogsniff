@@ -6,6 +6,8 @@
 
 #include "tor.h"
 
+#include "netutil.h"
+
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -25,40 +27,6 @@ static inline void fill_rand_nonce(unsigned char *vec, size_t sz)
 
     fread(vec, sizeof(uint8_t), sz, rfp);
     fclose(rfp);
-}
-
-static inline size_t btostrhex(char *out, const unsigned char *in, size_t in_sz)
-{
-    size_t i;
-    size_t h_sz = 0;
-    for (i = 0; i < in_sz; i++) {
-        unsigned char hi = (in[i] >> 4) & 0x0f;
-        unsigned char lo = (in[i] & 0x0f);
-        out[h_sz++] = (hi > 9 ? ('A' + (hi - 10)) : ('0' + hi));
-        out[h_sz++] = (lo > 9 ? ('A' + (lo - 10)) : ('0' + lo));
-    }
-    return out[h_sz] = '\0';
-}
-
-static inline size_t strhextob(unsigned char *out, const char *in)
-{
-    size_t i = 0;
-    size_t h_sz = 0;
-    while (i < strlen(in)) {
-        char hi = in[i++];
-        char lo = in[i++];
-        if (hi >= '0' && hi <= '9')
-            hi = hi - '0';
-        else if (hi >= 'A' && hi <= 'F')
-            hi = hi - 'A' + 10;
-
-        if (lo >= '0' && lo <= '9')
-            lo = lo - '0';
-        else if (lo >= 'A' && lo <= 'F')
-            lo = lo - 'A' + 10;
-        out[h_sz++] = ((hi << 4) & 0xf0) | (lo & 0x0f);
-    }
-    return h_sz;
 }
 
 static int read_reply(int fd, char *reply_buf, size_t buf_size)
@@ -153,7 +121,7 @@ static int read_reply_AUTHCHALLENGE(int fd, unsigned char *hash, unsigned char *
     if (!toka || strcmp(toka, "SERVERHASH")) {
         return -1;
     }
-    strhextob(hash, tokv);
+    hex_string_to_bytes(hash, tokv);
 
     toka = strtok_r(NULL, " ", &tokap);
     if (!toka) {
@@ -164,7 +132,7 @@ static int read_reply_AUTHCHALLENGE(int fd, unsigned char *hash, unsigned char *
     if (!toka || strcmp(toka, "SERVERNONCE")) {
         return -1;
     }
-    strhextob(nonce, tokv);
+    hex_string_to_bytes(nonce, tokv);
 
     return 0;// serverhash, servernonce
 }
@@ -334,7 +302,7 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         fill_rand_nonce(client_nonce, 32);
 
         char  hex_data[65];
-        btostrhex(hex_data, client_nonce, 32);
+        bytes_to_hex_string(hex_data, client_nonce, 32);
         sprintf(buf, "AUTHCHALLENGE SAFECOOKIE %s\n", hex_data);
         send_sz = strlen(buf);
         if (send(fd, buf, send_sz, 0) != send_sz) {
@@ -370,7 +338,7 @@ int tor_add_onion(TorControlSession *ctx, char *onionaddr, const char *baddr, in
         HMAC_Final(hmac_ctx, server_hash_chk, &len);
         HMAC_CTX_free(hmac_ctx);
 
-        btostrhex(password, server_hash_chk, 32);
+        bytes_to_hex_string(password, server_hash_chk, 32);
     } else {
         strcpy(password, ctx->password);
     }

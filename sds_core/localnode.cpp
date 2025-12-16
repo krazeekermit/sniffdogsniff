@@ -260,10 +260,8 @@ LocalNode::LocalNode(SdsConfigFile *configFile_)
         LOG_F(WARNING, "ktable is empty populating with known nodes from configuration file");
         SdsConfigFile::Section *peers = this->configFile->lookupSection("peers");
         if (peers) {
-            std::vector<std::string> knownPeers;
-            peers->lookupStrings("address", knownPeers);
-            for (auto it = knownPeers.begin(); it != knownPeers.end(); it++) {
-                KadNode kn(*it);
+            for (auto it = peers->values()->begin(); it != peers->values()->end(); it++) {
+                KadNode kn(KadId::fromHexString(it->first.c_str()), it->second);
                 this->ktable->pushNode(kn);
             }
         }
@@ -291,10 +289,8 @@ LocalNode::~LocalNode()
 
 void LocalNode::setSelfNodeAddress(std::string address)
 {
-    KadNode self(address.c_str());
-    this->ktable->setSelfNode(self);
-
-    LOG_S(1) << "self node " << self;
+    this->ktable->setSelfNodeAddress(address);
+    LOG_S(1) << "self node " << this->ktable->getSelfNode();
 }
 
 int LocalNode::ping(const KadId &id, std::string address)
@@ -328,7 +324,7 @@ int LocalNode::ping(const KadId &id, std::string address)
 
             LOG_S(INFO) << "new neighbour node added: " << kn;
         }  catch (std::exception &ex) {
-            LOG_S(WARNING) << "new neighbour node conected but seems down, discarded " << kn;
+            LOG_S(WARNING) << "new neighbour node conected: " << kn << ", but seems down, discarded";
         }
     }).detach();
 
