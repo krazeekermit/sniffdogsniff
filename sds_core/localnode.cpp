@@ -11,6 +11,8 @@
 #include <future>
 #include <thread>
 
+#define ALPHA 3 // max concurrency value
+
 /*
     NodesLookupTask
 */
@@ -57,7 +59,6 @@ private:
 
         const KadId selfNodeId = this->node->ktable->getSelfNode().getId();
         const std::string selfNodeAddress = this->node->ktable->getSelfNode().getAddress();
-        static int ALPHA = 3;
 
         std::vector<KadNode> alphaClosest;
         this->node->ktable->getClosestTo(alphaClosest, targetId, ALPHA);
@@ -177,62 +178,68 @@ private:
 
     void publishResults(const std::vector<SearchEntry> &results)
     {
-        const KadId selfNodeId = this->node->ktable->getSelfNode().getId();
-        const std::string selfNodeAddress = this->node->ktable->getSelfNode().getAddress();
+        const KadNode selfNode = this->node->ktable->getSelfNode();
 
         std::set<KadId> failed;
-        std::set<KadNode> targetNodes;
+        std::map<KadNode, std::vector<SearchEntry>> publishMap;
         std::map<KadId, std::future<void>> futures;
 
-        int i;
-        for (auto rit = results.begin(); rit != results.end(); rit++) {
+        this->node->lock();
+        std::vector<KadNode> closest;
+        for (int i = 0; i < results.size(); i++) {
+            closest.clear();
 
-            this->node->lock();
-            targetNodes.clear();
-            std::vector<KadNode> nodes;
-            this->node->ktable->getKClosestTo(nodes, rit->getSimHash().getId());
-            for (auto nit = nodes.begin(); nit != nodes.end(); nit++) {
-                KadId id = nit->getId();
-                if (id == selfNodeId) {
-                    SearchEntry se = *rit;
-                    this->node->searchesDB->insertResult(se);
-                } else {
-                    targetNodes.insert(*nit);
-                }
+            SearchEntry se = results[i];
+            this->node->ktable->getKClosestTo(closest, se.getSimHash().getId());
+            for (int j = 0; j < closest.size(); j++) {
+                publishMap[closest[j]].push_back(se);
             }
-            this->node->unlock();
+        }
 
+        if (publishMap.find(selfNode) != publishMap.end()) {
+            std::vector<SearchEntry> rr = publishMap[selfNode];
+            for (auto rit = rr.begin(); rit != rr.end(); rit++) {
+                this->node->searchesDB->insertResult(*rit);
+            }
+
+            // remove local node because it is already been processed
+            publishMap.erase(selfNode);
+        }
+
+        this->node->unlock();
+
+        for (auto nit = publishMap.begin(); nit != publishMap.end();) {
             futures.clear();
-            for (auto itn = targetNodes.begin(); itn != targetNodes.end(); itn++) {
-                if (failed.find(itn->getId()) != failed.end()) {
+            for (; nit != publishMap.end() && futures.size() < ALPHA; nit++) {
+                futures[nit->first.getId()] = std::move(std::async(std::launch::async, [this, selfNode, nit]() {
+                    SdsP2PClient client(this->node->configFile, nit->first.getAddress());
+                    client.ping(selfNode.getId(), selfNode.getAddress());
 
-                    futures[itn->getId()] = std::move(std::async(std::launch::async, [this, itn, selfNodeId, selfNodeAddress, rit]() {
-                        SdsP2PClient client(this->node->configFile, itn->getAddress());
-                        client.storeResult(*rit);
-                    }));
-
-                    if (futures.size() >= 3) {
-                        for (auto fit = futures.begin(); fit != futures.end(); fit++) {
-                            try {
-                                fit->second.get();
-                            } catch (std::exception &ex) {
-                                failed.insert(fit->first);
-
-                                LOG_F(ERROR, ex.what());
-                            }
-                        }
-                        futures.clear();
+                    for (int i = 0; i < nit->second.size(); i++) {
+                        client.storeResult(nit->second[i]);
                     }
+
+                    client.closeConnection();
+                }));
+            }
+
+            for (auto fit = futures.begin(); fit != futures.end(); fit++) {
+                try {
+                    fit->second.get();
+                } catch (std::exception &ex) {
+                    failed.insert(fit->first);
+
+                    LOG_F(ERROR, ex.what());
                 }
             }
         }
 
         this->node->lock();
-        for (auto it = targetNodes.begin(); it != targetNodes.end(); it++) {
-            if (failed.find(it->getId()) != failed.end()) {
-                this->node->ktable->removeNode(it->getId());
+        for (auto nit = publishMap.begin(); nit != publishMap.end(); nit++) {
+            if (failed.find(nit->first.getId()) != failed.end()) {
+                this->node->ktable->removeNode(nit->first.getId());
             } else {
-                this->node->ktable->pushNode(*it);
+                this->node->ktable->pushNode(nit->first);
             }
         }
         this->node->unlock();
@@ -411,7 +418,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
             return reply;
         }));
 
-        if (futures.size() >= 3) {
+        if (futures.size() >= ALPHA) {
             for (auto fit = futures.begin(); fit != futures.end(); fit++) {
                 try {
                     FindResultsReply reply = fit->second.get();
