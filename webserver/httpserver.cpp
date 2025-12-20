@@ -1,6 +1,7 @@
 #include "httpserver.h"
 
 #include "common/loguru.hpp"
+#include "common/stringutil.h"
 
 #include <pthread.h>
 #include <sys/socket.h>
@@ -11,13 +12,13 @@
 
 #define THREAD_POOL_SZ 1
 
-static std::string httpUnescape(const char *ss)
+static std::string httpUnescape(const std::string ss)
 {
     std::string unescaped = "";
 
     char c, hi, lo;
     int i = 0;
-    while (i < strlen(ss)) {
+    while (i < ss.length()) {
         c = ss[i++];
         switch (c) {
         case '+':
@@ -47,114 +48,109 @@ static std::string httpUnescape(const char *ss)
     return unescaped;
 }
 
-static int parseHttpAttrs(HttpRequest &req, char *valssp)
+static int parseHttpAttrs(HttpRequest &req, std::string &attrsString)
 {
-    if (!strlen(valssp))
-        return 0;
-
-    req.values.clear();
-    char *linestart = nullptr;
-    char *lineend = nullptr;
-    char *keyp = nullptr;
-    char *valuep = nullptr;
-    linestart = strtok_r(valssp, "&", &lineend);
-    do {
-        keyp = strtok_r(linestart, "=", &valuep);
-        if (strlen(keyp)) {
-            if (!strlen(valuep))
-                return -1; //BAD REQUEST
-
-            req.values.emplace(keyp, valuep);
+    req.headers.clear();
+    std::vector<std::string> toks = split(attrsString, "&");
+    for (auto it = toks.begin(); it != toks.end(); it++) {
+        ssize_t delimPos = it->find("=");
+        if (delimPos == std::string::npos) {
+            return -1;
         }
-    } while ((linestart = strtok_r(nullptr, "&", &lineend)) != nullptr);
+
+        req.values[it->substr(0, delimPos)] = httpUnescape(it->substr(delimPos +1));
+    }
+
     return 0;
 }
 
-static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
+static int parseHttpHeaders(HttpRequest &req, std::string &headersString)
 {
-    LOG_F(1, "new http request: %s", line);
+    req.values.clear();
+    std::vector<std::string> toks = split(headersString, "\r\n");
+    for (auto it = toks.begin(); it != toks.end(); it++) {
+        ssize_t delimPos = it->find(":");
+        if (delimPos == std::string::npos) {
+            return -1;
+        }
 
-    char *linestart = nullptr;
-    char *lineend = nullptr;
-    char *lineend2 = nullptr;
-    linestart = strtok_r(line, " ", &lineend);
-    if (strcmp(linestart, "GET") == 0 || strcmp(linestart, "HEAD") == 0) {
-        req.method = strcmp(linestart, "GET") ? HttpMethod::HTTP_GET : HttpMethod::HTTP_HEAD;
-        linestart = strtok_r(nullptr, " ", &lineend);
-        linestart = strtok_r(linestart, "?", &lineend2);
-        req.url = linestart;
-        if (parseHttpAttrs(req, lineend2))
-            LOG_F(ERROR, "bad http request");
-            return HttpCode::HTTP_BAD_REQUEST;
-
-    } else if (strcmp(linestart, "POST") == 0) {
-        req.method = HttpMethod::HTTP_POST;
-
-        req.url = strtok_r(nullptr, " ", &lineend);
-    } else {
-        return HttpCode::HTTP_NOT_IMPLEMENTED;
+        req.headers[it->substr(0, delimPos)] = it->substr(delimPos +1);
     }
 
-    req.version = strtok_r(nullptr, " ", &lineend);
+    return 0;
+}
+
+static HttpCode parseHttpFirstLine(HttpRequest &req, std::string &line)
+{
+    LOG_F(1, "new http request: %s", line.c_str());
+    std::vector<std::string> toks = split(line, " ");
+    if (toks.size() > 2) {
+        req.url = toks[1];
+        if (toks[0] == "GET" || toks[0] == "HEAD") {
+            req.method = toks[0] == "GET" ? HttpMethod::HTTP_GET : HttpMethod::HTTP_HEAD;
+            ssize_t attrsPos = toks[1].find("?");
+            if (attrsPos != std::string::npos) {
+                req.url = toks[1].substr(0, attrsPos);
+                std::string attrsString = toks[1].substr(attrsPos + 1);
+                if (parseHttpAttrs(req, attrsString)) {
+                    LOG_F(ERROR, "bad http request url %s", attrsString.c_str());
+                    return HttpCode::HTTP_BAD_REQUEST;
+                }
+            }
+        } else if (toks[0] == "POST") {
+            req.method = HttpMethod::HTTP_POST;
+        } else {
+            return HttpCode::HTTP_NOT_IMPLEMENTED;
+        }
+
+        req.version = toks[2];
+
+        return HttpCode::HTTP_OK;
+    }
+    return HttpCode::HTTP_BAD_REQUEST;
+}
+
+static HttpCode parseHttpReqest(HttpRequest &req, std::string &sbuffer)
+{
+    ssize_t lineStart = 0;
+    ssize_t lineEnd = sbuffer.find("\r\n");
+    if (lineEnd == std::string::npos) {
+        return HttpCode::HTTP_BAD_REQUEST;
+    }
+
+    std::string line = sbuffer.substr(lineStart, lineEnd);
+    lineStart = lineEnd + 2;
+    if (parseHttpFirstLine(req, line) != HttpCode::HTTP_OK) {
+        return HttpCode::HTTP_BAD_REQUEST;
+    }
+
+    lineEnd = sbuffer.find("\r\n\r\n", lineStart);
+    if (lineEnd != std::string::npos) {
+        std::string headersStr = sbuffer.substr(lineStart, lineEnd - lineStart);
+        if (parseHttpHeaders(req, headersStr)) {
+            return HttpCode::HTTP_BAD_REQUEST;
+        }
+
+        req.data = sbuffer.substr(lineEnd + 4);
+        if (req.method == HttpMethod::HTTP_POST) {
+            if (parseHttpAttrs(req, req.data)) {
+                return HttpCode::HTTP_BAD_REQUEST;
+            }
+        }
+    }
 
     return HttpCode::HTTP_OK;
 }
 
-static HttpCode parseHttpReqest(HttpRequest &req, SdsBytesBuf &sbuffer)
+static int createResponse(HttpResponse &resp, std::string &sbuffer)
 {
-    HttpCode ret = HttpCode::HTTP_OK;
-
-    size_t i;
-    size_t parsep_len = 0;
-    for (i = 0; i < sbuffer.size(); i++) {
-        if (sbuffer.bufPtr()[i] != '\r')
-            sbuffer.bufPtr()[parsep_len++] = sbuffer.bufPtr()[i];
-    }
-//    parsep[parsep_len] = '\0';
-
-    char *linestart = nullptr;
-    char *lineend = nullptr;
-    char *keyp = nullptr;
-    char *valuep = nullptr;
-    linestart = strtok_r((char*) sbuffer.bufPtr(), "\n", &lineend);
-    ret = parseHttpFirstLine(req, linestart);
-    if (ret != HttpCode::HTTP_OK) {
-        goto parse_end;
-    }
-
-    req.headers.clear();
-    while ((linestart = strtok_r(nullptr, "\n", &lineend)) != nullptr) {
-        valuep = strchr(linestart, ':');
-        if (!valuep)
-            break;
-
-        *valuep = '\0';
-        req.headers.emplace(linestart, valuep+1);
-    }
-
-    if (req.method == HttpMethod::HTTP_POST) {
-        if (parseHttpAttrs(req, linestart)) {
-
-            ret = HttpCode::HTTP_BAD_REQUEST;
-            goto parse_end;
-        }
-    }
-
-parse_end:
-    return ret;
-}
-
-static int createResponse(HttpResponse &resp, SdsBytesBuf &sbuffer)
-{
-    std::string body = "";
-    body.clear();
-    body += "HTTP/1.1 " + std::to_string(resp.code) + "\r\n";
+    sbuffer.clear();
+    sbuffer += "HTTP/1.1 " + std::to_string(resp.code) + "\r\n";
     for (auto it = resp.headers.begin(); it != resp.headers.end(); it++)
-        body += it->first + ":" + it->second + "\r\n";
+        sbuffer += it->first + ":" + it->second + "\r\n";
 
-    body += "\r\n";
-    sbuffer.writeBytes(body.c_str(), body.size());
-    sbuffer.writeBytes(resp.buffer.bufPtr(), resp.buffer.size());
+    sbuffer += "\r\n";
+    sbuffer += resp.buffer;
     return 0;
 }
 
@@ -180,7 +176,7 @@ HttpServer::~HttpServer()
 void *accessHandlerCallback(void *cls) {
     HttpServer *srv = static_cast<HttpServer*>(cls);
     int client_fd;
-    int previous_error = 0;
+    HttpCode httpErr = HttpCode::HTTP_OK;
     if (srv) {
         while (srv->running) {
             pthread_mutex_lock(&srv->mutex);
@@ -199,26 +195,29 @@ void *accessHandlerCallback(void *cls) {
             char buf[512];
             size_t nrecv = 0;
             size_t trecv = 0;
-            SdsBytesBuf ss;
+            std::string ss;
             while ((nrecv = recv(client_fd, buf, sizeof(buf), 0))) {
                 trecv += nrecv;
-                ss.writeBytes(buf, nrecv);
+                ss.append(buf, nrecv);
                 if (nrecv < sizeof(buf))
                     break;
             }
 
             HttpRequest request;
             HttpResponse response;
-            if (parseHttpReqest(request, ss)) {
-
+            httpErr = parseHttpReqest(request, ss);
+            if (httpErr == HttpCode::HTTP_OK) {
+                httpErr = srv->handleRequest(request, response);
             }
 
-            previous_error = srv->handleRequest(request, response);
+            if (httpErr != HttpCode::HTTP_OK) {
+                srv->handleError(request, response, httpErr);
+            }
 
-            SdsBytesBuf respBody;
+            std::string respBody;
             createResponse(response, respBody);
 
-            send(client_fd, respBody.bufPtr(), respBody.size(), 0);
+            send(client_fd, respBody.data(), respBody.size(), 0);
             close(client_fd);
         }
     }
@@ -333,37 +332,33 @@ bool HttpServer::hasHandlerFor(std::string u)
 
 HttpCode HttpServer::handleRequest(HttpRequest &request, HttpResponse &response)
 {
-    HttpCode code = HttpCode::HTTP_OK;
-
     response.headers["Content-Type"] = this->defaultContentType;
     if (this->hasHandlerFor(request.url)) {
-        code = this->handlers[request.url]->handleRequest(request, response);
-    } else {
-        code = this->handleError(request, response, HttpCode::HTTP_NOT_FOUND);
+        return this->handlers[request.url]->handleRequest(request, response);
     }
 
-    return code;
+    LOG_F(1, "no handlerfor request %s", request.url.c_str());
+    return HttpCode::HTTP_NOT_FOUND;
 }
 
 HttpCode HttpServer::handleError(HttpRequest &request, HttpResponse &response, HttpCode errorCode)
 {
-    std::string ss;
-    ss += "<html><body>";
-    ss += "<h2> Error " + std::to_string(errorCode) + "</h2>";
+    response.buffer = "";
+    response.buffer += "<html><body>";
+    response.buffer += "<h2> Error " + std::to_string(errorCode) + "</h2>";
     switch (errorCode) {
     case HttpCode::HTTP_NOT_FOUND:
-        ss += "<h4>" + request.url + " Not Found" + "</h4>";
+        response.buffer += "<h4>" + request.url + " Not Found" + "</h4>";
         break;
     case HttpCode::HTTP_INTERNAL_ERROR:
-        ss += "<h4> Internal Server Error </h4>";
+        response.buffer += "<h4> Internal Server Error </h4>";
         break;
     case HttpCode::HTTP_NOT_IMPLEMENTED:
-        ss += "<h4> Method Not Implemented </h4>";
+        response.buffer += "<h4> Method Not Implemented </h4>";
         break;
     default:
         break;
     }
-    ss + "</body></html>";
-    response.buffer.writeBytes((unsigned char*) ss.c_str(), ss.size());
+    response.buffer + "</body></html>";
     return errorCode;
 }

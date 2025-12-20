@@ -1,8 +1,6 @@
 #ifndef HTTPSERVER_H
 #define HTTPSERVER_H
 
-#include "common/sdsbytesbuf.h"
-
 #include <pthread.h>
 #include <iostream>
 #include <sstream>
@@ -45,21 +43,22 @@ struct HttpRequest {
     std::string version;
     std::map<std::string, std::string> headers;
     std::map<std::string, std::string> values;
+    std::string data;
 };
 
 struct HttpResponse {
     std::map<std::string, std::string> headers;
-    SdsBytesBuf buffer;
+    std::string buffer;
     HttpCode code;
 
     void writeResponse(std::string str)
     {
-        this->buffer.writeBytes(str.c_str(), str.length());
+        this->buffer += str;
     }
 
-    void writeResponse(const uint8_t *buffer, size_t bufferSize)
+    void writeResponse(const char *buffer, size_t bufferSize)
     {
-        this->buffer.writeBytes(buffer, bufferSize);
+        this->buffer.append(buffer, bufferSize);
     }
 };
 

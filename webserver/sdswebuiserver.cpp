@@ -22,6 +22,8 @@ public:
     virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
         std::ostringstream ss;
+        HttpCode httpErr = HttpCode::HTTP_OK;
+
         ss << "<!DOCTYPE html>";
         ss << "<html lang=\"en\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\">";
         ss << "<head>";
@@ -41,17 +43,17 @@ public:
         ss << "</style></head>";
         ss << "<body class=\"\">";
 
-        populateBody(request, ss);
+        httpErr = populateBody(request, ss);
 
         ss << "</body></html>";
 
         response.writeResponse(ss.str());
-        return HttpCode::HTTP_OK;
+        return httpErr;
 
     }
 
 protected:
-    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) = 0;
+    virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) = 0;
 
     LocalNode *node;
 };
@@ -71,10 +73,10 @@ public:
         if (!fp)
             return HttpCode::HTTP_NOT_FOUND;
 
-        uint8_t buf[1024];
+        char buf[1024];
         size_t nread = 0;
-        while ((nread = fread(buf, sizeof(uint8_t), 1024, fp)) > 0) {
-            response.buffer.writeBytes(buf, nread);
+        while ((nread = fread(buf, sizeof(char), 1024, fp)) > 0) {
+            response.writeResponse(buf, nread);
         }
 
         fclose(fp);
@@ -96,7 +98,7 @@ public:
     IndexHandler(LocalNode *node_, std::string path)
         : WebUiHandler(node_, path) {}
 
-    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
+    virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
         ss << "<nav class=\"navbar navbar-light bg-light\">";
         ss << "<a class=\"navbar-brand\" href=\"/insert_link\">Insert link</a>";
@@ -157,6 +159,8 @@ public:
         ss << "</div>";
         ss << "<input type=\"hidden\" name=\"data_type\" value=\"links\"/>";
         ss << "</form>";
+
+        return HttpCode::HTTP_OK;
     }
 };
 
@@ -167,7 +171,7 @@ public:
     ResultsViewHandler(LocalNode *node_, std::string path)
         : WebUiHandler(node_, path) {}
 
-    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
+    virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
         std::string query = request.values["q"];
         if (request.values["link_filter"] != this->linkFilter) {
@@ -261,6 +265,8 @@ public:
         ss << "</ul>";
         ss << "</div>";
         ss << "</main>";
+
+        return HttpCode::HTTP_OK;
     }
 
 private:
@@ -275,12 +281,13 @@ public:
     InsertEntryHandler(LocalNode *node_, std::string path)
         : WebUiHandler(node_, path) {}
 
-    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
+    virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
         ss << "<main><h2>Insert Link</h2></div>";
         for (auto it = request.values.begin(); it != request.values.end(); it++) LOG_S(2) <<"VALS:: "<< it->first <<":"<< it->second;
         if (!request.values.empty()) {
-            ss << "<div class=\"error-box\"><p>Result insertion error: unknown<p></div>";
+            return HttpCode::HTTP_INTERNAL_ERROR;
+            //ss << "<div class=\"error-box\"><p>Result insertion error: unknown<p></div>";
         }
         ss << "<form class=\"container\" action=\"/insert_link\" method=\"post\">";
         ss << "<p>Link title:</p>";
@@ -296,7 +303,9 @@ public:
         ss << "<option value=\"videos\">Video</option>";
         ss << "</select>";
         ss << "<input type=\"submit\" class=\"btn-gradient thing-align-right\" value=\" Insert \"/></form></main>";
-    };
+
+        return HttpCode::HTTP_OK;
+    }
 };
 
 /* Web UI Server */
