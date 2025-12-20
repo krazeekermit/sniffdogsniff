@@ -78,7 +78,7 @@ static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
     char *lineend = nullptr;
     char *lineend2 = nullptr;
     linestart = strtok_r(line, " ", &lineend);
-    if (strcmp(linestart, "GET") == 0 || strcmp(linestart, "HEAD")) {
+    if (strcmp(linestart, "GET") == 0 || strcmp(linestart, "HEAD") == 0) {
         req.method = strcmp(linestart, "GET") ? HttpMethod::HTTP_GET : HttpMethod::HTTP_HEAD;
         linestart = strtok_r(nullptr, " ", &lineend);
         linestart = strtok_r(linestart, "?", &lineend2);
@@ -89,6 +89,7 @@ static HttpCode parseHttpFirstLine(HttpRequest &req, char *line)
 
     } else if (strcmp(linestart, "POST") == 0) {
         req.method = HttpMethod::HTTP_POST;
+
         req.url = strtok_r(nullptr, " ", &lineend);
     } else {
         return HttpCode::HTTP_NOT_IMPLEMENTED;
@@ -123,14 +124,17 @@ static HttpCode parseHttpReqest(HttpRequest &req, SdsBytesBuf &sbuffer)
 
     req.headers.clear();
     while ((linestart = strtok_r(nullptr, "\n", &lineend)) != nullptr) {
-        if (strlen(linestart)) {
-            keyp = strtok_r(linestart, ":", &valuep);
-            req.headers.emplace(keyp, valuep);
-        }
+        valuep = strchr(linestart, ':');
+        if (!valuep)
+            break;
+
+        *valuep = '\0';
+        req.headers.emplace(linestart, valuep+1);
     }
 
     if (req.method == HttpMethod::HTTP_POST) {
-        if (parseHttpAttrs(req, lineend)) {
+        if (parseHttpAttrs(req, linestart)) {
+
             ret = HttpCode::HTTP_BAD_REQUEST;
             goto parse_end;
         }

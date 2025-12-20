@@ -229,7 +229,7 @@ private:
                 } catch (std::exception &ex) {
                     failed.insert(fit->first);
 
-                    LOG_F(ERROR, ex.what());
+                    LOG_F(ERROR, "error in broadcast results: %s", ex.what());
                 }
             }
         }
@@ -405,9 +405,6 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
     std::map<KadId, std::future<FindResultsReply>> futures;
     for (auto ikn = targetNodes.begin(); ikn != targetNodes.end(); ikn++) {
         KadId id = ikn->getId();
-        if (std::find(failed.begin(), failed.end(), id) != failed.end()) {
-            continue;
-        }
 
         futures[id] = std::move(std::async(std::launch::async, [this, ikn, selfNodeId, selfNodeAddress, query] () {
             SdsP2PClient client(this->configFile, ikn->getAddress());
@@ -432,7 +429,7 @@ int LocalNode::doSearch(std::vector<SearchEntry> &results, const char *query)
                         }
                     }
                 }  catch (std::exception &ex) {
-                    LOG_F(ERROR, ex.what());
+                    LOG_F(ERROR, "%s", ex.what());
                     failed.insert(fit->first);
                 }
             }

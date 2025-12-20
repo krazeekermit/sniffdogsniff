@@ -1,6 +1,7 @@
 #include "sdswebuiserver.h"
 
-#include "dirent.h"
+#include "common/loguru.hpp"
+#include <dirent.h>
 
 #include <vector>
 #include <ostream>
@@ -20,8 +21,6 @@ public:
 
     virtual HttpCode handleRequest(HttpRequest &request, HttpResponse &response) override
     {
-
-
         std::ostringstream ss;
         ss << "<!DOCTYPE html>";
         ss << "<html lang=\"en\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\">";
@@ -31,13 +30,16 @@ public:
         ss << ".container{width:100%;padding-right:15px;padding-left:15px;margin-right:auto;margin-left:auto}";
         ss << ".btn-gradient {background: linear-gradient(45deg, #979797, #858585 70%);color: #fff;padding: 6px 7px;border: none;border-radius: 2px;cursor: pointer;}";
         ss << ".sds-input {padding: 5px 7px;border: none;border-radius: 2px;border-style: solid;border-width: 0.5px;border-color: #858585;cursor: pointer;}";
+        ss << ".sds-input-sub {width: 80%;padding: 5px 7px;border: none;border-radius: 2px;border-style: solid;border-width: 0.5px;border-color: #858585;cursor: pointer;}";
         ss << ".input-group{width:100%;height: 20px;display: inline-block;}";
         ss << ".input-group-append{display: inline-block;}";
         ss << ".sds-groupbox-first{margin-top: 15px;margin-bottom: 5px;padding-right:15px;padding-left:15px;}";
         ss << ".sds-groupbox-spacer{margin-left: 15px;margin-right: 15px;padding: auto;display: inline-block;}";
         ss << ".sds-groupbox-item{display: inline-block;}";
+        ss << ".thing-align-right{float: right;}";
+        ss << ".error-box{width: 100%; border-style: solid; border-width: 1px; border-color: red; color: red;}";
         ss << "</style></head>";
-        ss << "<body class=\"text-center\">";
+        ss << "<body class=\"\">";
 
         populateBody(request, ss);
 
@@ -99,8 +101,8 @@ public:
         ss << "<nav class=\"navbar navbar-light bg-light\">";
         ss << "<a class=\"navbar-brand\" href=\"/insert_link\">Insert link</a>";
         ss << "</nav>";
-        ss << "<div class=\"container\">";
-        ss << "<div class=\"py-5 text-center\">";
+        ss << "<div class=\"container text-center\">";
+        ss << "<div class=\"text-center\">";
         ss << "<img class=\"d-block mx-auto mb-4\" src=\"sds_header.png\" alt=\"\">";
         ss << "</div>";
         ss << "<form action=\"/search\" method=\"get\">";
@@ -266,6 +268,37 @@ private:
     std::string dataType;
 };
 
+class InsertEntryHandler : public WebUiHandler
+{
+
+public:
+    InsertEntryHandler(LocalNode *node_, std::string path)
+        : WebUiHandler(node_, path) {}
+
+    virtual void populateBody(HttpRequest &request, std::ostringstream &ss) override
+    {
+        ss << "<main><h2>Insert Link</h2></div>";
+        for (auto it = request.values.begin(); it != request.values.end(); it++) LOG_S(2) <<"VALS:: "<< it->first <<":"<< it->second;
+        if (!request.values.empty()) {
+            ss << "<div class=\"error-box\"><p>Result insertion error: unknown<p></div>";
+        }
+        ss << "<form class=\"container\" action=\"/insert_link\" method=\"post\">";
+        ss << "<p>Link title:</p>";
+        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_title\" placeholder=\"Title\" aria-label=\"Search\" name=\"link_title\"/>";
+        ss << "<p>Link url</p>";
+        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_url\" placeholder=\"http://example.com\" aria-label=\"Search\" name=\"link_url\"/>";
+        ss << "<p>Link description</p>";
+        ss << "<textarea rows=\"4\" class=\"sds-input-sub\" id=\"text_area_description\" placeholder=\"Something...\" aria-label=\"Search\" name=\"link_description\"></textarea>";
+        ss << "<p></p><label>Link Type (cathegory) </label>";
+        ss << "<select class=\"form-control\" id=\"data_type_combo\" name=\"data_type\">";
+        ss << "<option value=\"links\">Link</option>";
+        ss << "<option value=\"images\">Image</option>";
+        ss << "<option value=\"videos\">Video</option>";
+        ss << "</select>";
+        ss << "<input type=\"submit\" class=\"btn-gradient thing-align-right\" value=\" Insert \"/></form></main>";
+    };
+};
+
 /* Web UI Server */
 
 SdsWebUiServer::SdsWebUiServer(LocalNode *node_, std::string resourcesDir_)
@@ -282,6 +315,7 @@ void SdsWebUiServer::createHandlers()
 {
     this->addHandler("/", new IndexHandler(this->node, this->resourcesDir + "/templates/index.html"));
     this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/results_links.html"));
+    this->addHandler("/insert_link", new InsertEntryHandler(this->node, ""));
 
     this->addHandler("/sds_logo.png", new FileHandler(this->resourcesDir, "image/png"));
     this->addHandler("/sds_header.png", new FileHandler(this->resourcesDir, "image/png"));
