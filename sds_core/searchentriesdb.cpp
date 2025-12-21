@@ -63,9 +63,18 @@ void SearchEntriesDB::insertResult(SearchEntry &se)
     if (!this->dbp)
         return;
 
+    if (!se.hasValidSize()) {
+        throw std::runtime_error(
+            "search entry exceeds size limit of " + std::to_string(MAX_SEARCH_ENTRY_SIZE) + " bytes"
+            );
+    }
+
     this->timestamps[se.getHash()] = time(nullptr);    
 
     DBT key, data;
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+
     key.data = se.getHash().hash;
     key.size = SHA256_DIGEST_LENGTH;
 
@@ -74,7 +83,10 @@ void SearchEntriesDB::insertResult(SearchEntry &se)
 
     data.data = buf.bufPtr();
     data.size = buf.size();
-    this->dbp->put(this->dbp, nullptr, &key, &data, 0);
+    int dberr = this->dbp->put(this->dbp, nullptr, &key, &data, 0);
+    if (dberr) {
+        throw std::runtime_error("insert result fail database error: " + std::string(db_strerror(dberr)));
+    }
 
     this->modified();
 }
@@ -176,6 +188,8 @@ void SearchEntriesDB::modified()
 {
     DBT key;
     memset(&key, 0, sizeof(key));
+    key.size = SHA256_DIGEST_LENGTH;
+
     time_t now = time(nullptr);
 
     for (auto it = this->timestamps.begin(); it != this->timestamps.end();) {

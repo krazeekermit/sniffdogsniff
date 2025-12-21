@@ -11,9 +11,6 @@
 
 #include <climits>
 
-#define FNV128_BIT_SIZE 128
-#define FNV128_SIZE (FNV128_BIT_SIZE/8)
-
 /* 128 bit FNV_prime = 2^88 + 2^8 + 0x3b */
 /* 0x00000000 01000000 00000000 0000013B */
 #define FNV128primeX 0x013B

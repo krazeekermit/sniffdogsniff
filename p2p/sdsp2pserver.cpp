@@ -47,7 +47,12 @@ int SdsP2PServer::storeResult(SdsBytesBuf &args, SdsBytesBuf &reply)
     StoreResultArgs storeArgs;
     storeArgs.read(args);
 
-    this->localNode->storeResult(storeArgs.se);
+    try {
+        this->localNode->storeResult(storeArgs.se);
+    } catch (std::exception &ex) {
+        LOG_F(ERROR, "store result error: %s", ex.what());
+        return ERR_TYPE_ARGUMENT;
+    }
 
     return ERR_NULL;
 }

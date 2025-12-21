@@ -7,6 +7,10 @@
 #include <iostream>
 #include <vector>
 
+#define FNV128_BIT_SIZE 128
+#define FNV128_SIZE (FNV128_BIT_SIZE/8)
+#define SIMHASH_DIGEST_LENGTH FNV128_BIT_SIZE
+
 class SimHash {
 public:
     SimHash() = default;

@@ -62,6 +62,21 @@ void SearchEntry::reHash()
     SHA256((unsigned char*) this->title.data(), this->title.length(), this->hash.hash);
 }
 
+bool SearchEntry::hasValidSize()
+{
+    size_t size = SHA256_DIGEST_LENGTH;
+    size += this->title.length();
+    size += this->url.length();
+    size++;
+    size += SIMHASH_DIGEST_LENGTH;
+
+    for (auto pit = this->properties.begin(); pit != this->properties.end(); pit++) {
+        size += 1 + pit->second.length();
+    }
+
+    return size <= MAX_SEARCH_ENTRY_SIZE;
+}
+
 void SearchEntry::read(SdsBytesBuf &buf)
 {
     this->simHash.read(buf);

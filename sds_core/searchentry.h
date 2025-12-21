@@ -11,8 +11,11 @@
 #include <array>
 #include <openssl/sha.h>
 
-#define MAX_SEARCH_ENTRY_SZ 1104
-#define METRICS_LEN       4
+#define MAX_SEARCH_ENTRY_SIZE 20136
+
+#define PROPERTY_DESCRIPTION 0
+#define PROPERTY_TAGS 1
+#define PROPERTY_ORIGIN 2
 
 class SearchEntry {
 
@@ -43,6 +46,7 @@ public:
     void removeProperty(uint8_t idx);
 
     void reHash();
+    bool hasValidSize();
     void read(SdsBytesBuf &buf);
     void write(SdsBytesBuf &buf);
 

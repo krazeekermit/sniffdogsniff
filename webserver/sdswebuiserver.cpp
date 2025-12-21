@@ -12,7 +12,7 @@
 class WebUiHandler : public HttpRequestHandler
 {
 public:
-    WebUiHandler(LocalNode *node_, std::string &path)
+    WebUiHandler(LocalNode *node_)
         : node(node_)
     {}
 
@@ -27,6 +27,24 @@ public:
         ss << "<!DOCTYPE html>";
         ss << "<html lang=\"en\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\" xmlns=\"http://www.w3.org/1999/html\">";
         ss << "<head>";
+
+        populateHead(ss);
+
+        ss << "</head>";
+        ss << "<body class=\"\">";
+
+        httpErr = populateBody(request, ss);
+
+        ss << "</body></html>";
+
+        response.writeResponse(ss.str());
+        return httpErr;
+
+    }
+
+protected:
+    virtual void populateHead(std::ostringstream &ss)
+    {
         ss << "<meta charset=\"UTF-8\"><title>SniffDigSniff - Search</title><style>";
         ss << ".text-center{text-align:center}";
         ss << ".container{width:100%;padding-right:15px;padding-left:15px;margin-right:auto;margin-left:auto}";
@@ -40,19 +58,10 @@ public:
         ss << ".sds-groupbox-item{display: inline-block;}";
         ss << ".thing-align-right{float: right;}";
         ss << ".error-box{width: 100%; border-style: solid; border-width: 1px; border-color: red; color: red;}";
-        ss << "</style></head>";
-        ss << "<body class=\"\">";
-
-        httpErr = populateBody(request, ss);
-
-        ss << "</body></html>";
-
-        response.writeResponse(ss.str());
-        return httpErr;
-
+        ss << ".success-box{width: 100%; border-style: solid; border-width: 1px; border-color: green; color: green;}";
+        ss << "</style>";
     }
 
-protected:
     virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) = 0;
 
     LocalNode *node;
@@ -95,8 +104,8 @@ class IndexHandler : public WebUiHandler
 {
 
 public:
-    IndexHandler(LocalNode *node_, std::string path)
-        : WebUiHandler(node_, path) {}
+    IndexHandler(LocalNode *node_)
+        : WebUiHandler(node_) {}
 
     virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
@@ -168,8 +177,8 @@ class ResultsViewHandler : public WebUiHandler
 {
 
 public:
-    ResultsViewHandler(LocalNode *node_, std::string path)
-        : WebUiHandler(node_, path) {}
+    ResultsViewHandler(LocalNode *node_)
+        : WebUiHandler(node_) {}
 
     virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
@@ -257,7 +266,7 @@ public:
             ss << "<br/>";
             ss << "<img src=\"\" width=\"16\" height=\"16\">";
             ss << "<a href=\"" << rit->getUrl() << "\">" << rit->getTitle() << "</a>";
-            ss << "<p class=\"mb-1\">" /* << rit->getProperty(DESCRIPTION) */<< "</p>";
+            ss << "<p class=\"mb-1\">" << rit->getProperty(PROPERTY_DESCRIPTION) << "</p>";
             ss << "</div>";
             ss << "</li>";
         }
@@ -278,33 +287,77 @@ class InsertEntryHandler : public WebUiHandler
 {
 
 public:
-    InsertEntryHandler(LocalNode *node_, std::string path)
-        : WebUiHandler(node_, path) {}
+    InsertEntryHandler(LocalNode *node_)
+        : WebUiHandler(node_) {}
 
     virtual HttpCode populateBody(HttpRequest &request, std::ostringstream &ss) override
     {
         ss << "<main><h2>Insert Link</h2></div>";
-        for (auto it = request.values.begin(); it != request.values.end(); it++) LOG_S(2) <<"VALS:: "<< it->first <<":"<< it->second;
+
         if (!request.values.empty()) {
-            return HttpCode::HTTP_INTERNAL_ERROR;
-            //ss << "<div class=\"error-box\"><p>Result insertion error: unknown<p></div>";
+            this->insertSearchEntry(request, ss);
         }
+
         ss << "<form class=\"container\" action=\"/insert_link\" method=\"post\">";
         ss << "<p>Link title:</p>";
         ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_title\" placeholder=\"Title\" aria-label=\"Search\" name=\"link_title\"/>";
         ss << "<p>Link url</p>";
-        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_url\" placeholder=\"http://example.com\" aria-label=\"Search\" name=\"link_url\"/>";
+        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_url\" placeholder=\"http://example.com\"name=\"link_url\"/>";
         ss << "<p>Link description</p>";
-        ss << "<textarea rows=\"4\" class=\"sds-input-sub\" id=\"text_area_description\" placeholder=\"Something...\" aria-label=\"Search\" name=\"link_description\"></textarea>";
-        ss << "<p></p><label>Link Type (cathegory) </label>";
-        ss << "<select class=\"form-control\" id=\"data_type_combo\" name=\"data_type\">";
-        ss << "<option value=\"links\">Link</option>";
-        ss << "<option value=\"images\">Image</option>";
-        ss << "<option value=\"videos\">Video</option>";
+        ss << "<textarea rows=\"4\" class=\"sds-input-sub\" id=\"text_area_description\" placeholder=\"Something...\" name=\"property_description\"></textarea>";
+        ss << "<p>Tags</p>";
+        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_tags\" placeholder=\"Tag1,Tag2,Tag3...\" name=\"property_tags\"/>";
+        ss << "<p>Link Cathegory </p>";
+        ss << "<select class=\"sds-input-sub\" id=\"data_type_combo\" name=\"data_type\">";
+        ss << "<option value=\"link\">Link</option>";
+        ss << "<option value=\"image\">Image</option>";
+        ss << "<option value=\"video\">Video</option>";
         ss << "</select>";
-        ss << "<input type=\"submit\" class=\"btn-gradient thing-align-right\" value=\" Insert \"/></form></main>";
+        ss << "<div id=\"property_origin_div\">";
+        ss << "<p>Origin</p>";
+        ss << "<input type=\"text\" class=\"sds-input-sub\" id=\"text_input_tags\" placeholder=\"http://example.com/img.png\" name=\"property_origin\"/>";
+        ss << "</div>";
+        ss << "<input type=\"submit\" class=\"btn-gradient thing-align-right\" value=\" Insert \"/>";
+        ss << "</form></main>";
 
         return HttpCode::HTTP_OK;
+    }
+
+    void insertSearchEntry(HttpRequest &request, std::ostringstream &ss)
+    {
+        if (request.values["link_title"].empty()) {
+            ss << "<div class=\"error-box\"><p>Result insertion error: title is empty<p></div>";
+            return;
+        }
+        if (request.values["link_url"].empty()) {
+            ss << "<div class=\"error-box\"><p>Result insertion error: url is empty<p></div>";
+            return;
+        }
+
+        SearchEntry::Type type = SearchEntry::Type::SITE;
+        if (request.values["data_type"] == "image")
+            type = SearchEntry::Type::IMAGE;
+        else if (request.values["data_type"] == "video")
+            type = SearchEntry::Type::VIDEO;
+
+        SearchEntry se(request.values["link_title"], request.values["link_url"]);
+
+        if (!request.values["property_description"].empty()) {
+            se.addProperty(PROPERTY_DESCRIPTION, request.values["property_description"]);
+        }
+        if (!request.values["property_tags"].empty()) {
+            se.addProperty(PROPERTY_TAGS, request.values["property_tags"]);
+        }
+        if (!request.values["property_origin"].empty()) {
+            se.addProperty(PROPERTY_ORIGIN, request.values["property_origin"]);
+        }
+
+        try {
+            this->node->storeResult(se);
+            ss << "<div class=\"success-box\"><p>Result added: " << se << "<p></div>";
+        } catch (std::exception &ex) {
+            ss << "<div class=\"error-box\"><p>Result insertion error: " << ex.what() << "<p></div>";
+        }
     }
 };
 
@@ -322,9 +375,9 @@ SdsWebUiServer::~SdsWebUiServer()
 
 void SdsWebUiServer::createHandlers()
 {
-    this->addHandler("/", new IndexHandler(this->node, this->resourcesDir + "/templates/index.html"));
-    this->addHandler("/search", new ResultsViewHandler(this->node, this->resourcesDir + "/templates/results_links.html"));
-    this->addHandler("/insert_link", new InsertEntryHandler(this->node, ""));
+    this->addHandler("/", new IndexHandler(this->node));
+    this->addHandler("/search", new ResultsViewHandler(this->node));
+    this->addHandler("/insert_link", new InsertEntryHandler(this->node));
 
     this->addHandler("/sds_logo.png", new FileHandler(this->resourcesDir, "image/png"));
     this->addHandler("/sds_header.png", new FileHandler(this->resourcesDir, "image/png"));
