@@ -51,7 +51,7 @@ static std::string httpUnescape(const std::string ss)
 static int parseHttpAttrs(HttpRequest &req, std::string &attrsString)
 {
     req.headers.clear();
-    std::vector<std::string> toks = split(attrsString, "&");
+    std::vector<std::string> toks = StringUtil::split(attrsString, "&");
     for (auto it = toks.begin(); it != toks.end(); it++) {
         ssize_t delimPos = it->find("=");
         if (delimPos == std::string::npos) {
@@ -67,7 +67,7 @@ static int parseHttpAttrs(HttpRequest &req, std::string &attrsString)
 static int parseHttpHeaders(HttpRequest &req, std::string &headersString)
 {
     req.values.clear();
-    std::vector<std::string> toks = split(headersString, "\r\n");
+    std::vector<std::string> toks = StringUtil::split(headersString, "\r\n");
     for (auto it = toks.begin(); it != toks.end(); it++) {
         ssize_t delimPos = it->find(":");
         if (delimPos == std::string::npos) {
@@ -83,7 +83,7 @@ static int parseHttpHeaders(HttpRequest &req, std::string &headersString)
 static HttpCode parseHttpFirstLine(HttpRequest &req, std::string &line)
 {
     LOG_F(1, "new http request: %s", line.c_str());
-    std::vector<std::string> toks = split(line, " ");
+    std::vector<std::string> toks = StringUtil::split(line, " ");
     if (toks.size() > 2) {
         req.url = toks[1];
         if (toks[0] == "GET" || toks[0] == "HEAD") {

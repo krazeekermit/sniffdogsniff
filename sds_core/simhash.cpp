@@ -78,7 +78,7 @@ struct wordhash {
 
 SimHash::SimHash(std::string str)
 {
-    std::vector<std::string> tokens = tokenize(str, " \n\r", ".:,;()[]{}#@");
+    std::vector<std::string> tokens = StringUtil::tokenize(str, " \n\r", ".:,;()[]{}#@");
     this->init(tokens);
 }
 

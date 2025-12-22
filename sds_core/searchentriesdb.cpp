@@ -38,7 +38,7 @@ void SearchEntriesDB::open(const char *db_path)
     DBT key, data;
     DBC *dbcp;
     if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
-        LOG_F(ERROR, db_strerror(ret));
+        LOG_F(ERROR, "%s", db_strerror(ret));
         return;
     }
 
@@ -54,7 +54,7 @@ void SearchEntriesDB::open(const char *db_path)
     }
 
     if ((ret = dbcp->close(dbcp)) != 0) {
-        LOG_F(ERROR, db_strerror(ret));
+        LOG_F(ERROR, "%s", db_strerror(ret));
     }
 }
 
@@ -115,14 +115,14 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
     DBT key, data;
     DBC *dbcp;
     if ((ret = this->dbp->cursor(this->dbp, nullptr, &dbcp, 0)) != 0) {
-        LOG_F(ERROR, db_strerror(ret));
+        LOG_F(ERROR, "%s", db_strerror(ret));
         return;
     }
 
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
 
-    std::vector<std::string> queryTokens = tokenize(query, " \n\r", ".:,;()[]{}#@");
+    std::vector<std::string> queryTokens = StringUtil::tokenize(query, " \n\r", ".:,;()[]{}#@");
     SimHash queryHash(queryTokens);
 
     while ((ret = dbcp->get(dbcp, &key, &data, DB_NEXT)) == 0) {
@@ -140,7 +140,7 @@ void SearchEntriesDB::doSearch(std::vector<SearchEntry> &entries, std::string qu
     }
 
     if ((ret = dbcp->close(dbcp)) != 0) {
-        LOG_F(ERROR, db_strerror(ret));
+        LOG_F(ERROR, "%s", db_strerror(ret));
     }
 }
 

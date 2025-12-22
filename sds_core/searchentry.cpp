@@ -109,7 +109,7 @@ void SearchEntry::write(SdsBytesBuf &buf)
 bool SearchEntry::matchesQuery(std::vector<std::string> tokens)
 {
     int nmatches = 0;
-    std::string lowerTitle = toLower(this->title);
+    std::string lowerTitle = StringUtil::toLower(this->title);
     for (auto it = tokens.begin(); it != tokens.end(); it++) {
         if (lowerTitle.find(*it) != std::string::npos) {
             nmatches++;
@@ -123,7 +123,7 @@ bool SearchEntry::matchesQuery(std::vector<std::string> tokens)
     }
 
     for (auto pit = this->properties.begin(); pit != this->properties.end(); pit++) {
-        std::string pLower = toLower(pit->second);
+        std::string pLower = StringUtil::toLower(pit->second);
         for (auto it = tokens.begin(); it != tokens.end(); it++) {
             if (pLower.find(*it) != std::string::npos) {
                 nmatches++;
@@ -131,7 +131,7 @@ bool SearchEntry::matchesQuery(std::vector<std::string> tokens)
         }
     }
 
-    if (tokens.size() > 1 && split(this->title, " ").size() > 1)
+    if (tokens.size() > 1 && StringUtil::split(this->title, " ").size() > 1)
         return nmatches >= 2;
 
     return nmatches;

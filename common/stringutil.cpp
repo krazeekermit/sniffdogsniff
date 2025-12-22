@@ -5,7 +5,7 @@
 
 #include "stringutil.h"
 
-std::vector<std::string> split(const std::string &str, const char *delim)
+std::vector<std::string> StringUtil::split(const std::string &str, const char *delim)
 {
     std::vector<std::string> splitstring;
 
@@ -21,7 +21,7 @@ std::vector<std::string> split(const std::string &str, const char *delim)
     return splitstring;
 }
 
-std::string trim(const std::string &target, const char *cutset)
+std::string StringUtil::trim(const std::string &target, const char *cutset)
 {
     if (strlen(cutset) == 0) {
         return target;
@@ -51,38 +51,14 @@ std::string trim(const std::string &target, const char *cutset)
     return target.substr(startpos, endpos - startpos + 1);
 }
 
-std::string replace(std::string targetString, std::string oldValue, std::string newValue)
-{
-    size_t pos = targetString.find( oldValue );
-    if( pos == std::string::npos ) {
-        return targetString;
-    }
-    return targetString.replace(pos, oldValue.length(), newValue);
-}
-
-std::string replaceGlobal(std::string targetString, std::string oldValue, std::string newValue)
-{
-    int pos = 0;
-    std::string resultString = "";
-    size_t targetPos = targetString.find( oldValue, pos );
-    while (targetPos != std::string::npos ) {
-        std::string preOld = targetString.substr( pos, targetPos - pos );
-        resultString += preOld + newValue;
-        pos = targetPos + oldValue.length();
-        targetPos = targetString.find( oldValue, pos );
-    }
-    resultString += targetString.substr(pos);
-    return resultString;
-}
-
-std::string toLower(std::string in) {
+std::string StringUtil::toLower(std::string in) {
     for (size_t i = 0; i < in.length(); i++) {
         in[i] = tolower(in[i]);
     }
     return in;
 }
 
-std::vector<std::string> tokenize(const std::string &str, const char *delimsset, const char *cutset)
+std::vector<std::string> StringUtil::tokenize(const std::string &str, const char *delimsset, const char *cutset)
 {
     std::vector<std::string> tokens;
     std::string lowerStr = toLower(str);
